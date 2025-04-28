@@ -1,0 +1,9 @@
+{
+    "software_redirect_uris": [
+      "https://localhost.emobix.co.uk:8443/test/a/mockbank/callback"
+    ],
+    "software_api_webhook_uris": [
+      "https://localhost.emobix.co.uk:8443/test-mtls/a/mockbank"
+    ],
+    "software_jwks_uri": "https://directory/application.jwks"
+}

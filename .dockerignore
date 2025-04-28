@@ -1,0 +1,55 @@
+# Ignore the Go modules and package cache
+/pkg
+/bin
+/tmp
+
+# Ignore Go test files and coverage results
+*.test
+*.out
+
+# Ignore configuration files that should not be part of the Docker image
+.env
+*.env
+*.local
+
+# Ignore build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Ignore log and temporary files
+*.log
+*.tmp
+
+# Ignore Git repository files
+.git
+.gitignore
+
+# Ignore the Dockerfile itself if not needed inside the container
+Dockerfile
+
+# Ignore editor and IDE-specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore any other vendor folder, if not using Go modules
+/vendor
+
+# Ignore Benchmark result files if they are created as artifacts
+/benchmark-results/
+
+# Ignore Go workspace configuration
+go.work
+go.work.sum
+
+# Others
+logs/
+conformance-suite
+*.zip
+*.bkp
+.vscode
+.DS_store
+cs_config.json

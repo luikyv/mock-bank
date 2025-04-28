@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mockbank</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+        .login-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-container h1 {
+            margin-bottom: 20px;
+            font-size: 24px;
+            text-align: center;
+        }
+        .login-container label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .login-container input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .login-container ul {
+            margin-bottom: 15px;
+            padding-left: 20px;
+        }
+        .login-container ul li {
+            margin-bottom: 10px;
+        }
+        .login-container button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .login-container button:hover {
+            background-color: #0056b3;
+        }
+        .login-container .cancel-button {
+            background-color: #ccc;
+            color: #000;
+        }
+        .login-container .cancel-button:hover {
+            background-color: #999;
+        }
+        .error-message {
+            color: red;
+            margin-bottom: 15px;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.5s, transform 0.5s;
+        }
+        .error-message.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+    <script>
+        var error = "{{ .Error }}";
+
+        function showError() {
+            if (error) {
+                var errorMessageElement = document.getElementById("error-message");
+                errorMessageElement.textContent = error;
+                errorMessageElement.classList.add("show");
+            }
+        }
+
+        window.onload = showError;
+    </script>
+</head>
+<body>
+    <div class="login-container">
+        <h1>MockBank</h1>
+        <div id="error-message" class="error-message"></div>
+        <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
+            <input type="hidden" id="loginTrue" name="login" value="true">
+            <label for="username">User:</label>
+            <input type="text" id="username" name="username" required>
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+            <button type="submit">Login</button>
+        </form>
+        <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
+            <input type="hidden" id="loginFalse" name="login" value="false">
+            <button type="submit" class="cancel-button">Deny</button>
+        </form>
+    </div>
+</body>
+</html>

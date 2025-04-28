@@ -1,0 +1,110 @@
+package consent
+
+import (
+	"slices"
+	"strings"
+
+	"github.com/google/uuid"
+	"github.com/luiky/mock-bank/internal/timex"
+)
+
+func ID(scopes string) (string, bool) {
+	for _, s := range strings.Split(scopes, " ") {
+		if ScopeID.Matches(s) {
+			return strings.Replace(s, "consent:", "", 1), true
+		}
+	}
+	return "", false
+}
+
+func validatePermissions(requestedPermissions []Permission) error {
+
+permissionsLoop:
+	// Make sure if a permission is requested, at least one group of permissions
+	// containing it is requested as well.
+	for _, requestedPermission := range requestedPermissions {
+		for _, group := range PermissionGroups {
+
+			if slices.Contains(group, requestedPermission) && containsAll(requestedPermissions, group...) {
+				continue permissionsLoop
+			}
+
+		}
+
+		// Return an error if there is no group that contains requestedPermission
+		// and is fully present in requestedPermissions.
+		return errInvalidPermissionGroup
+	}
+
+	return validatePersonalAndBusinessPermissions(requestedPermissions)
+}
+
+func validatePersonalAndBusinessPermissions(requestedPermissions []Permission) error {
+	isPersonal := containsAny(requestedPermissions,
+		PermissionCustomersPersonalIdentificationsRead,
+		PermissionCustomersPersonalAdittionalInfoRead,
+	)
+	isBusiness := containsAny(requestedPermissions,
+		PermissionCustomersBusinessIdentificationsRead,
+		PermissionCustomersBusinessAdittionalInfoRead,
+	)
+
+	if isPersonal && isBusiness {
+		return errPersonalAndBusinessPermissionsTogether
+	}
+
+	return nil
+}
+
+func validateExtension(c Consent, ext Extension) error {
+	if !c.IsAuthorized() {
+		return errCannotExtendConsentNotAuthorized
+	}
+
+	if c.UserCPF != ext.UserCPF {
+		return errExtensionNotAllowed
+	}
+
+	if c.BusinessCNPJ != "" && c.BusinessCNPJ != ext.BusinessCNPJ {
+		return errExtensionNotAllowed
+	}
+
+	if ext.ExpiresAt == nil {
+		return nil
+	}
+
+	now := timex.Now()
+	if ext.ExpiresAt.Before(now) || ext.ExpiresAt.After(now.AddDate(1, 0, 0)) {
+		return errInvalidExpiration
+	}
+
+	if c.ExpiresAt != nil && !ext.ExpiresAt.After(*c.ExpiresAt) {
+		return errInvalidExpiration
+	}
+
+	return nil
+}
+
+func containsAll[T comparable](superSet []T, subSet ...T) bool {
+	for _, t := range subSet {
+		if !slices.Contains(superSet, t) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func containsAny[T comparable](slice1 []T, slice2 ...T) bool {
+	for _, t := range slice2 {
+		if slices.Contains(slice1, t) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func consentID() string {
+	return idPrefix + uuid.NewString()
+}

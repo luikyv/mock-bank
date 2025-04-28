@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consent - MockBank</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f0f0f0;
+      font-family: Arial, sans-serif;
+      margin: 0;
+    }
+    .consent-container {
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 500px;
+    }
+    .consent-container h1, .consent-container h2 {
+      text-align: center;
+    }
+    .section-title {
+      font-weight: bold;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+    ul {
+      list-style: none;
+      padding-left: 0;
+      margin-bottom: 20px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    li {
+      margin-bottom: 10px;
+    }
+    label.checkbox {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+    }
+    label.checkbox input {
+      margin-right: 10px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .consent-button {
+      background-color: #007bff;
+      color: #fff;
+    }
+    .consent-button:hover {
+      background-color: #0056b3;
+    }
+    .cancel-button {
+      background-color: #ccc;
+      color: #000;
+    }
+    .cancel-button:hover {
+      background-color: #999;
+    }
+    .consent-description {
+      font-size: 14px;
+      color: #666;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="consent-container">
+    <h1>MockBank</h1>
+    <h2>Data Sharing Consent</h2>
+
+    <p class="consent-description">
+      You are about to share your information with a trusted third party.
+      Please review the requested permissions below and select the resources you wish to share.
+    </p>
+
+    {{ if .BusinessCNPJ }}
+    <p><strong>Company (CNPJ):</strong> {{ .BusinessCNPJ }}</p>
+    {{ end }}
+
+    <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
+
+      {{ if .Accounts }}
+      <div class="section-title">Accounts</div>
+      <ul>
+        {{ range .Accounts }}
+        <li>
+          <label class="checkbox">
+            <input type="checkbox" name="accounts" value="{{ .ID }}" checked>
+            Branch: 0001, Number: {{ .Number }}
+          </label>
+        </li>
+        {{ end }}
+      </ul>
+      {{ end }}
+
+      <input type="hidden" name="consent" value="true">
+      <button type="submit" class="consent-button">Consent and Continue</button>
+    </form>
+
+    <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
+      <input type="hidden" name="consent" value="false">
+      <button type="submit" class="cancel-button">Deny</button>
+    </form>
+  </div>
+</body>
+</html>
