@@ -11,6 +11,7 @@ import (
 
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/auth"
 	"github.com/luiky/mock-bank/internal/consent"
 	"github.com/luiky/mock-bank/internal/user"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,9 +25,11 @@ const (
 
 var (
 	host         = getEnv("MOCKBANK_HOST", "https://mockbank.local")
+	appHost      = strings.Replace(host, "https://", "https://app.", 1)
+	apiHost      = strings.Replace(host, "https://", "https://api.", 1)
+	apiMTLSHost  = strings.Replace(host, "https://", "https://matls-api.", 1)
 	authHost     = strings.Replace(host, "https://", "https://auth.", 1)
 	authMTLSHost = strings.Replace(host, "https://", "https://matls-auth.", 1)
-	apiHost      = strings.Replace(host, "https://", "https://matls-api.", 1)
 	port         = getEnv("MOCKBANK_PORT", "80")
 	dbSchema     = getEnv("MOCKBANK_DB_SCHEMA", "mockbank")
 	dbStringCon  = getEnv("MOCKBANK_DB_CONNECTION", "mongodb://localhost:27017/mockbank")
@@ -43,11 +46,13 @@ func main() {
 	}
 
 	// Storage.
+	authStorage := auth.NewStorage(db)
 	userStorage := user.NewStorage(db)
 	consentStorage := consent.NewStorage(db)
 	accountStorage := account.NewStorage(db)
 
 	// Services.
+	authService := auth.NewService(authStorage)
 	userService := user.NewService(userStorage)
 	consentService := consent.NewService(consentStorage, userService)
 	accountService := account.NewService(accountStorage, consentService)
@@ -61,11 +66,13 @@ func main() {
 	// Servers.
 	mux := http.NewServeMux()
 
-	consent.NewAppServer(host, consentService).Register(mux)
+	auth.NewAppServer(appHost, authService).Register(mux)
+	user.NewAppServer(apiHost, userService, authService).Register(mux)
+	consent.NewAppServer(apiHost, consentService, authService).Register(mux)
 
 	op.RegisterRoutes(mux)
-	consent.NewServerV3(apiHost, consentService, op).Register(mux)
-	account.NewServerV2(apiHost, accountService, consentService, op).Register(mux)
+	consent.NewServerV3(apiMTLSHost, consentService, op).Register(mux)
+	account.NewServerV2(apiMTLSHost, accountService, consentService, op).Register(mux)
 
 	loadMocks(userService, accountService)
 

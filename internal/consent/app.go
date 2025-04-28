@@ -5,19 +5,22 @@ import (
 
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/api/middleware"
+	"github.com/luiky/mock-bank/internal/auth"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timex"
 )
 
 type AppServer struct {
-	host    string
-	service Service
+	host        string
+	service     Service
+	authService auth.Service
 }
 
-func NewAppServer(host string, service Service) AppServer {
+func NewAppServer(host string, service Service, authService auth.Service) AppServer {
 	return AppServer{
-		host:    host,
-		service: service,
+		host:        host,
+		service:     service,
+		authService: authService,
 	}
 }
 
@@ -25,7 +28,7 @@ func (s AppServer) Register(mux *http.ServeMux) {
 	consentMux := http.NewServeMux()
 
 	handler := s.consentsHandler()
-	handler = middleware.AppAuth(handler)
+	handler = auth.Middleware(handler, s.authService)
 	consentMux.Handle("GET /app/consents", handler)
 
 	handler = consentMux
