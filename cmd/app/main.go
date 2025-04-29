@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"log"
 	"log/slog"
 	"net/http"
@@ -24,15 +25,16 @@ const (
 )
 
 var (
-	host         = getEnv("MOCKBANK_HOST", "https://mockbank.local")
-	appHost      = strings.Replace(host, "https://", "https://app.", 1)
-	apiHost      = strings.Replace(host, "https://", "https://api.", 1)
-	apiMTLSHost  = strings.Replace(host, "https://", "https://matls-api.", 1)
-	authHost     = strings.Replace(host, "https://", "https://auth.", 1)
-	authMTLSHost = strings.Replace(host, "https://", "https://matls-auth.", 1)
-	port         = getEnv("MOCKBANK_PORT", "80")
-	dbSchema     = getEnv("MOCKBANK_DB_SCHEMA", "mockbank")
-	dbStringCon  = getEnv("MOCKBANK_DB_CONNECTION", "mongodb://localhost:27017/mockbank")
+	host            = getEnv("MOCKBANK_HOST", "https://mockbank.local")
+	appHost         = strings.Replace(host, "https://", "https://app.", 1)
+	apiHost         = strings.Replace(host, "https://", "https://api.", 1)
+	apiMTLSHost     = strings.Replace(host, "https://", "https://matls-api.", 1)
+	authHost        = strings.Replace(host, "https://", "https://auth.", 1)
+	authMTLSHost    = strings.Replace(host, "https://", "https://matls-auth.", 1)
+	directoryIssuer = getEnv("DIRECTORY_ISSUER", "https://directory")
+	port            = getEnv("MOCKBANK_PORT", "80")
+	dbSchema        = getEnv("MOCKBANK_DB_SCHEMA", "mockbank")
+	dbStringCon     = getEnv("MOCKBANK_DB_CONNECTION", "mongodb://localhost:27017/mockbank")
 )
 
 func main() {
@@ -52,7 +54,8 @@ func main() {
 	accountStorage := account.NewStorage(db)
 
 	// Services.
-	authService := auth.NewService(authStorage)
+	directoryService := auth.NewDirectoryService(directoryIssuer, httpClient())
+	authService := auth.NewService(authStorage, directoryService)
 	userService := user.NewService(userStorage)
 	consentService := consent.NewService(consentStorage, userService)
 	accountService := account.NewService(accountStorage, consentService)
@@ -66,7 +69,7 @@ func main() {
 	// Servers.
 	mux := http.NewServeMux()
 
-	auth.NewAppServer(appHost, authService).Register(mux)
+	auth.NewAppServer(appHost, authService, directoryService).Register(mux)
 	user.NewAppServer(apiHost, userService, authService).Register(mux)
 	consent.NewAppServer(apiHost, consentService, authService).Register(mux)
 
@@ -162,4 +165,14 @@ func (h *logCtxHandler) Handle(ctx context.Context, r slog.Record) error {
 		r.AddAttrs(slog.String("interaction_id", interactionID))
 	}
 	return h.Handler.Handle(ctx, r)
+}
+
+func httpClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
 }

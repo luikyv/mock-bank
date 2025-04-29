@@ -16,15 +16,17 @@ services:
     profiles:
       - dev
       - main
-    image: nginx:latest
+    build:
+      context: ./cmd/mockgw
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./keys/server.crt:/etc/nginx/ssl/server.crt
-      - ./keys/server.key:/etc/nginx/ssl/server.key
-      - ./keys/client_ca.crt:/etc/nginx/ssl/client_ca.crt
-      - ./logs/:/var/log/nginx/
-      - ./participants.json:/etc/nginx/mocks/participants.json
-      - ./keys/client_one_pub.jwks:/etc/nginx/mocks/client_one_pub.jwks
+      - ./keys/server.crt:/mocks/server.crt
+      - ./keys/server.key:/mocks/server.key
+      - ./keys/client_one_pub.jwks:/mocks/client.jwks
+      - ./keys/client_ca.crt:/mocks/client_ca.crt
+      - ./mocks/participants.json:/mocks/participants.json
+      - ./mocks/directory.jwks:/mocks/directory.jwks
+      - ./mocks/id_token.json:/mocks/id_token.json
+      - ./mocks/software_statement.json:/mocks/software_statement.json
     ports:
       - 443:443
     networks:
@@ -35,6 +37,7 @@ services:
           - matls-auth.mockbank.local
           - matls-api.mockbank.local
           - directory
+          - keystore
 
   cs-httpd:
     profiles:

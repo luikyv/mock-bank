@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"io"
 	"log"
@@ -168,16 +167,7 @@ func privateJWKS(filePath string) goidc.JSONWebKeySet {
 }
 
 func httpClientFunc() goidc.HTTPClientFunc {
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				Renegotiation:      tls.RenegotiateOnceAsClient,
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-
 	return func(ctx context.Context) *http.Client {
-		return client
+		return httpClient()
 	}
 }

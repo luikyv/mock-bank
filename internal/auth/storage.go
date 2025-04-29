@@ -14,7 +14,7 @@ type Storage struct {
 
 func NewStorage(db *mongo.Database) Storage {
 	return Storage{
-		coll: db.Collection("sessions"),
+		coll: db.Collection("user_sessions"),
 	}
 }
 

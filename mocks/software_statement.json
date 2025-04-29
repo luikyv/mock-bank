@@ -5,5 +5,5 @@
     "software_api_webhook_uris": [
       "https://localhost.emobix.co.uk:8443/test-mtls/a/mockbank"
     ],
-    "software_jwks_uri": "https://directory/application.jwks"
+    "software_jwks_uri": "https://keystore/application.jwks"
 }

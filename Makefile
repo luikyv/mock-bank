@@ -3,7 +3,7 @@
 setup:
 	@make keys
 
-# Sets up the development environment by downloading dependencies installing
+# Set up the development environment by downloading dependencies installing
 # pre-commit hooks, generating keys, and setting up the Open Finance
 # Conformance Suite.
 setup-dev:
@@ -12,20 +12,9 @@ setup-dev:
 	@make keys
 	@make setup-cs
 
-# Clone and build the Open Finance Conformance Suite.
-setup-cs:
-	@if [ ! -d "conformance-suite" ]; then \
-	  echo "Cloning open finance conformance suite repository..."; \
-	  git clone --branch master --single-branch --depth=1 https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance-suite; \
-	fi
-
 # Runs the main MockBank components.
 run:
 	@docker-compose --profile main up
-
-# Start MockBank along with the Open Finance Conformance Suite.
-run-with-cs:
-	@docker-compose --profile main --profile conformance up
 
 # Runs only the MockBank dependencies necessary for local development. With this
 # command the MockBank server can run and be debugged in the local host.
@@ -46,29 +35,24 @@ run-cs:
 keys:
 	@go run cmd/keymaker/main.go
 
-db-migration-files:
-	@read -p "Enter migration name: " name; \
-	go run github.com/golang-migrate/migrate/v4/cmd/migrate create -ext sql -dir db/migrations $$name
-
-db-migrations:
-	go run -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate \
-		-path db/migrations \
-		-database "postgres://admin:password@localhost:5432/mockbank?sslmode=disable" \
-		up
-
-db-seeds:
-	go run -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate \
-		-path db/seeds \
-		-database "postgres://admin:password@localhost:5432/mockbank?sslmode=disable" \
-		up
-
 # Build the MockBank Docker Image.
 build-mockbank:
 	@docker-compose build mockbank
 
+# Clone and build the Open Finance Conformance Suite.
+setup-cs:
+	@if [ ! -d "conformance-suite" ]; then \
+	  echo "Cloning open finance conformance suite repository..."; \
+	  git clone --branch master --single-branch --depth=1 https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance-suite; \
+	fi
+
 # Build the Conformance Suite JAR file.
 build-cs:
 	@docker compose run cs-builder
+
+# Start MockBank along with the Open Finance Conformance Suite.
+run-with-cs:
+	@docker-compose --profile main --profile conformance up
 
 # Create a Conformance Suite configuration file using the client keys in /keys.
 cs-config:

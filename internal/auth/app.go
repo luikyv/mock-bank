@@ -5,37 +5,55 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/timex"
 )
 
 type AppServer struct {
-	host    string
-	service Service
+	host             string
+	service          Service
+	directoryService DirectoryService
 }
 
-func NewAppServer(host string, service Service) AppServer {
+func NewAppServer(host string, service Service, directoryService DirectoryService) AppServer {
 	return AppServer{
-		host:    host,
-		service: service,
+		host:             host,
+		service:          service,
+		directoryService: directoryService,
 	}
 }
 
 func (app AppServer) Register(mux *http.ServeMux) {
-	mux.Handle("GET /app/callback", app.directoryCallbackHandler())
+	mux.Handle("GET /app/directory/auth-url", app.directoryAuthURLHandler())
+	mux.Handle("GET /app/directory/callback", app.directoryCallbackHandler())
 	mux.Handle("GET /app/me", app.userHandler())
-	mux.Handle("GET /app/logout", app.logoutHandler())
+	mux.Handle("POST /app/logout", app.logoutHandler())
+}
+
+func (app AppServer) directoryAuthURLHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authURL, err := app.directoryService.authURL(r.Context())
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+
+		resp := toAuthURLResponse(authURL)
+		api.WriteJSON(w, resp, http.StatusOK)
+	})
 }
 
 func (app AppServer) directoryCallbackHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		session := Session{
-			ID:            uuid.NewString(),
-			Organizations: map[string]Organization{},
+		// TODO: Validate nonce, exp, ...
+		idTkn := r.URL.Query().Get("id_token")
+		if idTkn == "" {
+			writeError(w, api.NewError("BAD_REQUEST", http.StatusBadRequest, "the id token is missing"))
+			return
 		}
-		if err := app.service.createSession(r.Context(), session); err != nil {
+
+		session, err := app.service.createSession(r.Context(), idTkn)
+		if err != nil {
 			writeError(w, err)
 			return
 		}
@@ -48,7 +66,7 @@ func (app AppServer) directoryCallbackHandler() http.Handler {
 			HttpOnly: true,
 			Secure:   false,
 		})
-		http.Redirect(w, r, app.host+"/home", http.StatusSeeOther)
+		http.Redirect(w, r, app.host+"/organizations", http.StatusSeeOther)
 	})
 }
 
@@ -76,7 +94,16 @@ func (app AppServer) logoutHandler() http.Handler {
 		if cookie, err := r.Cookie(cookieSessionId); err == nil {
 			_ = app.service.deleteSession(r.Context(), cookie.Value)
 		}
-		w.WriteHeader(http.StatusNoContent)
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     cookieSessionId,
+			Path:     "/",
+			Expires:  time.Unix(0, 0),
+			MaxAge:   -1,
+			HttpOnly: true,
+			Secure:   true,
+		})
+		http.Redirect(w, r, app.host+"/login", http.StatusSeeOther)
 	})
 }
 
@@ -99,6 +126,16 @@ func toUserResponse(s Session) userResponse {
 	}
 
 	return resp
+}
+
+type authURLResponse struct {
+	AuthURL string `json:"auth_url"`
+}
+
+func toAuthURLResponse(authURL string) authURLResponse {
+	return authURLResponse{
+		AuthURL: authURL,
+	}
 }
 
 func writeError(w http.ResponseWriter, err error) {
