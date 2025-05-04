@@ -1,42 +1,58 @@
-package auth
+package app
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
-	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luikyv/go-oidc/pkg/goidc"
 )
 
 var (
+	cacheTime = 1 * time.Hour
+
 	directoryWellKnownMu            sync.Mutex
 	directoryWellKnownCache         *directoryWellKnown
 	directoryWellKnownLastFetchedAt time.Time
 
 	directoryJWKSMu            sync.Mutex
-	directoryJWKSCache         *jose.JSONWebKeySet
+	directoryJWKSCache         *goidc.JSONWebKeySet
 	directoryJWKSLastFetchedAt time.Time
 )
 
 type DirectoryService struct {
 	issuer     string
+	clientID   string
 	httpClient *http.Client
 }
 
-func NewDirectoryService(issuer string, httpClient *http.Client) DirectoryService {
+func NewDirectoryService(issuer string, clientID string, httpClient *http.Client) DirectoryService {
 	return DirectoryService{
 		issuer:     issuer,
+		clientID:   clientID,
 		httpClient: httpClient,
 	}
 }
 
-func (DirectoryService) authURL(_ context.Context) (string, error) {
-	return "random_auth_url", nil
+func (ds DirectoryService) authURL(_ context.Context) (string, error) {
+	wellKnown, err := ds.wellKnown()
+	if err != nil {
+		return "", err
+	}
+
+	authURL, _ := url.Parse(wellKnown.AuthEndpoint)
+	query := authURL.Query()
+	query.Set("request_uri", "random_req_uri")
+	authURL.RawQuery = query.Encode()
+
+	return authURL.String(), nil
 }
 
 func (ds DirectoryService) idToken(_ context.Context, idTkn string) (directoryIDToken, error) {
@@ -56,7 +72,19 @@ func (ds DirectoryService) idToken(_ context.Context, idTkn string) (directoryID
 	}
 
 	var idToken directoryIDToken
-	if err := parsedIDTkn.Claims(jwks, &idToken); err != nil {
+	var idTokenClaims jwt.Claims
+	if err := parsedIDTkn.Claims(jwks.ToJOSE(), &idToken, &idTokenClaims); err != nil {
+		return directoryIDToken{}, fmt.Errorf("invalid id token: %w", err)
+	}
+
+	if idTokenClaims.Expiry == nil {
+		return directoryIDToken{}, errors.New("id token expiration is missing")
+	}
+
+	if err := idTokenClaims.Validate(jwt.Expected{
+		Issuer:      ds.issuer,
+		AnyAudience: []string{ds.clientID},
+	}); err != nil {
 		return directoryIDToken{}, fmt.Errorf("invalid id token: %w", err)
 	}
 
@@ -68,7 +96,7 @@ func (ds DirectoryService) wellKnown() (directoryWellKnown, error) {
 	directoryWellKnownMu.Lock()
 	defer directoryWellKnownMu.Unlock()
 
-	if directoryWellKnownCache != nil && timex.Now().Before(directoryWellKnownLastFetchedAt.Add(1*time.Hour)) {
+	if directoryWellKnownCache != nil && timex.Now().Before(directoryWellKnownLastFetchedAt.Add(cacheTime)) {
 		return *directoryWellKnownCache, nil
 	}
 
@@ -93,33 +121,33 @@ func (ds DirectoryService) wellKnown() (directoryWellKnown, error) {
 	return config, nil
 }
 
-func (ds DirectoryService) jwks() (jose.JSONWebKeySet, error) {
+func (ds DirectoryService) jwks() (goidc.JSONWebKeySet, error) {
 
 	directoryJWKSMu.Lock()
 	defer directoryJWKSMu.Unlock()
 
-	if directoryJWKSCache != nil && timex.Now().Before(directoryJWKSLastFetchedAt.Add(1*time.Hour)) {
+	if directoryJWKSCache != nil && timex.Now().Before(directoryJWKSLastFetchedAt.Add(cacheTime)) {
 		return *directoryJWKSCache, nil
 	}
 
 	wellKnown, err := ds.wellKnown()
 	if err != nil {
-		return jose.JSONWebKeySet{}, err
+		return goidc.JSONWebKeySet{}, err
 	}
 
 	resp, err := ds.httpClient.Get(wellKnown.JWKSURI)
 	if err != nil {
-		return jose.JSONWebKeySet{}, err
+		return goidc.JSONWebKeySet{}, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return jose.JSONWebKeySet{}, fmt.Errorf("directory jwks unexpected status code: %d", resp.StatusCode)
+		return goidc.JSONWebKeySet{}, fmt.Errorf("directory jwks unexpected status code: %d", resp.StatusCode)
 	}
 
-	var jwks jose.JSONWebKeySet
+	var jwks goidc.JSONWebKeySet
 	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
-		return jose.JSONWebKeySet{}, fmt.Errorf("failed to decode directory jwks response: %w", err)
+		return goidc.JSONWebKeySet{}, fmt.Errorf("failed to decode directory jwks response: %w", err)
 	}
 
 	directoryJWKSCache = &jwks

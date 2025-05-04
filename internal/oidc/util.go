@@ -39,7 +39,7 @@ func HandleGrantFunc(op *provider.Provider, consentService consent.Service) goid
 
 		consent, err := consentService.Consent(r.Context(), consentID)
 		if err != nil {
-			return fmt.Errorf("could not get consent for verifying grant: %w", err)
+			return fmt.Errorf("could not fetch consent for verifying grant: %w", err)
 		}
 
 		if !consent.IsAuthorized() {

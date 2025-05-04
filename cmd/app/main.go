@@ -8,12 +8,12 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/auth"
+	"github.com/luiky/mock-bank/internal/app"
 	"github.com/luiky/mock-bank/internal/consent"
+	"github.com/luiky/mock-bank/internal/timex"
 	"github.com/luiky/mock-bank/internal/user"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -25,16 +25,18 @@ const (
 )
 
 var (
-	host            = getEnv("MOCKBANK_HOST", "https://mockbank.local")
-	appHost         = strings.Replace(host, "https://", "https://app.", 1)
-	apiHost         = strings.Replace(host, "https://", "https://api.", 1)
-	apiMTLSHost     = strings.Replace(host, "https://", "https://matls-api.", 1)
-	authHost        = strings.Replace(host, "https://", "https://auth.", 1)
-	authMTLSHost    = strings.Replace(host, "https://", "https://matls-auth.", 1)
-	directoryIssuer = getEnv("DIRECTORY_ISSUER", "https://directory")
-	port            = getEnv("MOCKBANK_PORT", "80")
-	dbSchema        = getEnv("MOCKBANK_DB_SCHEMA", "mockbank")
-	dbStringCon     = getEnv("MOCKBANK_DB_CONNECTION", "mongodb://localhost:27017/mockbank")
+	env               = getEnv("ENV", "LOCAL")
+	host              = getEnv("MOCKBANK_HOST", "https://mockbank.local")
+	appHost           = strings.Replace(host, "https://", "https://app.", 1)
+	apiHost           = strings.Replace(host, "https://", "https://api.", 1)
+	apiMTLSHost       = strings.Replace(host, "https://", "https://matls-api.", 1)
+	authHost          = strings.Replace(host, "https://", "https://auth.", 1)
+	authMTLSHost      = strings.Replace(host, "https://", "https://matls-auth.", 1)
+	directoryIssuer   = getEnv("DIRECTORY_ISSUER", "https://directory")
+	directoryClientID = getEnv("DIRECTORY_ISSUER", "mockbank")
+	port              = getEnv("MOCKBANK_PORT", "80")
+	dbSchema          = getEnv("MOCKBANK_DB_SCHEMA", "mockbank")
+	dbStringCon       = getEnv("MOCKBANK_DB_CONNECTION", "mongodb://localhost:27017/mockbank")
 )
 
 func main() {
@@ -48,14 +50,14 @@ func main() {
 	}
 
 	// Storage.
-	authStorage := auth.NewStorage(db)
+	appStorage := app.NewStorage(db)
 	userStorage := user.NewStorage(db)
 	consentStorage := consent.NewStorage(db)
 	accountStorage := account.NewStorage(db)
 
 	// Services.
-	directoryService := auth.NewDirectoryService(directoryIssuer, httpClient())
-	authService := auth.NewService(authStorage, directoryService)
+	directoryService := app.NewDirectoryService(directoryIssuer, directoryClientID, httpClient())
+	appService := app.NewService(appStorage, directoryService)
 	userService := user.NewService(userStorage)
 	consentService := consent.NewService(consentStorage, userService)
 	accountService := account.NewService(accountStorage, consentService)
@@ -69,42 +71,14 @@ func main() {
 	// Servers.
 	mux := http.NewServeMux()
 
-	auth.NewAppServer(appHost, authService, directoryService).Register(mux)
-	user.NewAppServer(apiHost, userService, authService).Register(mux)
-	consent.NewAppServer(apiHost, consentService, authService).Register(mux)
-
 	op.RegisterRoutes(mux)
+	app.NewServer(apiHost, appHost, appService, directoryService, userService, consentService).Register(mux)
 	consent.NewServerV3(apiMTLSHost, consentService, op).Register(mux)
 	account.NewServerV2(apiMTLSHost, accountService, consentService, op).Register(mux)
-
-	loadMocks(userService, accountService)
 
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func loadMocks(userService user.Service, accountService account.Service) {
-	ctx := context.Background()
-	userID := "11111111-1111-1111-1111-111111111111"
-	err := userService.Save(ctx, user.User{
-		ID:       userID,
-		CPF:      "12345678901",
-		OrgID:    OrgID,
-		Username: "test_user",
-	})
-	if err != nil {
-		log.Fatalf("failed to create user: %v", err)
-	}
-
-	accountID := "11111111-1111-1111-1111-111111111112"
-	_ = accountService.Save(ctx, account.Account{
-		ID:      accountID,
-		UserID:  userID,
-		Number:  "123456789",
-		Type:    account.TypeCheckingAccount,
-		SubType: account.SubTypeIndividual,
-	})
 }
 
 func dbConnection() (*mongo.Database, error) {
@@ -144,7 +118,7 @@ func logger() *slog.Logger {
 			// Make sure time is logged in UTC.
 			ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
 				if attr.Key == slog.TimeKey {
-					utcTime := time.Now()
+					utcTime := timex.Now()
 					return slog.Attr{Key: slog.TimeKey, Value: slog.TimeValue(utcTime)}
 				}
 				return attr
@@ -161,18 +135,26 @@ func (h *logCtxHandler) Handle(ctx context.Context, r slog.Record) error {
 	if clientID, ok := ctx.Value(api.CtxKeyClientID).(string); ok {
 		r.AddAttrs(slog.String("client_id", clientID))
 	}
+
 	if interactionID, ok := ctx.Value(api.CtxKeyInteractionID).(string); ok {
 		r.AddAttrs(slog.String("interaction_id", interactionID))
 	}
+
+	if orgID, ok := ctx.Value(api.CtxKeyOrgID).(string); ok {
+		r.AddAttrs(slog.String("org_id", orgID))
+	}
+
 	return h.Handler.Handle(ctx, r)
 }
 
 func httpClient() *http.Client {
+	tlsConfig := &tls.Config{}
+	if env == "LOCAL" {
+		tlsConfig.InsecureSkipVerify = true
+	}
 	return &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
+			TLSClientConfig: tlsConfig,
 		},
 	}
 }

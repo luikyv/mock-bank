@@ -79,6 +79,10 @@ func (s Service) Reject(ctx context.Context, id string, by RejectedBy, reason Re
 	return s.st.save(ctx, c)
 }
 
+func (s Service) Consents(ctx context.Context, userID, orgID string, pag page.Pagination) (page.Page[Consent], error) {
+	return s.st.consents(ctx, userID, orgID, pag)
+}
+
 func (s Service) delete(ctx context.Context, id string) error {
 	c, err := s.Consent(ctx, id)
 	if err != nil {
@@ -99,8 +103,7 @@ func (s Service) create(ctx context.Context, c Consent) error {
 		return err
 	}
 
-	orgID := ctx.Value(api.CtxKeyOrgID).(string)
-	if user, err := s.userService.UserByCPF(ctx, c.UserCPF, orgID); err == nil {
+	if user, err := s.userService.UserByCPF(ctx, c.UserCPF, c.OrgID); err == nil {
 		c.UserID = user.ID
 	}
 
@@ -161,10 +164,6 @@ func (s Service) extend(ctx context.Context, id string, ext Extension) (Consent,
 
 func (s Service) extensions(ctx context.Context, id string, pag page.Pagination) (page.Page[Extension], error) {
 	return s.st.extensions(ctx, id, pag)
-}
-
-func (s Service) consents(ctx context.Context, userID, orgID string, pag page.Pagination) (page.Page[Consent], error) {
-	return s.st.consents(ctx, userID, orgID, pag)
 }
 
 func validate(c Consent) error {

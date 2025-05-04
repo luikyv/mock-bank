@@ -1,18 +1,21 @@
 services:
-
   mockbank:
     profiles:
       - main
     build: .
     volumes:
       - ./keys/:/app/keys/
-  
+
   mongodb:
     image: mongo:latest
     ports:
       - 27017:27017
-  
-  reverse-proxy:
+    environment:
+      - MONGO_INITDB_DATABASE=mockbank
+    volumes:
+      - ./mocks/mongo-init.js:/docker-entrypoint-initdb.d/init-mongo.js
+
+  mockgw:
     profiles:
       - dev
       - main
@@ -24,7 +27,8 @@ services:
       - ./keys/client_one_pub.jwks:/mocks/client.jwks
       - ./keys/client_ca.crt:/mocks/client_ca.crt
       - ./mocks/participants.json:/mocks/participants.json
-      - ./mocks/directory.jwks:/mocks/directory.jwks
+      - ./mocks/directory_jwks.json:/mocks/directory_jwks.json
+      - ./mocks/directory_well_known.json:/mocks/directory_well_known.json
       - ./mocks/id_token.json:/mocks/id_token.json
       - ./mocks/software_statement.json:/mocks/software_statement.json
     ports:
@@ -33,8 +37,10 @@ services:
       default:
         aliases:
           - mockbank.local
+          - app.mockbank.local
           - auth.mockbank.local
           - matls-auth.mockbank.local
+          - api.mockbank.local
           - matls-api.mockbank.local
           - directory
           - keystore
@@ -46,11 +52,11 @@ services:
       context: ./conformance-suite/httpd
       dockerfile: Dockerfile-static
     ports:
-     - "8443:8443"
+      - "8443:8443"
     volumes:
-     - ./conformance-suite/src/main/resources/:/usr/local/apache2/htdocs/
+      - ./conformance-suite/src/main/resources/:/usr/local/apache2/htdocs/
     depends_on:
-     - cs-server
+      - cs-server
     networks:
       default:
         aliases:
@@ -64,9 +70,9 @@ services:
     build:
       context: ./conformance-suite/server-dev
     ports:
-     - "9999:9999"
+      - "9999:9999"
     volumes:
-     - ./conformance-suite/target/:/server/
+      - ./conformance-suite/target/:/server/
     command: >
       java
       -Xdebug -Xrunjdwp:transport=dt_socket,address=*:9999,server=y,suspend=n
@@ -79,16 +85,16 @@ services:
       --fintechlabs.startredir=true
       --fintechlabs.yacs.directory.uri=http://directory/participants
     links:
-     - mongodb:mongodb
+      - mongodb:mongodb
     depends_on:
-     - mongodb
+      - mongodb
     logging:
       # limit logs retained on host
       driver: "json-file"
       options:
         max-size: "500k"
         max-file: "5"
-  
+
   cs-builder:
     profiles:
       - build

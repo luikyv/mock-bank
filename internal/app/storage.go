@@ -1,4 +1,4 @@
-package auth
+package app
 
 import (
 	"context"
@@ -29,7 +29,7 @@ func (st Storage) session(ctx context.Context, id string) (Session, error) {
 	filter := bson.D{{Key: "_id", Value: id}}
 	result := st.coll.FindOne(ctx, filter)
 	if result.Err() != nil {
-		return Session{}, errNotFound
+		return Session{}, errSessionNotFound
 	}
 
 	var s Session

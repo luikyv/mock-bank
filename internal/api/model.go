@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -29,7 +28,6 @@ const (
 const (
 	HeaderCustomerIPAddress = "X-FAPI-Customer-IP-Address"
 	HeaderCustomerUserAgent = "X-Customer-User-Agent"
-	HeaderOrgID             = "X-Org-ID"
 )
 
 func NewPagination(r *http.Request) (page.Pagination, error) {
@@ -44,7 +42,7 @@ func NewPagination(r *http.Request) (page.Pagination, error) {
 	}
 
 	if pageNumber < 1 {
-		return page.Pagination{}, errors.New("invalid page number")
+		return page.Pagination{}, NewError("INVALID_PARAMETER", http.StatusBadRequest, "invalid page number")
 	}
 
 	// Get "page-size" query parameter and convert it to an integer.
@@ -55,7 +53,7 @@ func NewPagination(r *http.Request) (page.Pagination, error) {
 	}
 
 	if pageSize < 0 || pageSize > 1000 {
-		return page.Pagination{}, errors.New("invalid page size")
+		return page.Pagination{}, NewError("INVALID_PARAMETER", http.StatusBadRequest, "invalid page size")
 	}
 
 	if pageSize > maxPageSize {

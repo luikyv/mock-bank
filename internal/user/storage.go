@@ -19,6 +19,10 @@ func NewStorage(db *mongo.Database) Storage {
 
 	indexes := []mongo.IndexModel{
 		{
+			Keys:    bson.D{{Key: "org_id", Value: 1}, {Key: "_id", Value: 1}},
+			Options: options.Index().SetUnique(true).SetName("unique_orgid_id"),
+		},
+		{
 			Keys:    bson.D{{Key: "org_id", Value: 1}, {Key: "cpf", Value: 1}},
 			Options: options.Index().SetUnique(true).SetName("unique_orgid_cpf"),
 		},
@@ -35,7 +39,7 @@ func NewStorage(db *mongo.Database) Storage {
 	}
 
 	return Storage{
-		coll: db.Collection("users"),
+		coll: coll,
 	}
 }
 
@@ -45,13 +49,16 @@ func (s Storage) save(ctx context.Context, u User) error {
 	if _, err := s.coll.ReplaceOne(ctx, filter, u, &options.ReplaceOptions{
 		Upsert: &shouldUpsert,
 	}); err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return ErrAlreadyExists
+		}
 		return err
 	}
 	return nil
 }
 
-func (s Storage) user(ctx context.Context, id string) (User, error) {
-	filter := bson.D{{Key: "_id", Value: id}}
+func (s Storage) user(ctx context.Context, id, orgID string) (User, error) {
+	filter := bson.D{{Key: "_id", Value: id}, {Key: "org_id", Value: orgID}}
 	return s.filterUser(ctx, filter)
 }
 
@@ -93,4 +100,12 @@ func (s Storage) filterUser(ctx context.Context, filter any) (User, error) {
 	}
 
 	return u, nil
+}
+
+func (s Storage) delete(ctx context.Context, id, orgID string) error {
+	filter := bson.D{{Key: "_id", Value: id}, {Key: "org_id", Value: orgID}}
+	if _, err := s.coll.DeleteOne(ctx, filter); err != nil {
+		return err
+	}
+	return nil
 }

@@ -1,12 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -18,7 +22,7 @@ import (
 
 func main() {
 
-	directoryJWKSBytes, err := os.ReadFile("/mocks/directory.jwks")
+	directoryJWKSBytes, err := os.ReadFile("/mocks/directory_jwks.json")
 	if err != nil {
 		log.Fatal("failed to read directory jwks:", err)
 	}
@@ -45,14 +49,7 @@ func main() {
 
 	mux.HandleFunc("GET directory/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = io.WriteString(w, `{
-			"issuer": "https://directory",
-			"jwks_uri": "https://directory/jwks",
-			"token_endpoint": "https://directory/token",
-			"authorization_endpoint": "https://directory/authorize",
-			"id_token_signing_alg_values_supported": ["RS256", "ES256"]
-		}`)
+		http.ServeFile(w, r, "/mocks/directory_well_known.json")
 	})
 
 	mux.HandleFunc("GET directory/jwks", func(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +85,6 @@ func main() {
 
 	mux.HandleFunc("GET directory/participants", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
 		http.ServeFile(w, r, "/mocks/participants.json")
 	})
 
@@ -108,29 +104,61 @@ func main() {
 
 	mux.HandleFunc("GET keystore/{org_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
 		http.ServeFile(w, r, "/mocks/client.jwks")
 	})
 
-	// Reverse proxy for mockbank.
-	mockbankURL, _ := url.Parse("http://mockbank:80")
-	reverseProxy := httputil.NewSingleHostReverseProxy(mockbankURL)
+	appURL, _ := url.Parse("http://host.docker.internal:8080")
+	mux.Handle("app.mockbank.local/", httputil.NewSingleHostReverseProxy(appURL))
+
 	// Reverse proxy fallback.
-	fallbackURL, _ := url.Parse("http://host.docker.internal:80")
+	fallbackURL, _ := url.Parse("http://host.docker.internal")
 	fallbackProxy := httputil.NewSingleHostReverseProxy(fallbackURL)
+	// Reverse proxy for mockbank.
+	mockbankURL, _ := url.Parse("http://mockbank")
+	reverseProxy := httputil.NewSingleHostReverseProxy(mockbankURL)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		r.Header.Set("X-Client-Cert", "")
-		reverseProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-			log.Println("Proxy error, using fallback:", err)
-			fallbackProxy.ServeHTTP(w, r)
+		// Extract client certificate if available.
+		if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+			clientCert := r.TLS.PeerCertificates[0]
+			pemBytes := pem.EncodeToMemory(&pem.Block{
+				Type:  "CERTIFICATE",
+				Bytes: clientCert.Raw,
+			})
+
+			r.Header.Set("X-Client-Cert", url.QueryEscape(string(pemBytes)))
 		}
+
+		// Buffer the request body.
+		var bodyBytes []byte
+		if r.Body != nil {
+			bodyBytes, _ = io.ReadAll(r.Body)
+		}
+		r.Body.Close()
+
+		// Replace with a new ReadCloser for ReverseProxy.
+		r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+		// Make a copy of the request in case fallback is needed.
+		rCopy := r.Clone(r.Context())
+		rCopy.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+		reverseProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+			log.Println("Proxy error:", err)
+			var dnsErr *net.DNSError
+			if errors.As(err, &dnsErr) {
+				log.Println("DNS resolution failed, serving fallback")
+				fallbackProxy.ServeHTTP(w, rCopy)
+				return
+			}
+			http.Error(w, "Bad Gateway", http.StatusBadGateway)
+		}
+
 		reverseProxy.ServeHTTP(w, r)
 	})
 
 	// Serve participant information over HTTP because the Conformance Suite
 	// does not accept self-signed certificates.
 	http.HandleFunc("GET directory/participants", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, "/mocks/participants.json")
 	})

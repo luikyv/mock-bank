@@ -1,4 +1,4 @@
-package auth
+package app
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/luiky/mock-bank/internal/api"
 )
 
-func Middleware(next http.Handler, service Service) http.Handler {
+func authMiddleware(next http.Handler, service Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		cookie, err := r.Cookie(cookieSessionId)
@@ -22,7 +22,7 @@ func Middleware(next http.Handler, service Service) http.Handler {
 			return
 		}
 
-		orgID := r.Header.Get(api.HeaderOrgID)
+		orgID := r.PathValue("org_id")
 		if orgID == "" {
 			api.WriteError(w, api.NewError("MISSING_ORG_ID", http.StatusBadRequest, "missing org id"))
 			return

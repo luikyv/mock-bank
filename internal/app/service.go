@@ -1,4 +1,4 @@
-package auth
+package app
 
 import (
 	"context"
@@ -30,7 +30,7 @@ func (s Service) createSession(ctx context.Context, idToken string) (Session, er
 		Username:      idTkn.Sub,
 		Organizations: map[string]Organization{},
 		CreatedAt:     timex.DateTimeNow(),
-		ExpiresAt:     timex.DateTimeNow(),
+		ExpiresAt:     timex.NewDateTime(timex.DateTimeNow().Add(sessionValidity)),
 	}
 	for orgID, org := range idTkn.Profile.OrgAccessDetails {
 		session.Organizations[orgID] = Organization{
@@ -52,7 +52,7 @@ func (s Service) session(ctx context.Context, id string) (Session, error) {
 
 	if session.IsExpired() {
 		_ = s.deleteSession(ctx, id)
-		return Session{}, errNotFound
+		return Session{}, errSessionNotFound
 	}
 	return session, nil
 }

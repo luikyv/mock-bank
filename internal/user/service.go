@@ -16,7 +16,6 @@ type Service struct {
 }
 
 func NewService(st Storage) Service {
-
 	return Service{
 		st: st,
 	}
@@ -26,8 +25,8 @@ func (s Service) Save(ctx context.Context, u User) error {
 	return s.st.save(ctx, u)
 }
 
-func (s Service) User(ctx context.Context, id string) (User, error) {
-	return s.st.user(ctx, id)
+func (s Service) User(ctx context.Context, id, orgID string) (User, error) {
+	return s.st.user(ctx, id, orgID)
 }
 
 func (s Service) UserByCPF(ctx context.Context, cpf, orgID string) (User, error) {
@@ -38,6 +37,10 @@ func (s Service) UserByUsername(ctx context.Context, username, orgID string) (Us
 	return s.st.userByUsername(ctx, username, orgID)
 }
 
-func (s Service) users(ctx context.Context, orgID string, pag page.Pagination) (page.Page[User], error) {
+func (s Service) Users(ctx context.Context, orgID string, pag page.Pagination) (page.Page[User], error) {
 	return s.st.users(ctx, orgID, pag)
+}
+
+func (s Service) Delete(ctx context.Context, id, orgID string) error {
+	return s.st.delete(ctx, id, orgID)
 }

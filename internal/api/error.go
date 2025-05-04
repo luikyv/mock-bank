@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 )
 
@@ -35,6 +36,7 @@ func NewError(code string, status int, description string) Error {
 func WriteError(w http.ResponseWriter, err error) {
 	var apiErr Error
 	if !errors.As(err, &apiErr) {
+		slog.Error("unknown error", slog.String("error", err.Error()))
 		WriteError(w, Error{"INTERNAL_ERROR", http.StatusInternalServerError, "internal error", false})
 		return
 	}

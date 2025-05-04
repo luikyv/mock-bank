@@ -1,26 +1,25 @@
 {
-    "sub": "admin",
-    "txn": "q0RwM_vzkv39zoa0nTJDDaJm_VHpHLzSheB7waKB-tT",
-    "trust_framework_profile": {
-      "basic_information": {
-        "status": "Active",
-        "user_email": "admin@mail.com"
-      },
-      "certification_manager": false,
-      "org_access_details": {
-        "02b64634_c73e_4e55_9bbf_b4fd4b19562d": {
-          "org_admin": true,
-          "org_registration_number": "MockBank",
-          "organisation_name": "MockBank"
-        }
-      },
-      "super_user": true,
-      "system_user": true
+  "sub": "admin",
+  "txn": "q0RwM_vzkv39zoa0nTJDDaJm_VHpHLzSheB7waKB-tT",
+  "trust_framework_profile": {
+    "basic_information": {
+      "status": "Active",
+      "user_email": "admin@mail.com"
     },
-    "nonce": "gXGldLyaaty",
-    "at_hash": "knA8aZ1jL9-HyMRfdbmhmw",
-    "aud": "b7add03c-b18e-495f-b6e5-499ef745a6b9",
-    "exp": 1694526084,
-    "iat": 1694522484,
-    "iss": "https://directory"
-  }
+    "certification_manager": false,
+    "org_access_details": {
+      "00000000-0000-0000-0000-000000000000": {
+        "org_admin": true,
+        "org_registration_number": "0000000000",
+        "organisation_name": "MockBank"
+      }
+    },
+    "super_user": true,
+    "system_user": true
+  },
+  "nonce": "gXGldLyaaty",
+  "aud": "mockbank",
+  "exp": 9999999999,
+  "iat": 1694522484,
+  "iss": "https://directory"
+}
