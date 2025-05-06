@@ -107,16 +107,56 @@ func main() {
 		http.ServeFile(w, r, "/mocks/client.jwks")
 	})
 
-	appURL, _ := url.Parse("http://host.docker.internal:8080")
-	mux.Handle("app.mockbank.local/", httputil.NewSingleHostReverseProxy(appURL))
-
 	// Reverse proxy fallback.
 	fallbackURL, _ := url.Parse("http://host.docker.internal")
 	fallbackProxy := httputil.NewSingleHostReverseProxy(fallbackURL)
 	// Reverse proxy for mockbank.
 	mockbankURL, _ := url.Parse("http://mockbank")
 	reverseProxy := httputil.NewSingleHostReverseProxy(mockbankURL)
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mbHandler := mockbankHandler(reverseProxy, fallbackProxy)
+	mux.HandleFunc("auth.mockbank.local/api/", mbHandler)
+	mux.HandleFunc("matls-auth.mockbank.local/api/", mbHandler)
+	mux.HandleFunc("matls-api.mockbank.local/api/", mbHandler)
+	mux.HandleFunc("app.mockbank.local/api/", mbHandler)
+
+	appURL, _ := url.Parse("http://host.docker.internal:8080")
+	mux.Handle("app.mockbank.local/", httputil.NewSingleHostReverseProxy(appURL))
+
+	// Serve participant information over HTTP because the Conformance Suite
+	// does not accept self-signed certificates.
+	http.HandleFunc("GET directory/participants", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		http.ServeFile(w, r, "/mocks/participants.json")
+	})
+	go func() {
+		if err := http.ListenAndServe(":80", nil); err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	caCertPEM, err := os.ReadFile("/mocks/client_ca.crt")
+	if err != nil {
+		log.Fatal("Failed to read client CA file:", err)
+	}
+	clientCAPool := x509.NewCertPool()
+	if ok := clientCAPool.AppendCertsFromPEM(caCertPEM); !ok {
+		log.Fatal("Failed to append client CA certs")
+	}
+	server := &http.Server{
+		Addr:    ":443",
+		Handler: mux,
+		TLSConfig: &tls.Config{
+			ClientCAs:  clientCAPool,
+			ClientAuth: tls.VerifyClientCertIfGiven,
+		},
+	}
+	if err := server.ListenAndServeTLS("/mocks/server.crt", "/mocks/server.key"); err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
+}
+
+func mockbankHandler(reverseProxy, fallbackProxy *httputil.ReverseProxy) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract client certificate if available.
 		if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 			clientCert := r.TLS.PeerCertificates[0]
@@ -154,37 +194,6 @@ func main() {
 		}
 
 		reverseProxy.ServeHTTP(w, r)
-	})
+	}
 
-	// Serve participant information over HTTP because the Conformance Suite
-	// does not accept self-signed certificates.
-	http.HandleFunc("GET directory/participants", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		http.ServeFile(w, r, "/mocks/participants.json")
-	})
-	go func() {
-		if err := http.ListenAndServe(":80", nil); err != http.ErrServerClosed {
-			log.Fatal(err)
-		}
-	}()
-
-	caCertPEM, err := os.ReadFile("/mocks/client_ca.crt")
-	if err != nil {
-		log.Fatal("Failed to read client CA file:", err)
-	}
-	clientCAPool := x509.NewCertPool()
-	if ok := clientCAPool.AppendCertsFromPEM(caCertPEM); !ok {
-		log.Fatal("Failed to append client CA certs")
-	}
-	server := &http.Server{
-		Addr:    ":443",
-		Handler: mux,
-		TLSConfig: &tls.Config{
-			ClientCAs:  clientCAPool,
-			ClientAuth: tls.VerifyClientCertIfGiven,
-		},
-	}
-	if err := server.ListenAndServeTLS("/mocks/server.crt", "/mocks/server.key"); err != http.ErrServerClosed {
-		log.Fatal(err)
-	}
 }

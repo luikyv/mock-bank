@@ -9,10 +9,11 @@ mock backend: https://matls-api.mockbank.local
 
 ## TODO
 * Add rules to DCR.
-* Seed users and clients.
+* Real pagination.
 * Improve error handling.
 * Add logs.
 * Register applies all versions.
 * https://github.com/unrolled/secure.
 * directory.local
 * opf pattern for responses (data, etc).
+* Optional fapi ip.

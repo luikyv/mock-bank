@@ -11,13 +11,14 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/luiky/mock-bank/internal/account"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/oidc"
-	"github.com/luiky/mock-bank/internal/user"
+	"github.com/luiky/mock-bank/internal/opf/account"
+	"github.com/luiky/mock-bank/internal/opf/consent"
+	"github.com/luiky/mock-bank/internal/opf/oidc"
+	"github.com/luiky/mock-bank/internal/opf/resource"
+	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 var Scopes = []goidc.Scope{
@@ -37,11 +38,11 @@ var Scopes = []goidc.Scope{
 	// ScopeTreasureTitles,
 	// ScopeFunds,
 	// ScopeExchanges,
-	// resource.Scope,
+	resource.Scope,
 }
 
 func openidProvider(
-	db *mongo.Database,
+	_ *gorm.DB,
 	userService user.Service,
 	consentService consent.Service,
 	accountService account.Service,
@@ -70,9 +71,9 @@ func openidProvider(
 		return nil, err
 	}
 	if err := op.WithOptions(
-		provider.WithClientStorage(oidc.NewClientManager(db)),
-		provider.WithAuthnSessionStorage(oidc.NewAuthnSessionManager(db)),
-		provider.WithGrantSessionStorage(oidc.NewGrantSessionManager(db)),
+		// provider.WithClientStorage(oidc.NewClientManager(db)),
+		// provider.WithAuthnSessionStorage(oidc.NewAuthnSessionManager(db)),
+		// provider.WithGrantSessionStorage(oidc.NewGrantSessionManager(db)),
 		provider.WithScopes(Scopes...),
 		provider.WithTokenOptions(oidc.TokenOptionsFunc()),
 		provider.WithAuthorizationCodeGrant(),

@@ -1,5 +1,9 @@
 package page
 
+const (
+	defaultPageSize = 10
+)
+
 type Page[T any] struct {
 	// Records are the records found for the page requested.
 	Records []T
@@ -10,6 +14,28 @@ type Page[T any] struct {
 	Pagination
 }
 
+func New[T any](records []T, pagination Pagination, totalRecords int) Page[T] {
+	page := Page[T]{
+		TotalRecords: totalRecords,
+		// Calculate the total number of pages using integer division.
+		// Adding (pagination.Size - 1) ensures correct rounding up for partial pages.
+		TotalPages: (totalRecords + pagination.Size - 1) / pagination.Size,
+		Pagination: pagination,
+	}
+
+	// Subtracting 1 from the page number to convert it to a zero-based index,
+	// as pages start at 1.
+	start := (page.Number - 1) * page.Size
+	if start >= totalRecords {
+		return page
+	}
+
+	end := min(start+page.Size, totalRecords)
+
+	page.Records = records[start:end]
+	return page
+}
+
 type Pagination struct {
 	// Number is the page number requested.
 	Number int
@@ -17,23 +43,30 @@ type Pagination struct {
 	Size int
 }
 
-// Offset calculates the offset based on the page number and size.
-// Subtract 1 from the page number to convert it to a zero-based index.
+// Offset returns the zero-based offset.
 func (p Pagination) Offset() int {
+	if p.Number <= 1 {
+		return 0
+	}
 	return (p.Number - 1) * p.Size
+}
+
+// Limit returns the number of items to retrieve.
+func (p Pagination) Limit() int {
+	return p.Size
 }
 
 func NewPagination(pageNumber int, pageSize int) Pagination {
 	pagination := Pagination{
 		Number: 1,
-		Size:   25,
+		Size:   defaultPageSize,
 	}
 
-	if pageNumber != 0 {
+	if pageNumber > 0 {
 		pagination.Number = pageNumber
 	}
 
-	if pageSize != 0 && pageSize <= 1000 {
+	if pageSize > 0 && pageSize <= 1000 {
 		pagination.Size = pageSize
 	}
 
@@ -43,24 +76,5 @@ func NewPagination(pageNumber int, pageSize int) Pagination {
 // Paginate slices a list of records into a specific page of data based on the
 // provided pagination parameters.
 func Paginate[T any](records []T, pagination Pagination) Page[T] {
-	numberOfRecords := len(records)
-	page := Page[T]{
-		TotalRecords: numberOfRecords,
-		// Calculate the total number of pages using integer division.
-		// Adding (pagination.Size - 1) ensures correct rounding up for partial pages.
-		TotalPages: (numberOfRecords + pagination.Size - 1) / pagination.Size,
-		Pagination: pagination,
-	}
-
-	// Subtracting 1 from the page number to convert it to a zero-based index,
-	// as pages start at 1.
-	start := (page.Number - 1) * page.Size
-	if start >= numberOfRecords {
-		return page
-	}
-
-	end := min(start+page.Size, numberOfRecords)
-
-	page.Records = records[start:end]
-	return page
+	return New(records, pagination, len(records))
 }

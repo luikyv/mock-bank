@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/luiky/mock-bank/internal/account"
+	"github.com/luiky/mock-bank/internal/opf/account"
 )
 
 type ConsentPageData struct {

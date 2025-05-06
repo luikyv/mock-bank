@@ -12,7 +12,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luiky/mock-bank/internal/consent"
+	"github.com/luiky/mock-bank/internal/opf/consent"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 )
@@ -30,14 +30,16 @@ func HandleGrantFunc(op *provider.Provider, consentService consent.Service) goid
 		if err != nil {
 			return fmt.Errorf("could not get client for verifying grant: %w", err)
 		}
-		gi.AdditionalTokenClaims["org_id"] = client.CustomAttribute("org_id")
+
+		orgID := client.CustomAttribute("org_id").(string)
+		gi.AdditionalTokenClaims["org_id"] = orgID
 
 		consentID, ok := consent.ID(gi.ActiveScopes)
 		if !ok {
 			return nil
 		}
 
-		consent, err := consentService.Consent(r.Context(), consentID)
+		consent, err := consentService.Consent(r.Context(), consentID, orgID)
 		if err != nil {
 			return fmt.Errorf("could not fetch consent for verifying grant: %w", err)
 		}

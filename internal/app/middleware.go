@@ -40,3 +40,13 @@ func authMiddleware(next http.Handler, service Service) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+func metaMiddleware(next http.Handler, host string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, api.CtxKeyRequestURL, host+r.URL.RequestURI())
+		r = r.WithContext(ctx)
+
+		next.ServeHTTP(w, r)
+	})
+}

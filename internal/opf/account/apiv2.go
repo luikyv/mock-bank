@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/api/middleware"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/mock"
+	"github.com/luiky/mock-bank/internal/opf/consent"
+	"github.com/luiky/mock-bank/internal/opf/middleware"
+	"github.com/luiky/mock-bank/internal/opf/mock"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timex"
 	"github.com/luikyv/go-oidc/pkg/goidc"
@@ -92,6 +92,7 @@ func (router ServerV2) Register(mux *http.ServeMux) {
 
 func (router ServerV2) accountsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		orgID := r.Context().Value(api.CtxKeyOrgID).(string)
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
 		pag, err := api.NewPagination(r)
@@ -100,7 +101,7 @@ func (router ServerV2) accountsHandler() http.Handler {
 			return
 		}
 
-		accs, err := router.service.accounts(r.Context(), consentID, pag)
+		accs, err := router.service.consentedAccounts(r.Context(), consentID, orgID, pag)
 		if err != nil {
 			writeErrorV2(w, err, true)
 			return
@@ -113,11 +114,12 @@ func (router ServerV2) accountsHandler() http.Handler {
 
 func (router ServerV2) accountHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		orgID := r.Context().Value(api.CtxKeyOrgID).(string)
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
 		accID := r.PathValue("id")
 
-		acc, err := router.service.account(r.Context(), accID, consentID)
+		acc, err := router.service.consentedAccount(r.Context(), accID, consentID, orgID)
 		if err != nil {
 			writeErrorV2(w, err, true)
 			return
@@ -130,11 +132,12 @@ func (router ServerV2) accountHandler() http.Handler {
 
 func (router ServerV2) accountBalancesHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		orgID := r.Context().Value(api.CtxKeyOrgID).(string)
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
 		accID := r.PathValue("id")
 
-		acc, err := router.service.account(r.Context(), accID, consentID)
+		acc, err := router.service.consentedAccount(r.Context(), accID, consentID, orgID)
 		if err != nil {
 			writeErrorV2(w, err, true)
 			return
@@ -147,6 +150,7 @@ func (router ServerV2) accountBalancesHandler() http.Handler {
 
 func (router ServerV2) accountTransactionsHandler(current bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		orgID := r.Context().Value(api.CtxKeyOrgID).(string)
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
 		accID := r.PathValue("id")
@@ -162,7 +166,7 @@ func (router ServerV2) accountTransactionsHandler(current bool) http.Handler {
 			return
 		}
 
-		trs, err := router.service.transactions(r.Context(), accID, consentID, pag, filter)
+		trs, err := router.service.consentedTransactions(r.Context(), accID, consentID, orgID, pag, filter)
 		if err != nil {
 			writeErrorV2(w, err, false)
 			return
@@ -175,11 +179,12 @@ func (router ServerV2) accountTransactionsHandler(current bool) http.Handler {
 
 func (router ServerV2) accountOverdraftLimitsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		orgID := r.Context().Value(api.CtxKeyOrgID).(string)
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
 		accID := r.PathValue("id")
 
-		acc, err := router.service.account(r.Context(), accID, consentID)
+		acc, err := router.service.consentedAccount(r.Context(), accID, consentID, orgID)
 		if err != nil {
 			writeErrorV2(w, err, true)
 			return
@@ -207,7 +212,7 @@ type accountV2 struct {
 	AccountID   string `json:"accountId"`
 }
 
-func toAccountsResponseV2(accs page.Page[Account], reqURL string) accountsResponseV2 {
+func toAccountsResponseV2(accs page.Page[*Account], reqURL string) accountsResponseV2 {
 	resp := accountsResponseV2{
 		Data: []accountV2{},
 		Meta: api.NewPaginatedMeta(accs),
@@ -245,7 +250,7 @@ type accountResponseV2 struct {
 	Links api.Links `json:"links"`
 }
 
-func toAccountResponseV2(acc Account, reqURL string) accountResponseV2 {
+func toAccountResponseV2(acc *Account, reqURL string) accountResponseV2 {
 	return accountResponseV2{
 		Data: struct {
 			Type       Type    `json:"type"`
@@ -282,7 +287,7 @@ type balancesResponseV2 struct {
 	Links api.Links `json:"links"`
 }
 
-func toBalancesResponseV2(acc Account, reqURL string) balancesResponseV2 {
+func toBalancesResponseV2(acc *Account, reqURL string) balancesResponseV2 {
 	return balancesResponseV2{
 		Data: struct {
 			AvailableAmount             amountResponseV2 `json:"availableAmount"`
@@ -291,15 +296,15 @@ func toBalancesResponseV2(acc Account, reqURL string) balancesResponseV2 {
 			UpdateDateTime              timex.DateTime   `json:"updateDateTime"`
 		}{
 			AvailableAmount: amountResponseV2{
-				Amount:   acc.Balance.AvailableAmount,
+				Amount:   acc.AvailableAmount,
 				Currency: DefaultCurrency,
 			},
 			BlockedAmount: amountResponseV2{
-				Amount:   acc.Balance.BlockedAmount,
+				Amount:   acc.BlockedAmount,
 				Currency: DefaultCurrency,
 			},
 			AutomaticallyInvestedAmount: amountResponseV2{
-				Amount:   acc.Balance.AutomaticallyInvestedAmount,
+				Amount:   acc.AutomaticallyInvestedAmount,
 				Currency: DefaultCurrency,
 			},
 			UpdateDateTime: timex.DateTimeNow(),
@@ -325,7 +330,7 @@ type transactionResponseV2 struct {
 	DateTime     string            `json:"transactionDateTime"`
 }
 
-func toAccountTransactionsResponseV2(trs page.Page[Transaction], reqURL string) transactionsResponseV2 {
+func toAccountTransactionsResponseV2(trs page.Page[*Transaction], reqURL string) transactionsResponseV2 {
 	resp := transactionsResponseV2{
 		Data:  []transactionResponseV2{},
 		Meta:  api.NewMeta(),
@@ -344,7 +349,7 @@ func toAccountTransactionsResponseV2(trs page.Page[Transaction], reqURL string) 
 				Amount:   tr.Amount,
 				Currency: DefaultCurrency,
 			},
-			DateTime: tr.DateTime.Format(dateTimeMillisFormat),
+			DateTime: tr.CreatedAt.Format(dateTimeMillisFormat),
 		})
 	}
 
@@ -361,29 +366,29 @@ type overdraftLimitsResponseV2 struct {
 	Links api.Links `json:"links"`
 }
 
-func toOverdraftLimitsResponseV2(acc Account, reqURL string) overdraftLimitsResponseV2 {
+func toOverdraftLimitsResponseV2(acc *Account, reqURL string) overdraftLimitsResponseV2 {
 	resp := overdraftLimitsResponseV2{
 		Meta:  api.NewSingleRecordMeta(),
 		Links: api.NewLinks(reqURL),
 	}
 
-	if acc.OverdraftLimit.Contracted != "" {
+	if acc.OverdraftLimitContracted != "" {
 		resp.Data.Contracted = &amountResponseV2{
-			Amount:   acc.OverdraftLimit.Contracted,
+			Amount:   acc.OverdraftLimitContracted,
 			Currency: DefaultCurrency,
 		}
 	}
 
-	if acc.OverdraftLimit.Used != "" {
+	if acc.OverdraftLimitUsed != "" {
 		resp.Data.Used = &amountResponseV2{
-			Amount:   acc.OverdraftLimit.Used,
+			Amount:   acc.OverdraftLimitUsed,
 			Currency: DefaultCurrency,
 		}
 	}
 
-	if acc.OverdraftLimit.Unarranged != "" {
+	if acc.OverdraftLimitUnarranged != "" {
 		resp.Data.Unarranged = &amountResponseV2{
-			Amount:   acc.OverdraftLimit.Unarranged,
+			Amount:   acc.OverdraftLimitUnarranged,
 			Currency: DefaultCurrency,
 		}
 	}
@@ -451,8 +456,8 @@ func newTransactionFilter(r *http.Request, current bool) (transactionFilter, err
 }
 
 func writeErrorV2(w http.ResponseWriter, err error, pagination bool) {
-	if errors.Is(err, errAccountNotAllowed) {
-		err := api.NewError("FORBIDDEN", http.StatusForbidden, errAccountNotAllowed.Error())
+	if errors.Is(err, errNotAllowed) {
+		err := api.NewError("FORBIDDEN", http.StatusForbidden, errNotAllowed.Error())
 		if pagination {
 			err = err.WithPagination()
 		}
@@ -461,7 +466,7 @@ func writeErrorV2(w http.ResponseWriter, err error, pagination bool) {
 	}
 
 	if errors.Is(err, errJointAccountPendingAuthorization) {
-		err := api.NewError("STATUS_RESOURCE_PENDING_AUTHORISATION", http.StatusForbidden, errAccountNotAllowed.Error())
+		err := api.NewError("STATUS_RESOURCE_PENDING_AUTHORISATION", http.StatusForbidden, errJointAccountPendingAuthorization.Error())
 		if pagination {
 			err = err.WithPagination()
 		}

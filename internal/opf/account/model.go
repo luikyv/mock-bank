@@ -1,8 +1,12 @@
 package account
 
 import (
+	"time"
+
+	"github.com/luiky/mock-bank/internal/opf/resource"
 	"github.com/luiky/mock-bank/internal/timex"
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"gorm.io/gorm"
 )
 
 const (
@@ -17,14 +21,29 @@ var (
 )
 
 type Account struct {
-	ID             string         `bson:"_id"`
-	UserID         string         `bson:"user_id"`
-	Number         string         `bson:"number"`
-	Type           Type           `bson:"type"`
-	SubType        SubType        `bson:"subtype"`
-	Balance        Balance        `bson:"balance"`
-	Transactions   []Transaction  `bson:"transactions"`
-	OverdraftLimit OverdraftLimit `bson:"overdraft_limit"`
+	ID                          string `gorm:"primaryKey"`
+	UserID                      string
+	OrgID                       string
+	Number                      string
+	Type                        Type
+	SubType                     SubType
+	AvailableAmount             string
+	BlockedAmount               string
+	AutomaticallyInvestedAmount string
+	OverdraftLimitContracted    string
+	OverdraftLimitUsed          string
+	OverdraftLimitUnarranged    string
+
+	Transactions []*Transaction `gorm:"foreignKey:account_id"`
+}
+
+func (acc *Account) BeforeCreate(tx *gorm.DB) error {
+	acc.ID = newID(90)
+	return nil
+}
+
+func (acc Account) IsJoint() bool {
+	return acc.SubType == SubTypeJointSimple
 }
 
 type Type string
@@ -43,20 +62,27 @@ const (
 	SubTypeJointSolidary SubType = "CONJUNTA_SOLIDARIA"
 )
 
-type Balance struct {
-	AvailableAmount             string
-	BlockedAmount               string
-	AutomaticallyInvestedAmount string
+type Transaction struct {
+	ID           string `gorm:"primaryKey"`
+	AccountID    string
+	Status       TransactionStatus
+	MovementType MovementType
+	Name         string
+	Type         TransactionType
+	Amount       string
+
+	OrgID     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
-type Transaction struct {
-	ID           string            `bson:"id"`
-	Status       TransactionStatus `bson:"status"`
-	MovementType MovementType      `bson:"movement_type"`
-	Name         string            `bson:"name"`
-	Type         TransactionType   `bson:"type"`
-	Amount       string            `bson:"amount"`
-	DateTime     timex.DateTime    `bson:"datetime"`
+func (Transaction) TableName() string {
+	return "account_transactions"
+}
+
+func (t *Transaction) BeforeCreate(tx *gorm.DB) error {
+	t.ID = "TX" + newID(50)
+	return nil
 }
 
 type TransactionStatus string
@@ -97,13 +123,28 @@ const (
 	MovementTypeDebit  MovementType = "DEBITO"
 )
 
-type OverdraftLimit struct {
-	Contracted string `bson:"contracted"`
-	Used       string `bson:"used"`
-	Unarranged string `bson:"unarranged"`
-}
-
 type transactionFilter struct {
 	from timex.Date
 	to   timex.Date
+}
+
+type ConsentAccount struct {
+	ID        string `gorm:"primaryKey"`
+	ConsentID string
+	AccountID string `gorm:"resource_id"`
+	Status    resource.Status
+	Type      resource.Type
+
+	OrgID     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (ConsentAccount) TableName() string {
+	return "consent_resources"
+}
+
+func (acc *ConsentAccount) BeforeCreate(tx *gorm.DB) error {
+	acc.Type = resource.TypeAccount
+	return nil
 }

@@ -7,60 +7,61 @@ import (
 	"time"
 
 	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/api/middleware"
-	"github.com/luiky/mock-bank/internal/consent"
+	"github.com/luiky/mock-bank/internal/opf/account"
+	"github.com/luiky/mock-bank/internal/opf/consent"
+	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luiky/mock-bank/internal/timex"
-	"github.com/luiky/mock-bank/internal/user"
 	"github.com/rs/cors"
 )
 
 type Server struct {
 	host             string
-	frontHost        string
 	service          Service
 	directoryService DirectoryService
 	userService      user.Service
 	consentService   consent.Service
+	accountService   account.Service
 }
 
 func NewServer(
-	host, frontHost string,
+	host string,
 	service Service,
 	directoryService DirectoryService,
 	userService user.Service,
 	consentService consent.Service,
+	accountService account.Service,
 ) Server {
 	return Server{
 		host:             host,
-		frontHost:        frontHost,
 		service:          service,
 		directoryService: directoryService,
 		userService:      userService,
 		consentService:   consentService,
+		accountService:   accountService,
 	}
 }
 
 func (app Server) Register(mux *http.ServeMux) {
 	appMux := http.NewServeMux()
 
-	appMux.Handle("GET /app/orgs/{org_id}/users", app.mockUsersHandler())
-	appMux.Handle("POST /app/orgs/{org_id}/users", app.createMockUserHandler())
-	appMux.Handle("GET /app/orgs/{org_id}/users/{user_id}", app.mockUserHandler())
-	appMux.Handle("DELETE /app/orgs/{org_id}/users/{user_id}", app.deleteMockUserHandler())
-
-	appMux.Handle("GET /app/orgs/{org_id}/users/{user_id}/consents", app.consentsHandler())
-	appHandler := middleware.Meta(appMux, app.host)
+	appMux.Handle("GET /api/orgs/{org_id}/users", app.mockUsersHandler())
+	appMux.Handle("POST /api/orgs/{org_id}/users", app.createMockUserHandler())
+	appMux.Handle("GET /api/orgs/{org_id}/users/{user_id}", app.mockUserHandler())
+	appMux.Handle("DELETE /api/orgs/{org_id}/users/{user_id}", app.deleteMockUserHandler())
+	appMux.Handle("GET /api/orgs/{org_id}/users/{user_id}/accounts", app.accountsHandler())
+	appMux.Handle("GET /api/orgs/{org_id}/users/{user_id}/consents", app.consentsHandler())
+	appHandler := metaMiddleware(appMux, app.host)
 	appHandler = authMiddleware(appHandler, app.service)
 
 	authMux := http.NewServeMux()
-	authMux.Handle("GET /app/directory/auth-url", app.directoryAuthURLHandler())
-	authMux.Handle("GET /app/directory/callback", app.directoryCallbackHandler())
-	authMux.Handle("GET /app/me", app.userHandler())
-	authMux.Handle("POST /app/logout", app.logoutHandler())
-	authHandler := middleware.Meta(authMux, app.host)
+	authMux.Handle("GET /api/directory/auth-url", app.directoryAuthURLHandler())
+	authMux.Handle("GET /api/directory/callback", app.directoryCallbackHandler())
+	authMux.Handle("GET /api/me", app.userHandler())
+	authMux.Handle("POST /api/logout", app.logoutHandler())
+	authHandler := metaMiddleware(authMux, app.host)
 
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{app.frontHost},
+		AllowedOrigins:   []string{app.host},
 		AllowCredentials: true,
 		AllowedMethods:   []string{"HEAD", "GET", "POST", "DELETE"},
 	})
@@ -98,14 +99,14 @@ func (app Server) directoryCallbackHandler() http.Handler {
 
 		http.SetCookie(w, &http.Cookie{
 			Name:     cookieSessionId,
-			Value:    session.ID,
+			Value:    session.ID.String(),
 			Path:     "/app",
 			Expires:  timex.Now().Add(sessionValidity),
 			HttpOnly: true,
 			Secure:   true,
-			Domain:   ".mockbank.local", // TODO: Fix this.
+			Domain:   app.host,
 		})
-		http.Redirect(w, r, app.frontHost+"/", http.StatusSeeOther)
+		http.Redirect(w, r, app.host+"/", http.StatusSeeOther)
 	})
 }
 
@@ -216,6 +217,22 @@ func (s Server) deleteMockUserHandler() http.Handler {
 		}
 
 		w.WriteHeader(http.StatusNoContent)
+	})
+}
+
+func (s Server) accountsHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		orgID := r.PathValue("org_id")
+		userID := r.PathValue("user_id")
+
+		users, err := s.accountService.Accounts(r.Context(), userID, orgID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+
+		resp := toAccountsResponse(users, s.host)
+		api.WriteJSON(w, resp, http.StatusOK)
 	})
 }
 

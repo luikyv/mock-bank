@@ -10,10 +10,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luiky/mock-bank/internal/account"
-	"github.com/luiky/mock-bank/internal/consent"
+	"github.com/luiky/mock-bank/internal/opf/account"
+	"github.com/luiky/mock-bank/internal/opf/consent"
+	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luiky/mock-bank/internal/timex"
-	"github.com/luiky/mock-bank/internal/user"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
 
@@ -24,6 +24,7 @@ func Policy(
 	accountService account.Service,
 ) goidc.AuthnPolicy {
 
+	// TODO: Move this to main.
 	loginTemplate := filepath.Join(templatesDir, "/login.html")
 	consentTemplate := filepath.Join(templatesDir, "/consent.html")
 	tmpl, err := template.ParseFiles(loginTemplate, consentTemplate)
@@ -118,12 +119,14 @@ func (a authenticator) authenticate(w http.ResponseWriter, r *http.Request, sess
 }
 
 func (a authenticator) setUp(r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
+	orgID := as.StoredParameter(paramOrgID).(string)
+
 	consentID, ok := consent.ID(as.Scopes)
 	if !ok {
 		return goidc.StatusFailure, errors.New("missing consent ID")
 	}
 
-	consent, err := a.consentService.Consent(r.Context(), consentID)
+	consent, err := a.consentService.Consent(r.Context(), consentID, orgID)
 	if err != nil {
 		return goidc.StatusFailure, err
 	}
@@ -132,7 +135,7 @@ func (a authenticator) setUp(r *http.Request, as *goidc.AuthnSession) (goidc.Aut
 		return goidc.StatusFailure, errors.New("consent is not awaiting authorization")
 	}
 
-	_, err = a.userService.UserByCPF(r.Context(), consent.UserCPF, as.StoredParameter(paramOrgID).(string))
+	_, err = a.userService.UserByCPF(r.Context(), consent.UserCPF, orgID)
 	if err != nil {
 		return goidc.StatusFailure, errors.New("the consent was created for an user that does not exist")
 	}
@@ -168,8 +171,9 @@ func (a authenticator) login(w http.ResponseWriter, r *http.Request, as *goidc.A
 	}
 
 	if isLogin != "true" {
+		orgID := as.StoredParameter(paramOrgID).(string)
 		consentID := as.StoredParameter(paramConsentID).(string)
-		_ = a.consentService.Reject(r.Context(), consentID, consent.RejectedByUser, consent.RejectionReasonCustomerManuallyRejected)
+		_ = a.consentService.Reject(r.Context(), consentID, orgID, consent.RejectedByUser, consent.RejectionReasonCustomerManuallyRejected)
 		return goidc.StatusFailure, errors.New("consent not granted")
 	}
 
@@ -203,21 +207,27 @@ func (a authenticator) grantConsent(w http.ResponseWriter, r *http.Request, as *
 		return a.renderConsentPage(w, r, as)
 	}
 
+	orgID := as.StoredParameter(paramOrgID).(string)
 	consentID := as.StoredParameter(paramConsentID).(string)
 
 	if isConsented != "true" {
-		_ = a.consentService.Reject(r.Context(), consentID, consent.RejectedByUser, consent.RejectionReasonCustomerManuallyRejected)
+		_ = a.consentService.Reject(r.Context(), consentID, orgID, consent.RejectedByUser, consent.RejectionReasonCustomerManuallyRejected)
 		return goidc.StatusFailure, errors.New("consent not granted")
 	}
 
-	c, err := a.consentService.Consent(r.Context(), consentID)
+	c, err := a.consentService.Consent(r.Context(), consentID, orgID)
 	if err != nil {
 		return goidc.StatusFailure, err
 	}
 
-	c.AccountIDs = r.Form[accountsFormParam]
-	slog.Debug("authorizing consent", "consent_id", c.ID, "accounts", c.AccountIDs)
+	slog.Debug("authorizing consent", "consent_id", c.ID)
 	if err := a.consentService.Authorize(r.Context(), c); err != nil {
+		return goidc.StatusFailure, err
+	}
+
+	accountIDs := r.Form[accountsFormParam]
+	slog.Debug("authorizing accounts", "consent_id", c.ID, "accounts", accountIDs)
+	if err := a.accountService.Authorize(r.Context(), accountIDs, consentID); err != nil {
 		return goidc.StatusFailure, err
 	}
 	return goidc.StatusSuccess, nil
@@ -234,7 +244,9 @@ func (a authenticator) renderConsentPage(w http.ResponseWriter, r *http.Request,
 	}
 
 	if permissions.HasAccountPermissions() {
-		accs, err := a.accountService.AccountsByUserID(r.Context(), as.StoredParameter(paramUserID).(string))
+		userID := as.StoredParameter(paramUserID).(string)
+		orgID := as.StoredParameter(paramOrgID).(string)
+		accs, err := a.accountService.Accounts(r.Context(), userID, orgID)
 		if err != nil {
 			page.Error = "Could not load the user accounts"
 			return a.executeTemplate(w, "consent.html", page)

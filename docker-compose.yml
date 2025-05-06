@@ -6,15 +6,6 @@ services:
     volumes:
       - ./keys/:/app/keys/
 
-  mongodb:
-    image: mongo:latest
-    ports:
-      - 27017:27017
-    environment:
-      - MONGO_INITDB_DATABASE=mockbank
-    volumes:
-      - ./mocks/mongo-init.js:/docker-entrypoint-initdb.d/init-mongo.js
-
   mockgw:
     profiles:
       - dev
@@ -84,16 +75,23 @@ services:
       --fintechlabs.devmode=true
       --fintechlabs.startredir=true
       --fintechlabs.yacs.directory.uri=http://directory/participants
-    links:
-      - mongodb:mongodb
     depends_on:
-      - mongodb
+      - cs-mongodb
     logging:
       # limit logs retained on host
       driver: "json-file"
       options:
         max-size: "500k"
         max-file: "5"
+  
+  cs-mongodb:
+    image: mongo:latest
+    ports:
+      - 27017:27017
+    networks:
+      default:
+        aliases:
+          - mongodb
 
   cs-builder:
     profiles:

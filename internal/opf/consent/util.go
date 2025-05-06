@@ -56,7 +56,7 @@ func validatePersonalAndBusinessPermissions(requestedPermissions []Permission) e
 	return nil
 }
 
-func validateExtension(c Consent, ext Extension) error {
+func validateExtension(c *Consent, ext *Extension) error {
 	if !c.IsAuthorized() {
 		return errCannotExtendConsentNotAuthorized
 	}

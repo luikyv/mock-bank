@@ -8,7 +8,7 @@ import (
 	"slices"
 
 	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/api/middleware"
+	"github.com/luiky/mock-bank/internal/opf/middleware"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timex"
 	"github.com/luikyv/go-oidc/pkg/goidc"
@@ -88,8 +88,9 @@ func (s ServerV3) createHandler() http.Handler {
 
 func (s ServerV3) consentHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		orgID := r.Context().Value(api.CtxKeyOrgID).(string)
 		id := r.PathValue("id")
-		c, err := s.service.Consent(r.Context(), id)
+		c, err := s.service.Consent(r.Context(), id, orgID)
 		if err != nil {
 			writeErrorV3(w, err)
 			return
@@ -102,8 +103,9 @@ func (s ServerV3) consentHandler() http.Handler {
 
 func (s ServerV3) deleteHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		orgID := r.Context().Value(api.CtxKeyOrgID).(string)
 		id := r.PathValue("id")
-		err := s.service.delete(r.Context(), id)
+		err := s.service.delete(r.Context(), id, orgID)
 		if err != nil {
 			writeErrorV3(w, err)
 			return
@@ -115,6 +117,8 @@ func (s ServerV3) deleteHandler() http.Handler {
 
 func (s ServerV3) extendHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		orgID := r.Context().Value(api.CtxKeyOrgID).(string)
+
 		id := r.PathValue("id")
 		if id != r.Context().Value(api.CtxKeyConsentID) {
 			api.WriteError(w, errBadRequest)
@@ -144,7 +148,7 @@ func (s ServerV3) extendHandler() http.Handler {
 			return
 		}
 
-		c, err := s.service.extend(r.Context(), id, req.toExtension(ip, userAgent))
+		c, err := s.service.extend(r.Context(), id, orgID, req.toExtension(ip, userAgent))
 		if err != nil {
 			writeErrorV3(w, err)
 			return
@@ -157,6 +161,7 @@ func (s ServerV3) extendHandler() http.Handler {
 
 func (s ServerV3) extensionsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		orgID := r.Context().Value(api.CtxKeyOrgID).(string)
 		id := r.PathValue("id")
 		pag, err := api.NewPagination(r)
 		if err != nil {
@@ -164,7 +169,7 @@ func (s ServerV3) extensionsHandler() http.Handler {
 			return
 		}
 
-		exts, err := s.service.extensions(r.Context(), id, pag)
+		exts, err := s.service.extensions(r.Context(), id, orgID, pag)
 		if err != nil {
 			writeErrorV3(w, err)
 			return
@@ -202,8 +207,8 @@ func (req createRequestV3) validate() error {
 	return nil
 }
 
-func (req createRequestV3) toConsent(ctx context.Context) Consent {
-	c := Consent{
+func (req createRequestV3) toConsent(ctx context.Context) *Consent {
+	c := &Consent{
 		ID:              consentID(),
 		Status:          StatusAwaitingAuthorization,
 		UserCPF:         req.Data.LoggerUser.Document.Identification,
@@ -241,7 +246,7 @@ type responseV3 struct {
 	Meta  api.Meta  `json:"meta"`
 }
 
-func toResponseV3(c Consent, host string) responseV3 {
+func toResponseV3(c *Consent, host string) responseV3 {
 	resp := responseV3{
 		Links: api.NewLinks(host + "/open-banking/consents/v3/consents/" + c.ID),
 		Meta:  api.NewMeta(),
@@ -287,8 +292,8 @@ func (r extendRequestV3) validate() error {
 	return nil
 }
 
-func (r extendRequestV3) toExtension(ip, userAgent string) Extension {
-	ext := Extension{
+func (r extendRequestV3) toExtension(ip, userAgent string) *Extension {
+	ext := &Extension{
 		UserCPF:       r.Data.LoggerUser.Document.Identification,
 		UserIPAddress: ip,
 		UserAgent:     userAgent,
@@ -318,7 +323,7 @@ type extensionResponseV3 struct {
 	CustomerUserAgent          string          `json:"xCustomerUserAgent"`
 }
 
-func toExtensionsResponseV3(exts page.Page[Extension], reqURL string) extensionsResponseV3 {
+func toExtensionsResponseV3(exts page.Page[*Extension], reqURL string) extensionsResponseV3 {
 	resp := extensionsResponseV3{
 		Links: api.Links{
 			Self: reqURL,

@@ -1,15 +1,19 @@
 package app
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/consent"
+	"github.com/luiky/mock-bank/internal/opf/account"
+	"github.com/luiky/mock-bank/internal/opf/consent"
+	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timex"
-	"github.com/luiky/mock-bank/internal/user"
 )
 
 const (
@@ -18,19 +22,32 @@ const (
 )
 
 type Session struct {
-	ID            string                  `bson:"_id"`
-	Username      string                  `bson:"username"`
-	Organizations map[string]Organization `bson:"organizations"`
-	CreatedAt     timex.DateTime          `bson:"created_at"`
-	ExpiresAt     timex.DateTime          `bson:"expires_at"`
+	ID            uuid.UUID `gorm:"primaryKey"`
+	Username      string
+	Organizations Organizations `gorm:"column:organizations;type:jsonb;not null"`
+
+	CreatedAt time.Time
+	ExpiresAt time.Time
 }
 
 func (s Session) IsExpired() bool {
 	return s.ExpiresAt.Before(timex.Now())
 }
 
-type Organization struct {
-	Name string `bson:"name"`
+type Organizations map[string]struct {
+	Name string `json:"name"`
+}
+
+func (o Organizations) Value() (driver.Value, error) {
+	return json.Marshal(o)
+}
+
+func (o *Organizations) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("failed to convert value to []byte")
+	}
+	return json.Unmarshal(bytes, o)
 }
 
 type directoryIDToken struct {
@@ -61,7 +78,7 @@ type userOrgResponse struct {
 	Name string `json:"name"`
 }
 
-func toUserResponse(s Session) userResponse {
+func toUserResponse(s *Session) userResponse {
 	resp := userResponse{}
 	resp.Data.Username = s.Username
 	resp.Data.Organizations = map[string]userOrgResponse{}
@@ -82,9 +99,8 @@ type mockUserRequest struct {
 	CPF      string `json:"cpf"`
 }
 
-func (req mockUserRequest) toMockUser(orgID string) user.User {
-	return user.User{
-		ID:       uuid.NewString(),
+func (req mockUserRequest) toMockUser(orgID string) *user.User {
+	return &user.User{
 		Username: req.Username,
 		Name:     req.Name,
 		CPF:      req.CPF,
@@ -94,22 +110,22 @@ func (req mockUserRequest) toMockUser(orgID string) user.User {
 
 type mockUserResponse struct {
 	Data struct {
-		ID       string `json:"id"`
-		Username string `json:"username"`
-		CPF      string `json:"cpf"`
-		Name     string `json:"name"`
+		ID       uuid.UUID `json:"id"`
+		Username string    `json:"username"`
+		CPF      string    `json:"cpf"`
+		Name     string    `json:"name"`
 	} `json:"data"`
 	Meta  api.Meta  `json:"meta"`
 	Links api.Links `json:"links"`
 }
 
-func toMockUserResponse(u user.User, reqURL string) mockUserResponse {
+func toMockUserResponse(u *user.User, reqURL string) mockUserResponse {
 	return mockUserResponse{
 		Data: struct {
-			ID       string `json:"id"`
-			Username string `json:"username"`
-			CPF      string `json:"cpf"`
-			Name     string `json:"name"`
+			ID       uuid.UUID `json:"id"`
+			Username string    `json:"username"`
+			CPF      string    `json:"cpf"`
+			Name     string    `json:"name"`
 		}{
 			ID:       u.ID,
 			Username: u.Username,
@@ -123,33 +139,33 @@ func toMockUserResponse(u user.User, reqURL string) mockUserResponse {
 
 type mockUsersResponse struct {
 	Data []struct {
-		ID       string `json:"id"`
-		Username string `json:"username"`
-		CPF      string `json:"cpf"`
-		Name     string `json:"name"`
+		ID       uuid.UUID `json:"id"`
+		Username string    `json:"username"`
+		CPF      string    `json:"cpf"`
+		Name     string    `json:"name"`
 	} `json:"data"`
 	Meta  api.Meta  `json:"meta"`
 	Links api.Links `json:"links"`
 }
 
-func toMockUsersResponse(us page.Page[user.User], reqURL string) mockUsersResponse {
+func toMockUsersResponse(us page.Page[*user.User], reqURL string) mockUsersResponse {
 	resp := mockUsersResponse{
 		Meta:  api.NewPaginatedMeta(us),
 		Links: api.NewPaginatedLinks(reqURL, us),
 	}
 
 	resp.Data = []struct {
-		ID       string `json:"id"`
-		Username string `json:"username"`
-		CPF      string `json:"cpf"`
-		Name     string `json:"name"`
+		ID       uuid.UUID `json:"id"`
+		Username string    `json:"username"`
+		CPF      string    `json:"cpf"`
+		Name     string    `json:"name"`
 	}{}
 	for _, u := range us.Records {
 		resp.Data = append(resp.Data, struct {
-			ID       string `json:"id"`
-			Username string `json:"username"`
-			CPF      string `json:"cpf"`
-			Name     string `json:"name"`
+			ID       uuid.UUID `json:"id"`
+			Username string    `json:"username"`
+			CPF      string    `json:"cpf"`
+			Name     string    `json:"name"`
 		}{
 			ID:       u.ID,
 			Username: u.Username,
@@ -176,11 +192,11 @@ type consentResponse struct {
 	ExpirationDateTime   *timex.DateTime         `json:"expirationDateTime,omitempty"`
 	RejectedBy           consent.RejectedBy      `json:"rejectedBy,omitempty"`
 	RejectionReason      consent.RejectionReason `json:"rejectionReason,omitempty"`
-	UserID               string                  `json:"userId"`
+	UserID               uuid.UUID               `json:"userId"`
 	ClientID             string                  `json:"clientId"`
 }
 
-func toConsentsResponse(cs page.Page[consent.Consent], reqURL string) consentsResponse {
+func toConsentsResponse(cs page.Page[*consent.Consent], reqURL string) consentsResponse {
 
 	resp := consentsResponse{
 		Data:  []consentResponse{},
@@ -207,6 +223,58 @@ func toConsentsResponse(cs page.Page[consent.Consent], reqURL string) consentsRe
 		}
 
 		resp.Data = append(resp.Data, data)
+	}
+
+	return resp
+}
+
+type accountResponse struct {
+	Data []struct {
+		AccountID   string       `json:"accountId"`
+		BrandName   string       `json:"brandName"`
+		CompanyCNPJ string       `json:"companyCnpj"`
+		Type        account.Type `json:"type"`
+		CompeCode   string       `json:"compeCode"`
+		BranchCode  string       `json:"branchCode"`
+		Number      string       `json:"number"`
+		CheckDigit  string       `json:"checkDigit"`
+	} `json:"data"`
+	Meta  api.Meta  `json:"meta"`
+	Links api.Links `json:"links"`
+}
+
+func toAccountsResponse(accs []account.Account, host string) accountResponse {
+	pag := page.Paginate(accs, page.NewPagination(0, 0))
+	resp := accountResponse{
+		Meta:  api.NewPaginatedMeta(pag),
+		Links: api.NewPaginatedLinks(host, pag),
+	}
+
+	resp.Data = []struct {
+		AccountID   string       `json:"accountId"`
+		BrandName   string       `json:"brandName"`
+		CompanyCNPJ string       `json:"companyCnpj"`
+		Type        account.Type `json:"type"`
+		CompeCode   string       `json:"compeCode"`
+		BranchCode  string       `json:"branchCode"`
+		Number      string       `json:"number"`
+		CheckDigit  string       `json:"checkDigit"`
+	}{}
+	for _, acc := range pag.Records {
+		resp.Data = append(resp.Data, struct {
+			AccountID   string       `json:"accountId"`
+			BrandName   string       `json:"brandName"`
+			CompanyCNPJ string       `json:"companyCnpj"`
+			Type        account.Type `json:"type"`
+			CompeCode   string       `json:"compeCode"`
+			BranchCode  string       `json:"branchCode"`
+			Number      string       `json:"number"`
+			CheckDigit  string       `json:"checkDigit"`
+		}{
+			AccountID: acc.ID,
+			Type:      acc.Type,
+			Number:    acc.Number,
+		})
 	}
 
 	return resp

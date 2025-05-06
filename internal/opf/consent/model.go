@@ -1,11 +1,13 @@
 package consent
 
 import (
+	"database/sql/driver"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/luiky/mock-bank/internal/timex"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
@@ -24,21 +26,19 @@ var (
 )
 
 type Consent struct {
-	ID              string          `bson:"_id"`
-	Status          Status          `bson:"status"`
-	Permissions     []Permission    `bson:"permissions"`
-	CreatedAt       time.Time       `bson:"created_at"`
-	StatusUpdatedAt time.Time       `bson:"status_updated_at"`
-	ExpiresAt       *time.Time      `bson:"expires_at"`
-	UserID          string          `bson:"user_id"`
-	UserCPF         string          `bson:"user_cpf"`
-	BusinessCNPJ    string          `bson:"business_cnpj"`
-	ClientID        string          `bson:"client_id"`
-	RejectedBy      RejectedBy      `bson:"rejected_by"`
-	RejectionReason RejectionReason `bson:"rejection_reason"`
-	Extensions      []Extension     `bson:"extensions"`
-	AccountIDs      []string        `bson:"account_ids"`
-	OrgID           string          `bson:"org_id"`
+	ID              string `gorm:"primaryKey"`
+	Status          Status
+	Permissions     Permissions
+	CreatedAt       time.Time
+	StatusUpdatedAt time.Time
+	ExpiresAt       *time.Time
+	UserID          uuid.UUID
+	UserCPF         string
+	BusinessCNPJ    string
+	ClientID        string
+	RejectedBy      RejectedBy
+	RejectionReason RejectionReason
+	OrgID           string
 }
 
 // HasAuthExpired returns true if the status is [StatusAwaitingAuthorization] and
@@ -127,6 +127,26 @@ const (
 )
 
 type Permissions []Permission
+
+func (p Permissions) Value() (driver.Value, error) {
+	strs := make([]string, len(p))
+	for i, perm := range p {
+		strs[i] = string(perm)
+	}
+	return pq.StringArray(strs).Value()
+}
+
+func (p *Permissions) Scan(src interface{}) error {
+	var strs pq.StringArray
+	if err := strs.Scan(src); err != nil {
+		return err
+	}
+	*p = make(Permissions, len(strs))
+	for i, s := range strs {
+		(*p)[i] = Permission(s)
+	}
+	return nil
+}
 
 func (p Permissions) HasAccountPermissions() bool {
 	return slices.ContainsFunc(p, func(permission Permission) bool {
@@ -289,15 +309,15 @@ const (
 )
 
 type Extension struct {
-	ID                uuid.UUID  `gorm:"column:id;default:uuid_generate_v4();primaryKey"`
-	ConsentID         uuid.UUID  `gorm:"column:consent_id"`
-	ExpiresAt         *time.Time `gorm:"column:expires_at"`
-	PreviousExpiresAt *time.Time `gorm:"column:previous_expires_at"`
-	UserCPF           string     `gorm:"column:user_cpf"`
-	BusinessCNPJ      string     `gorm:"column:business_cnpj"`
-	RequestedAt       time.Time  `gorm:"column:requested_at"`
-	UserIPAddress     string     `gorm:"column:user_ip"`
-	UserAgent         string     `gorm:"column:user_agent"`
+	ID                uuid.UUID `gorm:"primaryKey"`
+	ConsentID         uuid.UUID
+	UserCPF           string
+	BusinessCNPJ      string
+	ExpiresAt         *time.Time
+	PreviousExpiresAt *time.Time
+	RequestedAt       time.Time
+	UserIPAddress     string
+	UserAgent         string
 }
 
 func (Extension) TableName() string {

@@ -10,6 +10,11 @@ const (
 	dateFormat     = "2006-01-02"
 )
 
+var (
+	brazilLocation, _ = time.LoadLocation("America/Sao_Paulo")
+)
+
+// TODO: Add db functions.
 type DateTime struct {
 	time.Time
 }
@@ -53,27 +58,35 @@ func DateTimeNow() DateTime {
 }
 
 type Date struct {
-	// TODO: Date should be in Brazil timezone.
 	time.Time
 }
 
 func (d Date) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.String())
+	if d.IsZero() {
+		return json.Marshal(nil)
+	}
+
+	t := d.In(brazilLocation)
+	return json.Marshal(t.Format(dateFormat))
 }
 
 func (d *Date) UnmarshalJSON(data []byte) error {
 	var dateStr string
-	err := json.Unmarshal(data, &dateStr)
+	if err := json.Unmarshal(data, &dateStr); err != nil {
+		return err
+	}
+
+	if dateStr == "" {
+		d.Time = time.Time{}
+		return nil
+	}
+
+	parsed, err := time.ParseInLocation(dateFormat, dateStr, brazilLocation)
 	if err != nil {
 		return err
 	}
 
-	parsed, err := time.Parse(dateFormat, dateStr)
-	if err != nil {
-		return err
-	}
-
-	d.Time = parsed.UTC()
+	d.Time = parsed
 	return nil
 }
 

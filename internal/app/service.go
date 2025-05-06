@@ -2,61 +2,71 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/timex"
+	"gorm.io/gorm"
 )
 
 type Service struct {
-	st               Storage
+	db               *gorm.DB
 	directoryService DirectoryService
 }
 
-func NewService(st Storage, directoryService DirectoryService) Service {
+func NewService(db *gorm.DB, directoryService DirectoryService) Service {
 	return Service{
-		st:               st,
+		db:               db,
 		directoryService: directoryService,
 	}
 }
 
-func (s Service) createSession(ctx context.Context, idToken string) (Session, error) {
+func (s Service) createSession(ctx context.Context, idToken string) (*Session, error) {
 	idTkn, err := s.directoryService.idToken(ctx, idToken)
 	if err != nil {
-		return Session{}, err
+		return nil, err
 	}
 
-	session := Session{
-		ID:            uuid.NewString(),
+	session := &Session{
 		Username:      idTkn.Sub,
-		Organizations: map[string]Organization{},
-		CreatedAt:     timex.DateTimeNow(),
-		ExpiresAt:     timex.NewDateTime(timex.DateTimeNow().Add(sessionValidity)),
+		Organizations: Organizations{},
+		CreatedAt:     timex.Now(),
+		ExpiresAt:     timex.Now().Add(sessionValidity),
 	}
 	for orgID, org := range idTkn.Profile.OrgAccessDetails {
-		session.Organizations[orgID] = Organization{
+		session.Organizations[orgID] = struct {
+			Name string `json:"name"`
+		}{
 			Name: org.Name,
 		}
 	}
-	if err := s.st.createSession(ctx, session); err != nil {
-		return Session{}, err
+
+	if err := s.db.WithContext(ctx).Create(&session).Error; err != nil {
+		return nil, fmt.Errorf("could not create session: %w", err)
 	}
 
 	return session, nil
 }
 
-func (s Service) session(ctx context.Context, id string) (Session, error) {
-	session, err := s.st.session(ctx, id)
-	if err != nil {
-		return Session{}, err
+func (s Service) session(ctx context.Context, id string) (*Session, error) {
+	session := &Session{}
+	if err := s.db.WithContext(ctx).First(&session, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errSessionNotFound
+		}
+		return nil, fmt.Errorf("could not fetch session with id %s: %w", id, err)
 	}
 
 	if session.IsExpired() {
 		_ = s.deleteSession(ctx, id)
-		return Session{}, errSessionNotFound
+		return nil, errSessionNotFound
 	}
 	return session, nil
 }
 
 func (s Service) deleteSession(ctx context.Context, id string) error {
-	return s.st.deleteSession(ctx, id)
+	if err := s.db.WithContext(ctx).Delete(&Session{}, "id = ?", id).Error; err != nil {
+		return fmt.Errorf("could not delete session with id %s: %w", id, err)
+	}
+	return nil
 }

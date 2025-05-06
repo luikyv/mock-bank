@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/api/middleware"
+	"github.com/luiky/mock-bank/internal/opf/middleware"
 )
 
 func PermissionMiddleware(next http.Handler, consentService Service, permissions []Permission, opts *middleware.Options) http.Handler {
@@ -15,9 +15,10 @@ func PermissionMiddleware(next http.Handler, consentService Service, permissions
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		scopes := ctx.Value(api.CtxKeyScopes).(string)
+		orgID := ctx.Value(api.CtxKeyOrgID).(string)
 
 		id, _ := ID(scopes)
-		consent, err := consentService.Consent(ctx, id)
+		consent, err := consentService.Consent(ctx, id, orgID)
 		if err != nil {
 			slog.DebugContext(r.Context(), "the token is not active")
 			err := api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token")

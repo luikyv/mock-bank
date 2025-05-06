@@ -19,10 +19,7 @@ func NewClientManager(database *mongo.Database) ClientManager {
 	}
 }
 
-func (manager ClientManager) Save(
-	ctx context.Context,
-	client *goidc.Client,
-) error {
+func (manager ClientManager) Save(ctx context.Context, client *goidc.Client) error {
 	shouldUpsert := true
 	filter := bson.D{bson.E{Key: "_id", Value: client.ID}}
 	if _, err := manager.coll.ReplaceOne(ctx, filter, client, &options.ReplaceOptions{Upsert: &shouldUpsert}); err != nil {
