@@ -1,8 +1,10 @@
 package account
 
 import (
+	"net/http"
 	"time"
 
+	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/opf/resource"
 	"github.com/luiky/mock-bank/internal/timex"
 	"github.com/luikyv/go-oidc/pkg/goidc"
@@ -13,20 +15,34 @@ const (
 	DefaultCompeCode  string = "001"
 	DefaultBranch     string = "0001"
 	DefaultCheckDigit string = "1"
-	DefaultCurrency   string = "BRL"
 )
 
 var (
 	Scope = goidc.NewScope("accounts")
 )
 
+type ConsentAccount struct {
+	ConsentID string
+	AccountID string
+	Status    resource.Status
+
+	OrgID     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+
+	Account *Account
+}
+
+func (ConsentAccount) TableName() string {
+	return "consent_accounts"
+}
+
 type Account struct {
 	ID                          string `gorm:"primaryKey"`
 	UserID                      string
-	OrgID                       string
 	Number                      string
 	Type                        Type
-	SubType                     SubType
+	SubType                     SubType `gorm:"column:subtype"`
 	AvailableAmount             string
 	BlockedAmount               string
 	AutomaticallyInvestedAmount string
@@ -34,16 +50,16 @@ type Account struct {
 	OverdraftLimitUsed          string
 	OverdraftLimitUnarranged    string
 
+	OrgID     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+
 	Transactions []*Transaction `gorm:"foreignKey:account_id"`
 }
 
 func (acc *Account) BeforeCreate(tx *gorm.DB) error {
 	acc.ID = newID(90)
 	return nil
-}
-
-func (acc Account) IsJoint() bool {
-	return acc.SubType == SubTypeJointSimple
 }
 
 type Type string
@@ -123,28 +139,43 @@ const (
 	MovementTypeDebit  MovementType = "DEBITO"
 )
 
-type transactionFilter struct {
+type TransactionFilter struct {
 	from timex.Date
 	to   timex.Date
 }
 
-type ConsentAccount struct {
-	ID        string `gorm:"primaryKey"`
-	ConsentID string
-	AccountID string `gorm:"resource_id"`
-	Status    resource.Status
-	Type      resource.Type
+func NewTransactionFilter(from, to *timex.Date, current bool) (TransactionFilter, error) {
+	now := timex.DateNow()
+	filter := TransactionFilter{
+		from: now,
+		to:   timex.NewDate(now.AddDate(0, 0, 1)),
+	}
 
-	OrgID     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
+	if from != nil {
+		if to == nil {
+			return TransactionFilter{}, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, "toBookingDate is required if fromBookingDate is informed")
+		}
+		filter.from = *from
+	}
 
-func (ConsentAccount) TableName() string {
-	return "consent_resources"
-}
+	if to != nil {
+		if from == nil {
+			return TransactionFilter{}, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, "fromBookingDate is required if toBookingDate is informed")
+		}
 
-func (acc *ConsentAccount) BeforeCreate(tx *gorm.DB) error {
-	acc.Type = resource.TypeAccount
-	return nil
+		filter.to = *to
+	}
+
+	if current {
+		nowMinus7Days := now.AddDate(0, 0, -7)
+		if filter.from.Before(nowMinus7Days) {
+			return TransactionFilter{}, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, "fromBookingDate too far in the past")
+		}
+
+		if filter.to.Before(nowMinus7Days) {
+			return TransactionFilter{}, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, "toBookingDate too far in the past")
+		}
+	}
+
+	return filter, nil
 }

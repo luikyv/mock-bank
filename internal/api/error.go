@@ -23,6 +23,11 @@ func (err Error) WithPagination() Error {
 	return err
 }
 
+func (err Error) Pagination(b bool) Error {
+	err.pagination = b
+	return err
+}
+
 func NewError(code string, status int, description string) Error {
 	err := Error{
 		code:        code,
@@ -68,5 +73,5 @@ type response struct {
 		Title  string `json:"title"`
 		Detail string `json:"detail"`
 	} `json:"errors"`
-	Meta Meta `json:"meta"`
+	Meta *Meta `json:"meta"`
 }

@@ -1,0 +1,292 @@
+openapi: 3.0.3
+info:
+  title: MockBank App
+  description: BFF for the MockBank application.
+  version: 1.0.0
+paths:
+  /api/directory/auth-url:
+    get:
+      summary: Get the authentication URL for the directory service
+      operationId: getDirectoryAuthUrl
+      responses:
+        '200':
+          description: Authentication URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUrlResponse'
+
+  /api/directory/callback:
+    get:
+      operationId: handleDirectoryCallback
+      parameters:
+        - name: id_token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '303':
+          description: See Other - Redirect to the app
+
+  /api/me:
+    get:
+      summary: Get current user information
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  /api/logout:
+    post:
+      summary: Logout the current user
+      operationId: logoutUser
+      responses:
+        '303':
+          description: See Other - Redirect to the login page
+
+  /api/orgs/{orgId}/users:
+    get:
+      summary: List users in an organization
+      operationId: listUsers
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersResponse'
+    post:
+      summary: Create a new user in an organization
+      operationId: createUser
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  /api/orgs/{orgId}/users/{userId}:
+    get:
+      summary: Get user details
+      operationId: getUser
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+    delete:
+      summary: Delete a user
+      operationId: deleteUser
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: User deleted successfully
+
+  /api/orgs/{orgId}/users/{userId}/accounts:
+    get:
+      summary: Get accounts of a user
+      operationId: getUserAccounts
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountsResponse'
+
+  /api/orgs/{orgId}/users/{userId}/consents:
+    get:
+      summary: Get consents of a user
+      operationId: getUserConsents
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User consents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentsResponse'
+
+components:
+  schemas:
+    UserResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            username:
+              type: string
+            organizations:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+
+    MockUsersResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              username:
+                type: string
+              cpf:
+                type: string
+
+    CreateMockUserRequest:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            username:
+              type: string
+            password:
+              type: string
+            name:
+              type: string
+            cpf:
+              type: string
+
+    AccountsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              accountId:
+                type: string
+              balance:
+                type: number
+                format: float
+
+    ConsentsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required:
+              - consentId
+              - status
+              - permissions
+              - creationDateTime
+              - statusUpdateDateTime
+              - userId
+              - clientId
+            properties:
+              consentId:
+                type: string
+              status:
+                type: string
+              permissions:
+                type: array
+                items:
+                  type: string
+              creationDateTime:
+                type: string
+                format: date-time
+              statusUpdateDateTime:
+                type: string
+                format: date-time
+              expirationDateTime:
+                type: string
+                format: date-time
+              rejectedBy:
+                type: string
+              rejectionReason:
+                type: string
+              userId:
+                type: string
+              clientId:
+                type: string
+
+    AuthUrlResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            url:
+              type: string

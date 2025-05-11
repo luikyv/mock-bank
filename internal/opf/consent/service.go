@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/opf/user"
@@ -35,8 +36,8 @@ func (s Service) Authorize(ctx context.Context, c *Consent) error {
 	return s.save(ctx, c)
 }
 
-func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error) {
-	c, err := s.consent(ctx, id, orgID)
+func (s Service) Consent(ctx context.Context, urn, orgID string) (*Consent, error) {
+	c, err := s.consent(ctx, urn, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -52,8 +53,8 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 	return c, nil
 }
 
-func (s Service) Reject(ctx context.Context, id, orgID string, by RejectedBy, reason RejectionReason) error {
-	c, err := s.Consent(ctx, id, orgID)
+func (s Service) Reject(ctx context.Context, urn, orgID string, by RejectedBy, reason RejectionReason) error {
+	c, err := s.Consent(ctx, urn, orgID)
 	if err != nil {
 		return err
 	}
@@ -67,8 +68,8 @@ func (s Service) Reject(ctx context.Context, id, orgID string, by RejectedBy, re
 	c.RejectionReason = reason
 	return s.save(ctx, c)
 }
-func (s Service) delete(ctx context.Context, id, orgID string) error {
-	c, err := s.Consent(ctx, id, orgID)
+func (s Service) Delete(ctx context.Context, urn, orgID string) error {
+	c, err := s.Consent(ctx, urn, orgID)
 	if err != nil {
 		return err
 	}
@@ -79,10 +80,10 @@ func (s Service) delete(ctx context.Context, id, orgID string) error {
 		rejectionReason = RejectionReasonCustomerManuallyRevoked
 	}
 
-	return s.Reject(ctx, id, orgID, rejectedBy, rejectionReason)
+	return s.Reject(ctx, urn, orgID, rejectedBy, rejectionReason)
 }
 
-func (s Service) create(ctx context.Context, c *Consent) error {
+func (s Service) Create(ctx context.Context, c *Consent) error {
 	if err := validate(c); err != nil {
 		return err
 	}
@@ -126,8 +127,8 @@ func (s Service) modify(ctx context.Context, consent *Consent) error {
 	return nil
 }
 
-func (s Service) extend(ctx context.Context, id, orgID string, ext *Extension) (*Consent, error) {
-	c, err := s.Consent(ctx, id, orgID)
+func (s Service) Extend(ctx context.Context, urn, orgID string, ext *Extension) (*Consent, error) {
+	c, err := s.Consent(ctx, urn, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +171,9 @@ func (s Service) save(ctx context.Context, c *Consent) error {
 	return s.db.WithContext(ctx).Save(c).Error
 }
 
-func (s Service) consent(ctx context.Context, id, orgID string) (*Consent, error) {
+func (s Service) consent(ctx context.Context, urn, orgID string) (*Consent, error) {
+	id := strings.TrimPrefix(urn, urnPrefix)
+
 	c := &Consent{}
 	err := s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).First(c).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -203,7 +206,8 @@ func (s Service) saveExtension(ctx context.Context, ext *Extension) error {
 	return s.db.WithContext(ctx).Save(ext).Error
 }
 
-func (s Service) extensions(ctx context.Context, consentID, orgID string, pag page.Pagination) (page.Page[*Extension], error) {
+func (s Service) Extensions(ctx context.Context, consentURN, orgID string, pag page.Pagination) (page.Page[*Extension], error) {
+	consentID := strings.TrimPrefix(consentURN, urnPrefix)
 	query := s.db.WithContext(ctx).Model(&Extension{}).Where("consent_id = ? AND org_id = ?", consentID, orgID)
 
 	var extensions []*Extension

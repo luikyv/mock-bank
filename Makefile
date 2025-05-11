@@ -1,5 +1,7 @@
 .PHONY: keys
 
+DSN="postgres://admin:pass@localhost:5432/mockbank?sslmode=disable"
+
 setup:
 	@make keys
 
@@ -11,6 +13,10 @@ setup-dev:
 	@pre-commit install
 	@make keys
 	@make setup-cs
+	@make tools
+
+tools:
+	@go install tools
 
 # Runs the main MockBank components.
 run:
@@ -29,15 +35,34 @@ run-dev-with-cs:
 
 # Run the Conformance Suite.
 run-cs:
-	docker compose --profile conformance up
+	@docker compose --profile conformance up
 
 # Generate certificates, private keys, and JWKS files for both the server and clients.
 keys:
 	@go run cmd/keymaker/main.go
 
+models:
+	@go generate ./...
+
 # Build the MockBank Docker Image.
 build-mockbank:
 	@docker-compose build mockbank
+
+db-migrations:
+	@migrate -path ./db/migrations -database $(DSN) up
+
+db-migrations-down:
+	@migrate -path ./db/migrations -database $(DSN) down
+
+db-migration-file:
+	@read -p "Enter migration name (e.g. add_users_table): " name; \
+	migrate create -ext sql -dir ./db/migrations -seq $$name
+
+db-seeds:
+	@docker-compose exec -T psql psql -U admin -d mockbank < ./db/seeds/setup.up.sql
+
+db-seeds-down:
+	@docker-compose exec -T psql psql -U admin -d mockbank < ./db/seeds/setup.down.sql
 
 # Clone and build the Open Finance Conformance Suite.
 setup-cs:

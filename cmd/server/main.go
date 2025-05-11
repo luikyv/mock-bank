@@ -34,7 +34,7 @@ var (
 	directoryIssuer   = getEnv("DIRECTORY_ISSUER", "https://directory")
 	directoryClientID = getEnv("DIRECTORY_CLIENT_ID", "mockbank")
 	port              = getEnv("PORT", "80")
-	dbStringCon       = getEnv("DB_STRING", "mongodb://localhost:27017/mockbank")
+	dbStringCon       = getEnv("DB_STRING", "postgres://admin:pass@localhost:5432/mockbank?sslmode=disable")
 )
 
 func main() {
@@ -64,9 +64,9 @@ func main() {
 
 	op.RegisterRoutes(mux)
 	opf.NewServer(apiMTLSHost, consentService, accountService, op).RegisterRoutes(mux)
-	app.NewServer(appHost, appService, directoryService, userService, consentService, accountService).Register(mux)
+	app.NewServer(appHost, appService, directoryService, userService, consentService, accountService).RegisterRoutes(mux)
 
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
+	if err := http.ListenAndServe(":"+port, mux); err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }

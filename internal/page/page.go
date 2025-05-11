@@ -37,7 +37,7 @@ func New[T any](records []T, pagination Pagination, totalRecords int) Page[T] {
 }
 
 type Pagination struct {
-	// Number is the page number requested.
+	// Number is the page number requested starting from 1.
 	Number int
 	// Size is the page size requested.
 	Size int
@@ -56,18 +56,18 @@ func (p Pagination) Limit() int {
 	return p.Size
 }
 
-func NewPagination(pageNumber int, pageSize int) Pagination {
+func NewPagination(pageNumber *int32, pageSize *int32) Pagination {
 	pagination := Pagination{
 		Number: 1,
 		Size:   defaultPageSize,
 	}
 
-	if pageNumber > 0 {
-		pagination.Number = pageNumber
+	if pageNumber != nil && *pageNumber > 0 {
+		pagination.Number = int(*pageNumber)
 	}
 
-	if pageSize > 0 && pageSize <= 1000 {
-		pagination.Size = pageSize
+	if pageSize != nil && *pageSize > 0 && *pageSize <= 1000 {
+		pagination.Size = int(*pageSize)
 	}
 
 	return pagination

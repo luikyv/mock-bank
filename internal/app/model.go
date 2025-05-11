@@ -115,8 +115,8 @@ type mockUserResponse struct {
 		CPF      string    `json:"cpf"`
 		Name     string    `json:"name"`
 	} `json:"data"`
-	Meta  api.Meta  `json:"meta"`
-	Links api.Links `json:"links"`
+	Meta  *api.Meta  `json:"meta"`
+	Links *api.Links `json:"links"`
 }
 
 func toMockUserResponse(u *user.User, reqURL string) mockUserResponse {
@@ -144,8 +144,8 @@ type mockUsersResponse struct {
 		CPF      string    `json:"cpf"`
 		Name     string    `json:"name"`
 	} `json:"data"`
-	Meta  api.Meta  `json:"meta"`
-	Links api.Links `json:"links"`
+	Meta  *api.Meta  `json:"meta"`
+	Links *api.Links `json:"links"`
 }
 
 func toMockUsersResponse(us page.Page[*user.User], reqURL string) mockUsersResponse {
@@ -179,8 +179,8 @@ func toMockUsersResponse(us page.Page[*user.User], reqURL string) mockUsersRespo
 
 type consentsResponse struct {
 	Data  []consentResponse `json:"data"`
-	Links api.Links         `json:"links"`
-	Meta  api.Meta          `json:"meta"`
+	Links *api.Links        `json:"links"`
+	Meta  *api.Meta         `json:"meta"`
 }
 
 type consentResponse struct {
@@ -206,7 +206,7 @@ func toConsentsResponse(cs page.Page[*consent.Consent], reqURL string) consentsR
 
 	for _, c := range cs.Records {
 		data := consentResponse{
-			ID:                   c.ID,
+			ID:                   c.URN(),
 			Status:               c.Status,
 			Permissions:          c.Permissions,
 			CreationDateTime:     timex.NewDateTime(c.CreatedAt),
@@ -239,15 +239,14 @@ type accountResponse struct {
 		Number      string       `json:"number"`
 		CheckDigit  string       `json:"checkDigit"`
 	} `json:"data"`
-	Meta  api.Meta  `json:"meta"`
-	Links api.Links `json:"links"`
+	Meta  *api.Meta  `json:"meta"`
+	Links *api.Links `json:"links"`
 }
 
-func toAccountsResponse(accs []account.Account, host string) accountResponse {
-	pag := page.Paginate(accs, page.NewPagination(0, 0))
+func toAccountsResponse(accs page.Page[*account.Account], reqURL string) accountResponse {
 	resp := accountResponse{
-		Meta:  api.NewPaginatedMeta(pag),
-		Links: api.NewPaginatedLinks(host, pag),
+		Meta:  api.NewPaginatedMeta(accs),
+		Links: api.NewPaginatedLinks(reqURL, accs),
 	}
 
 	resp.Data = []struct {
@@ -260,7 +259,7 @@ func toAccountsResponse(accs []account.Account, host string) accountResponse {
 		Number      string       `json:"number"`
 		CheckDigit  string       `json:"checkDigit"`
 	}{}
-	for _, acc := range pag.Records {
+	for _, acc := range accs.Records {
 		resp.Data = append(resp.Data, struct {
 			AccountID   string       `json:"accountId"`
 			BrandName   string       `json:"brandName"`

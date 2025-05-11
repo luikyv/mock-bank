@@ -25,12 +25,21 @@ const (
 
 type Resource struct {
 	ID         uuid.UUID `gorm:"primaryKey"`
-	ConsentID  uuid.UUID
-	ResourceID uuid.UUID
+	ConsentID  string
+	ResourceID string
 	Status     Status
 	Type       Type
 }
 
 func (Resource) TableName() string {
 	return "consent_resources"
+}
+
+func New(resourceID, consentID string, status Status, resourceType Type) *Resource {
+	return &Resource{
+		ResourceID: resourceID,
+		ConsentID:  consentID,
+		Status:     status,
+		Type:       resourceType,
+	}
 }

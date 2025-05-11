@@ -1,10 +1,15 @@
 package resource
 
-import "context"
+import (
+	"gorm.io/gorm"
+)
 
 type Service struct {
+	db *gorm.DB
 }
 
-func (Service) IsAvailable(ctx context.Context, resourceID, consentID string) bool {
-	return false
+func NewService(db *gorm.DB) Service {
+	return Service{
+		db: db,
+	}
 }

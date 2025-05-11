@@ -6,52 +6,40 @@ import (
 	"net/http"
 
 	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/opf/middleware"
+	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 )
 
-func PermissionMiddleware(next http.Handler, consentService Service, permissions []Permission, opts *middleware.Options) http.Handler {
-	pagination := opts != nil && opts.ErrorPagination
+type PermissionOptions struct {
+	Permissions     []Permission
+	ErrorPagination bool
+}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		scopes := ctx.Value(api.CtxKeyScopes).(string)
-		orgID := ctx.Value(api.CtxKeyOrgID).(string)
+func PermissionMiddleware(optsMap map[string]PermissionOptions, consentService Service) strictnethttp.StrictHTTPMiddlewareFunc {
+	return func(next strictnethttp.StrictHTTPHandlerFunc, operationID string) strictnethttp.StrictHTTPHandlerFunc {
+		opts := optsMap[operationID]
+		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (res any, err error) {
+			scopes := ctx.Value(api.CtxKeyScopes).(string)
+			orgID := ctx.Value(api.CtxKeyOrgID).(string)
 
-		id, _ := ID(scopes)
-		consent, err := consentService.Consent(ctx, id, orgID)
-		if err != nil {
-			slog.DebugContext(r.Context(), "the token is not active")
-			err := api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token")
-			if pagination {
-				err = err.WithPagination()
+			id, _ := ID(scopes)
+			consent, err := consentService.Consent(ctx, id, orgID)
+			if err != nil {
+				slog.DebugContext(r.Context(), "the token is not active")
+				return nil, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(opts.ErrorPagination)
 			}
-			api.WriteError(w, err)
-			return
-		}
 
-		if !consent.IsAuthorized() {
-			slog.DebugContext(r.Context(), "the consent is not authorized")
-			err := api.NewError("INVALID_STATUS", http.StatusUnauthorized, "the consent is not authorized")
-			if pagination {
-				err = err.WithPagination()
+			if !consent.IsAuthorized() {
+				slog.DebugContext(r.Context(), "the consent is not authorized")
+				return nil, api.NewError("INVALID_STATUS", http.StatusUnauthorized, "the consent is not authorized").Pagination(opts.ErrorPagination)
 			}
-			api.WriteError(w, err)
-			return
-		}
 
-		if !consent.HasPermissions(permissions) {
-			slog.DebugContext(r.Context(), "the consent doesn't have the required permissions")
-			err := api.NewError("INVALID_STATUS", http.StatusForbidden, "the consent is missing permissions")
-			if pagination {
-				err = err.WithPagination()
+			if !consent.HasPermissions(opts.Permissions) {
+				slog.DebugContext(r.Context(), "the consent doesn't have the required permissions")
+				return nil, api.NewError("INVALID_STATUS", http.StatusForbidden, "the consent is missing permissions").Pagination(opts.ErrorPagination)
 			}
-			api.WriteError(w, err)
-			return
+
+			ctx = context.WithValue(ctx, api.CtxKeyConsentID, id)
+			return next(ctx, w, r, req)
 		}
-
-		ctx = context.WithValue(ctx, api.CtxKeyConsentID, id)
-		r = r.WithContext(ctx)
-
-		next.ServeHTTP(w, r)
-	})
+	}
 }

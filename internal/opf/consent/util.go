@@ -106,5 +106,5 @@ func containsAny[T comparable](slice1 []T, slice2 ...T) bool {
 }
 
 func consentID() string {
-	return idPrefix + uuid.NewString()
+	return urnPrefix + uuid.NewString()
 }

@@ -41,7 +41,7 @@ func NewServer(
 	}
 }
 
-func (app Server) Register(mux *http.ServeMux) {
+func (app Server) RegisterRoutes(mux *http.ServeMux) {
 	appMux := http.NewServeMux()
 
 	appMux.Handle("GET /api/orgs/{org_id}/users", app.mockUsersHandler())
@@ -63,10 +63,15 @@ func (app Server) Register(mux *http.ServeMux) {
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{app.host},
 		AllowCredentials: true,
-		AllowedMethods:   []string{"HEAD", "GET", "POST", "DELETE"},
+		AllowedMethods: []string{
+			http.MethodHead,
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodDelete,
+		},
 	})
-	mux.Handle("/app/orgs/{org_id}/", c.Handler(appHandler))
-	mux.Handle("/app/", c.Handler(authHandler))
+	mux.Handle("/api/orgs/{org_id}/", c.Handler(appHandler))
+	mux.Handle("/api/", c.Handler(authHandler))
 }
 
 func (app Server) directoryAuthURLHandler() http.Handler {
@@ -100,7 +105,7 @@ func (app Server) directoryCallbackHandler() http.Handler {
 		http.SetCookie(w, &http.Cookie{
 			Name:     cookieSessionId,
 			Value:    session.ID.String(),
-			Path:     "/app",
+			Path:     "/api",
 			Expires:  timex.Now().Add(sessionValidity),
 			HttpOnly: true,
 			Secure:   true,
@@ -137,7 +142,7 @@ func (app Server) logoutHandler() http.Handler {
 
 		http.SetCookie(w, &http.Cookie{
 			Name:     cookieSessionId,
-			Path:     "/app",
+			Path:     "/api",
 			Expires:  time.Unix(0, 0),
 			MaxAge:   -1,
 			HttpOnly: true,
@@ -224,14 +229,19 @@ func (s Server) accountsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		orgID := r.PathValue("org_id")
 		userID := r.PathValue("user_id")
-
-		users, err := s.accountService.Accounts(r.Context(), userID, orgID)
+		pag, err := api.NewPagination(r)
 		if err != nil {
 			writeError(w, err)
 			return
 		}
 
-		resp := toAccountsResponse(users, s.host)
+		accs, err := s.accountService.Accounts(r.Context(), userID, orgID, pag)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+
+		resp := toAccountsResponse(accs, s.host)
 		api.WriteJSON(w, resp, http.StatusOK)
 	})
 }
@@ -270,3 +280,5 @@ func writeError(w http.ResponseWriter, err error) {
 
 	api.WriteError(w, err)
 }
+
+var _ StrictServerInterface = Server{}

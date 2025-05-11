@@ -13,9 +13,9 @@ import (
 )
 
 const (
+	DefaultUserDocumentRelation      = "CPF"
 	maxTimeAwaitingAuthorizationSecs = 3600
-	idPrefix                         = "urn:mockbank:"
-	defaultUserDocumentRelation      = "CPF"
+	urnPrefix                        = "urn:mockbank:"
 )
 
 var (
@@ -26,10 +26,9 @@ var (
 )
 
 type Consent struct {
-	ID              string `gorm:"primaryKey"`
+	ID              uuid.UUID `gorm:"primaryKey"`
 	Status          Status
 	Permissions     Permissions
-	CreatedAt       time.Time
 	StatusUpdatedAt time.Time
 	ExpiresAt       *time.Time
 	UserID          uuid.UUID
@@ -38,7 +37,14 @@ type Consent struct {
 	ClientID        string
 	RejectedBy      RejectedBy
 	RejectionReason RejectionReason
-	OrgID           string
+
+	OrgID     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (c Consent) URN() string {
+	return urnPrefix + c.ID.String()
 }
 
 // HasAuthExpired returns true if the status is [StatusAwaitingAuthorization] and

@@ -246,7 +246,7 @@ func (a authenticator) renderConsentPage(w http.ResponseWriter, r *http.Request,
 	if permissions.HasAccountPermissions() {
 		userID := as.StoredParameter(paramUserID).(string)
 		orgID := as.StoredParameter(paramOrgID).(string)
-		accs, err := a.accountService.Accounts(r.Context(), userID, orgID)
+		accs, err := a.accountService.AllAccounts(r.Context(), userID, orgID)
 		if err != nil {
 			page.Error = "Could not load the user accounts"
 			return a.executeTemplate(w, "consent.html", page)

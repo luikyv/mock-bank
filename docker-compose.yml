@@ -3,8 +3,21 @@ services:
     profiles:
       - main
     build: .
+    environment:
+      - DB_STRING=postgres://admin:pass@psql:5432/mockbank?sslmode=disable
     volumes:
       - ./keys/:/app/keys/
+  
+  psql:
+    image: postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: mockbank
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/seeds/setup.sql:/docker-entrypoint-initdb.d/setup.sql
 
   mockgw:
     profiles:
