@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/opf/resource"
 	"github.com/luiky/mock-bank/internal/timex"
@@ -22,7 +23,7 @@ var (
 )
 
 type ConsentAccount struct {
-	ConsentID string
+	ConsentID uuid.UUID
 	AccountID string
 	Status    resource.Status
 

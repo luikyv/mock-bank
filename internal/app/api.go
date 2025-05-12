@@ -211,7 +211,7 @@ func (s Server) CreateMockUser(ctx context.Context, req CreateMockUserRequestObj
 		CPF:      req.Body.Data.Cpf,
 		OrgID:    req.OrgID,
 	}
-	if err := s.userService.Save(ctx, u); err != nil {
+	if err := s.userService.Create(ctx, u); err != nil {
 		return nil, err
 	}
 

@@ -18,9 +18,8 @@ func NewService(db *gorm.DB) Service {
 	}
 }
 
-// Save inserts or updates a user.
-func (s Service) Save(ctx context.Context, u *User) error {
-	if err := s.db.WithContext(ctx).Save(u).Error; err != nil {
+func (s Service) Create(ctx context.Context, u *User) error {
+	if err := s.db.WithContext(ctx).Create(u).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return ErrAlreadyExists
 		}

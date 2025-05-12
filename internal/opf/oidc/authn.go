@@ -194,7 +194,7 @@ func (a authenticator) login(w http.ResponseWriter, r *http.Request, as *goidc.A
 		})
 	}
 
-	as.StoreParameter(paramUserID, user.ID)
+	as.StoreParameter(paramUserID, user.ID.String())
 	return goidc.StatusSuccess, nil
 }
 
@@ -227,7 +227,7 @@ func (a authenticator) grantConsent(w http.ResponseWriter, r *http.Request, as *
 
 	accountIDs := r.Form[accountsFormParam]
 	slog.Debug("authorizing accounts", "consent_id", c.ID, "accounts", accountIDs)
-	if err := a.accountService.Authorize(r.Context(), accountIDs, consentID); err != nil {
+	if err := a.accountService.Authorize(r.Context(), accountIDs, c.ID); err != nil {
 		return goidc.StatusFailure, err
 	}
 	return goidc.StatusSuccess, nil

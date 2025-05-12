@@ -104,7 +104,7 @@ func (s Server) AccountsGetAccounts(ctx context.Context, req AccountsGetAccounts
 		})
 	}
 
-	return AccountsGetAccounts200JSONResponse{OKResponseAccountListJSONResponse{Body: resp}}, nil
+	return AccountsGetAccounts200JSONResponse{OKResponseAccountListJSONResponse: OKResponseAccountListJSONResponse(resp)}, nil
 }
 
 func (s Server) AccountsGetAccountsAccountID(ctx context.Context, req AccountsGetAccountsAccountIDRequestObject) (AccountsGetAccountsAccountIDResponseObject, error) {
@@ -131,7 +131,7 @@ func (s Server) AccountsGetAccountsAccountID(ctx context.Context, req AccountsGe
 		Meta:  *api.NewSingleRecordMeta(),
 		Links: *api.NewLinks(reqURL),
 	}
-	return AccountsGetAccountsAccountID200JSONResponse{OKResponseAccountIdentificationJSONResponse{Body: resp}}, nil
+	return AccountsGetAccountsAccountID200JSONResponse{OKResponseAccountIdentificationJSONResponse(resp)}, nil
 }
 
 func (s Server) AccountsGetAccountsAccountIDBalances(ctx context.Context, req AccountsGetAccountsAccountIDBalancesRequestObject) (AccountsGetAccountsAccountIDBalancesResponseObject, error) {
@@ -163,7 +163,7 @@ func (s Server) AccountsGetAccountsAccountIDBalances(ctx context.Context, req Ac
 		Meta:  *api.NewSingleRecordMeta(),
 		Links: *api.NewLinks(reqURL),
 	}
-	return AccountsGetAccountsAccountIDBalances200JSONResponse{OKResponseAccountBalancesJSONResponse{Body: resp}}, nil
+	return AccountsGetAccountsAccountIDBalances200JSONResponse{OKResponseAccountBalancesJSONResponse(resp)}, nil
 }
 
 func (s Server) AccountsGetAccountsAccountIDOverdraftLimits(ctx context.Context, req AccountsGetAccountsAccountIDOverdraftLimitsRequestObject) (AccountsGetAccountsAccountIDOverdraftLimitsResponseObject, error) {
@@ -199,7 +199,7 @@ func (s Server) AccountsGetAccountsAccountIDOverdraftLimits(ctx context.Context,
 		}
 	}
 
-	return AccountsGetAccountsAccountIDOverdraftLimits200JSONResponse{OKResponseAccountOverdraftLimitsJSONResponse{Body: resp}}, nil
+	return AccountsGetAccountsAccountIDOverdraftLimits200JSONResponse{OKResponseAccountOverdraftLimitsJSONResponse(resp)}, nil
 }
 
 func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, req AccountsGetAccountsAccountIDTransactionsRequestObject) (AccountsGetAccountsAccountIDTransactionsResponseObject, error) {
@@ -242,7 +242,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 			Type:                EnumTransactionTypes(tx.Type),
 		})
 	}
-	return AccountsGetAccountsAccountIDTransactions200JSONResponse{OKResponseAccountTransactionsJSONResponse{Body: resp}}, nil
+	return AccountsGetAccountsAccountIDTransactions200JSONResponse{OKResponseAccountTransactionsJSONResponse(resp)}, nil
 }
 
 func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Context, req AccountsGetAccountsAccountIDTransactionsCurrentRequestObject) (AccountsGetAccountsAccountIDTransactionsCurrentResponseObject, error) {
@@ -286,7 +286,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 		})
 	}
 
-	return AccountsGetAccountsAccountIDTransactionsCurrent200JSONResponse{OKResponseAccountTransactionsJSONResponse{Body: resp}}, nil
+	return AccountsGetAccountsAccountIDTransactionsCurrent200JSONResponse{OKResponseAccountTransactionsJSONResponse(resp)}, nil
 }
 
 func writeResponseError(w http.ResponseWriter, err error, pagination bool) {

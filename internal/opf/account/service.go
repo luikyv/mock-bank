@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/opf/resource"
 	"github.com/luiky/mock-bank/internal/page"
 	"gorm.io/gorm"
@@ -18,11 +19,11 @@ func NewService(db *gorm.DB) Service {
 	return Service{db: db}
 }
 
-func (s Service) Authorize(ctx context.Context, accIDs []string, consentID string) error {
+func (s Service) Authorize(ctx context.Context, accIDs []string, consentID uuid.UUID) error {
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, accID := range accIDs {
 			var acc Account
-			if err := tx.Select("subtype").First(&acc, "id = ?", accID).Error; err != nil {
+			if err := tx.First(&acc, "id = ?", accID).Error; err != nil {
 				return fmt.Errorf("account %s not found: %w", accID, err)
 			}
 
@@ -31,7 +32,7 @@ func (s Service) Authorize(ctx context.Context, accIDs []string, consentID strin
 				status = resource.StatusPendingAuthorization
 			}
 
-			if err := s.saveConsent(ctx, &ConsentAccount{
+			if err := s.createConsent(ctx, &ConsentAccount{
 				ConsentID: consentID,
 				AccountID: accID,
 				Status:    status,
@@ -45,8 +46,8 @@ func (s Service) Authorize(ctx context.Context, accIDs []string, consentID strin
 	})
 }
 
-func (s Service) Save(ctx context.Context, acc *Account) error {
-	if err := s.db.WithContext(ctx).Save(acc).Error; err != nil {
+func (s Service) Create(ctx context.Context, acc *Account) error {
+	if err := s.db.WithContext(ctx).Create(acc).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return ErrAlreadyExists
 		}
@@ -55,8 +56,8 @@ func (s Service) Save(ctx context.Context, acc *Account) error {
 	return nil
 }
 
-func (s Service) saveConsent(ctx context.Context, consentAcc *ConsentAccount) error {
-	return s.db.WithContext(ctx).Save(consentAcc).Error
+func (s Service) createConsent(ctx context.Context, consentAcc *ConsentAccount) error {
+	return s.db.WithContext(ctx).Create(consentAcc).Error
 }
 
 func (s Service) ConsentedAccount(ctx context.Context, consentID, accountID, orgID string) (*Account, error) {
@@ -131,8 +132,8 @@ func (s Service) ConsentedAccounts(ctx context.Context, consentID, orgID string,
 	return page.New(accs, pag, int(total)), nil
 }
 
-func (s Service) SaveTransaction(ctx context.Context, tx *Transaction) error {
-	return s.db.WithContext(ctx).Save(tx).Error
+func (s Service) CreateTransaction(ctx context.Context, tx *Transaction) error {
+	return s.db.WithContext(ctx).Create(tx).Error
 }
 
 func (s Service) Transactions(ctx context.Context, accID, orgID string, pag page.Pagination, filter TransactionFilter) (page.Page[*Transaction], error) {

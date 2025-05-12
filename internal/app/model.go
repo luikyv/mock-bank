@@ -17,7 +17,7 @@ const (
 )
 
 type Session struct {
-	ID            uuid.UUID `gorm:"primaryKey"`
+	ID            uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Username      string
 	Organizations Organizations `gorm:"column:organizations;type:jsonb;not null"`
 

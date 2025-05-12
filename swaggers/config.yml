@@ -6,5 +6,5 @@ generate:
 output-options:
   name-normalizer: ToCamelCaseWithInitialisms
   overlay:
-    path: overlay.yml
+    path: swaggers/overlay.yml
     strict: false

@@ -24,7 +24,7 @@ const (
 )
 
 type Resource struct {
-	ID         uuid.UUID `gorm:"primaryKey"`
+	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	ConsentID  string
 	ResourceID string
 	Status     Status

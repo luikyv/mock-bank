@@ -14,7 +14,7 @@ const headerXFAPIInteractionID = "X-FAPI-Interaction-ID"
 func FAPIID(optsMap map[string]Options) strictnethttp.StrictHTTPMiddlewareFunc {
 	return func(next strictnethttp.StrictHTTPHandlerFunc, operationID string) strictnethttp.StrictHTTPHandlerFunc {
 		opts := optsMap[operationID]
-		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (response any, err error) {
+		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (resp any, err error) {
 			interactionID := r.Header.Get(headerXFAPIInteractionID)
 			// Verify if the interaction ID is valid, return a new value if not.
 			if _, err := uuid.Parse(interactionID); err != nil {
@@ -23,7 +23,7 @@ func FAPIID(optsMap map[string]Options) strictnethttp.StrictHTTPMiddlewareFunc {
 			}
 
 			// Return the same interaction ID in the response.
-			w.Header().Add(headerXFAPIInteractionID, interactionID)
+			w.Header().Set(headerXFAPIInteractionID, interactionID)
 
 			ctx = context.WithValue(ctx, api.CtxKeyInteractionID, interactionID)
 			return next(ctx, w, r, req)

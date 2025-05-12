@@ -98,7 +98,7 @@ func (s Server) ConsentsPostConsents(ctx context.Context, req ConsentsPostConsen
 		resp.Data.ExpirationDateTime = &exp
 	}
 
-	return ConsentsPostConsents201JSONResponse{N201ConsentsCreatedJSONResponse{Body: resp}}, nil
+	return ConsentsPostConsents201JSONResponse{N201ConsentsCreatedJSONResponse(resp)}, nil
 }
 
 func (s Server) ConsentsGetConsentsConsentID(ctx context.Context, req ConsentsGetConsentsConsentIDRequestObject) (ConsentsGetConsentsConsentIDResponseObject, error) {
@@ -152,9 +152,7 @@ func (s Server) ConsentsGetConsentsConsentID(ctx context.Context, req ConsentsGe
 		resp.Data.Rejection.RejectedBy = EnumRejectedBy(c.RejectedBy)
 		resp.Data.Rejection.Reason.Code = ResponseConsentReadDataRejectionReasonCode(c.RejectionReason)
 	}
-	return ConsentsGetConsentsConsentID200JSONResponse{N200ConsentsConsentIDReadJSONResponse{
-		Body: resp,
-	}}, nil
+	return ConsentsGetConsentsConsentID200JSONResponse{N200ConsentsConsentIDReadJSONResponse(resp)}, nil
 }
 
 func (s Server) ConsentsDeleteConsentsConsentID(ctx context.Context, req ConsentsDeleteConsentsConsentIDRequestObject) (ConsentsDeleteConsentsConsentIDResponseObject, error) {
@@ -204,7 +202,7 @@ func (s Server) ConsentsPostConsentsConsentIDExtends(ctx context.Context, req Co
 		exp := timex.NewDateTime(*c.ExpiresAt)
 		resp.Data.ExpirationDateTime = &exp
 	}
-	return ConsentsPostConsentsConsentIDExtends201JSONResponse{N201ConsentsCreatedExtensionsJSONResponse{Body: resp}}, nil
+	return ConsentsPostConsentsConsentIDExtends201JSONResponse{N201ConsentsCreatedExtensionsJSONResponse(resp)}, nil
 }
 
 func (s Server) ConsentsGetConsentsConsentIDExtensions(ctx context.Context, req ConsentsGetConsentsConsentIDExtensionsRequestObject) (ConsentsGetConsentsConsentIDExtensionsResponseObject, error) {
@@ -252,7 +250,7 @@ func (s Server) ConsentsGetConsentsConsentIDExtensions(ctx context.Context, req 
 		resp.Data = append(resp.Data, extResp)
 	}
 
-	return ConsentsGetConsentsConsentIDExtensions200JSONResponse{N200ConsentsConsentIDReadExtensionsJSONResponse{Body: resp}}, nil
+	return ConsentsGetConsentsConsentIDExtensions200JSONResponse{N200ConsentsConsentIDReadExtensionsJSONResponse(resp)}, nil
 }
 
 func writeResponseError(w http.ResponseWriter, err error) {

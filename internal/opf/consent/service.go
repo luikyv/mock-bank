@@ -68,6 +68,7 @@ func (s Service) Reject(ctx context.Context, urn, orgID string, by RejectedBy, r
 	c.RejectionReason = reason
 	return s.save(ctx, c)
 }
+
 func (s Service) Delete(ctx context.Context, urn, orgID string) error {
 	c, err := s.Consent(ctx, urn, orgID)
 	if err != nil {
@@ -92,7 +93,7 @@ func (s Service) Create(ctx context.Context, c *Consent) error {
 		c.UserID = user.ID
 	}
 
-	return s.save(ctx, c)
+	return s.db.WithContext(ctx).Create(c).Error
 }
 
 // modify will evaluated the consent information and modify it to be compliant.

@@ -26,7 +26,7 @@ var (
 )
 
 type Consent struct {
-	ID              uuid.UUID `gorm:"primaryKey"`
+	ID              uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Status          Status
 	Permissions     Permissions
 	StatusUpdatedAt time.Time
@@ -315,7 +315,7 @@ const (
 )
 
 type Extension struct {
-	ID                uuid.UUID `gorm:"primaryKey"`
+	ID                uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	ConsentID         uuid.UUID
 	UserCPF           string
 	BusinessCNPJ      string
