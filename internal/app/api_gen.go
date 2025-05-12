@@ -18,32 +18,166 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/timex"
 	"github.com/oapi-codegen/runtime"
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 )
 
+// AccountsResponse defines model for AccountsResponse.
+type AccountsResponse struct {
+	Data []struct {
+		AccountID  string  `json:"accountId"`
+		BranchCode *string `json:"branchCode,omitempty"`
+		CheckDigit string  `json:"checkDigit"`
+		Number     string  `json:"number"`
+		Type       string  `json:"type"`
+	} `json:"data"`
+	Links *api.Links `json:"links,omitempty"`
+	Meta  *api.Meta  `json:"meta,omitempty"`
+}
+
 // AuthURLResponse defines model for AuthUrlResponse.
 type AuthURLResponse struct {
-	Data *struct {
-		URL *string `json:"url,omitempty"`
-	} `json:"data,omitempty"`
+	Data struct {
+		URL string `json:"url"`
+	} `json:"data"`
+}
+
+// ConsentsResponse defines model for ConsentsResponse.
+type ConsentsResponse struct {
+	Data []struct {
+		ClientID             string          `json:"clientId"`
+		ConsentID            string          `json:"consentId"`
+		CreationDateTime     timex.DateTime  `json:"creationDateTime"`
+		ExpirationDateTime   *timex.DateTime `json:"expirationDateTime,omitempty"`
+		Permissions          []string        `json:"permissions"`
+		RejectedBy           *string         `json:"rejectedBy,omitempty"`
+		RejectionReason      *string         `json:"rejectionReason,omitempty"`
+		Status               string          `json:"status"`
+		StatusUpdateDateTime timex.DateTime  `json:"statusUpdateDateTime"`
+		UserID               string          `json:"userId"`
+	} `json:"data"`
+	Links *api.Links `json:"links,omitempty"`
+	Meta  *api.Meta  `json:"meta,omitempty"`
+}
+
+// CreateMockUserRequest defines model for CreateMockUserRequest.
+type CreateMockUserRequest struct {
+	Data struct {
+		Cpf      string  `json:"cpf"`
+		Name     string  `json:"name"`
+		Password *string `json:"password,omitempty"`
+		Username string  `json:"username"`
+	} `json:"data"`
+}
+
+// MockUserResponse defines model for MockUserResponse.
+type MockUserResponse struct {
+	Data struct {
+		Cpf      string  `json:"cpf"`
+		ID       string  `json:"id"`
+		Name     string  `json:"name"`
+		Password *string `json:"password,omitempty"`
+		Username string  `json:"username"`
+	} `json:"data"`
+}
+
+// MockUsersResponse defines model for MockUsersResponse.
+type MockUsersResponse struct {
+	Data []struct {
+		Cpf      string `json:"cpf"`
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Username string `json:"username"`
+	} `json:"data"`
+	Links *api.Links `json:"links,omitempty"`
+	Meta  *api.Meta  `json:"meta,omitempty"`
 }
 
 // UserResponse defines model for UserResponse.
 type UserResponse struct {
-	Data *struct {
-		Organizations *[]struct {
-			ID   *string `json:"id,omitempty"`
-			Name *string `json:"name,omitempty"`
-		} `json:"organizations,omitempty"`
-		Username *string `json:"username,omitempty"`
-	} `json:"data,omitempty"`
+	Data struct {
+		Organizations []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"organizations"`
+		Username string `json:"username"`
+	} `json:"data"`
 }
+
+// MockUserID defines model for mockUserId.
+type MockUserID = string
+
+// OrganizationID defines model for organizationId.
+type OrganizationID = string
+
+// Page defines model for page.
+type Page = int32
+
+// PageSize defines model for pageSize.
+type PageSize = int32
+
+// SessionCookie defines model for sessionCookie.
+type SessionCookie = string
 
 // HandleDirectoryCallbackParams defines parameters for HandleDirectoryCallback.
 type HandleDirectoryCallbackParams struct {
 	IDToken string `form:"id_token" json:"id_token"`
 }
+
+// LogoutUserParams defines parameters for LogoutUser.
+type LogoutUserParams struct {
+	SessionID SessionCookie `form:"sessionId" json:"sessionId"`
+}
+
+// GetCurrentUserParams defines parameters for GetCurrentUser.
+type GetCurrentUserParams struct {
+	SessionID SessionCookie `form:"sessionId" json:"sessionId"`
+}
+
+// GetMockUsersParams defines parameters for GetMockUsers.
+type GetMockUsersParams struct {
+	// Page Número da página que está sendo requisitada (o valor da primeira página é 1).
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Quantidade total de registros por páginas.
+	PageSize  *PageSize     `form:"page-size,omitempty" json:"page-size,omitempty"`
+	SessionID SessionCookie `form:"sessionId" json:"sessionId"`
+}
+
+// CreateMockUserParams defines parameters for CreateMockUser.
+type CreateMockUserParams struct {
+	SessionID SessionCookie `form:"sessionId" json:"sessionId"`
+}
+
+// DeleteMockUserParams defines parameters for DeleteMockUser.
+type DeleteMockUserParams struct {
+	SessionID SessionCookie `form:"sessionId" json:"sessionId"`
+}
+
+// GetAccountsParams defines parameters for GetAccounts.
+type GetAccountsParams struct {
+	// Page Número da página que está sendo requisitada (o valor da primeira página é 1).
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Quantidade total de registros por páginas.
+	PageSize  *PageSize     `form:"page-size,omitempty" json:"page-size,omitempty"`
+	SessionID SessionCookie `form:"sessionId" json:"sessionId"`
+}
+
+// GetConsentsParams defines parameters for GetConsents.
+type GetConsentsParams struct {
+	// Page Número da página que está sendo requisitada (o valor da primeira página é 1).
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Quantidade total de registros por páginas.
+	PageSize  *PageSize     `form:"page-size,omitempty" json:"page-size,omitempty"`
+	SessionID SessionCookie `form:"sessionId" json:"sessionId"`
+}
+
+// CreateMockUserJSONRequestBody defines body for CreateMockUser for application/json ContentType.
+type CreateMockUserJSONRequestBody = CreateMockUserRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -55,10 +189,25 @@ type ServerInterface interface {
 	HandleDirectoryCallback(w http.ResponseWriter, r *http.Request, params HandleDirectoryCallbackParams)
 	// Logout the current user
 	// (POST /api/logout)
-	LogoutUser(w http.ResponseWriter, r *http.Request)
+	LogoutUser(w http.ResponseWriter, r *http.Request, params LogoutUserParams)
 	// Get current user information
 	// (GET /api/me)
-	GetCurrentUser(w http.ResponseWriter, r *http.Request)
+	GetCurrentUser(w http.ResponseWriter, r *http.Request, params GetCurrentUserParams)
+	// List mock users in an organization
+	// (GET /api/orgs/{orgId}/users)
+	GetMockUsers(w http.ResponseWriter, r *http.Request, orgID OrganizationID, params GetMockUsersParams)
+	// Create a new user in an organization
+	// (POST /api/orgs/{orgId}/users)
+	CreateMockUser(w http.ResponseWriter, r *http.Request, orgID OrganizationID, params CreateMockUserParams)
+	// Delete a mock user in an organization
+	// (DELETE /api/orgs/{orgId}/users/{userId})
+	DeleteMockUser(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params DeleteMockUserParams)
+	// Get accounts of a user
+	// (GET /api/orgs/{orgId}/users/{userId}/accounts)
+	GetAccounts(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetAccountsParams)
+	// Get consents of a user
+	// (GET /api/orgs/{orgId}/users/{userId}/consents)
+	GetConsents(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetConsentsParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -121,8 +270,29 @@ func (siw *ServerInterfaceWrapper) HandleDirectoryCallback(w http.ResponseWriter
 // LogoutUser operation middleware
 func (siw *ServerInterfaceWrapper) LogoutUser(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params LogoutUserParams
+
+	var cookie *http.Cookie
+
+	if cookie, err = r.Cookie("sessionId"); err == nil {
+		var value SessionCookie
+		err = runtime.BindStyledParameterWithOptions("simple", "sessionId", cookie.Value, &value, runtime.BindStyledParameterOptions{Explode: true, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+			return
+		}
+		params.SessionID = value
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sessionId"})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.LogoutUser(w, r)
+		siw.Handler.LogoutUser(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -135,8 +305,324 @@ func (siw *ServerInterfaceWrapper) LogoutUser(w http.ResponseWriter, r *http.Req
 // GetCurrentUser operation middleware
 func (siw *ServerInterfaceWrapper) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCurrentUserParams
+
+	var cookie *http.Cookie
+
+	if cookie, err = r.Cookie("sessionId"); err == nil {
+		var value SessionCookie
+		err = runtime.BindStyledParameterWithOptions("simple", "sessionId", cookie.Value, &value, runtime.BindStyledParameterOptions{Explode: true, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+			return
+		}
+		params.SessionID = value
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sessionId"})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetCurrentUser(w, r)
+		siw.Handler.GetCurrentUser(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMockUsers operation middleware
+func (siw *ServerInterfaceWrapper) GetMockUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "orgId" -------------
+	var orgID OrganizationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", r.PathValue("orgId"), &orgID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "orgId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetMockUsersParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", r.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "page-size" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page-size", r.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page-size", Err: err})
+		return
+	}
+
+	var cookie *http.Cookie
+
+	if cookie, err = r.Cookie("sessionId"); err == nil {
+		var value SessionCookie
+		err = runtime.BindStyledParameterWithOptions("simple", "sessionId", cookie.Value, &value, runtime.BindStyledParameterOptions{Explode: true, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+			return
+		}
+		params.SessionID = value
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sessionId"})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMockUsers(w, r, orgID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMockUser operation middleware
+func (siw *ServerInterfaceWrapper) CreateMockUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "orgId" -------------
+	var orgID OrganizationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", r.PathValue("orgId"), &orgID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "orgId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateMockUserParams
+
+	var cookie *http.Cookie
+
+	if cookie, err = r.Cookie("sessionId"); err == nil {
+		var value SessionCookie
+		err = runtime.BindStyledParameterWithOptions("simple", "sessionId", cookie.Value, &value, runtime.BindStyledParameterOptions{Explode: true, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+			return
+		}
+		params.SessionID = value
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sessionId"})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMockUser(w, r, orgID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMockUser operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMockUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "orgId" -------------
+	var orgID OrganizationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", r.PathValue("orgId"), &orgID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "orgId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "userId" -------------
+	var userID MockUserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteMockUserParams
+
+	var cookie *http.Cookie
+
+	if cookie, err = r.Cookie("sessionId"); err == nil {
+		var value SessionCookie
+		err = runtime.BindStyledParameterWithOptions("simple", "sessionId", cookie.Value, &value, runtime.BindStyledParameterOptions{Explode: true, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+			return
+		}
+		params.SessionID = value
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sessionId"})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMockUser(w, r, orgID, userID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAccounts operation middleware
+func (siw *ServerInterfaceWrapper) GetAccounts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "orgId" -------------
+	var orgID OrganizationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", r.PathValue("orgId"), &orgID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "orgId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "userId" -------------
+	var userID MockUserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAccountsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", r.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "page-size" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page-size", r.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page-size", Err: err})
+		return
+	}
+
+	var cookie *http.Cookie
+
+	if cookie, err = r.Cookie("sessionId"); err == nil {
+		var value SessionCookie
+		err = runtime.BindStyledParameterWithOptions("simple", "sessionId", cookie.Value, &value, runtime.BindStyledParameterOptions{Explode: true, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+			return
+		}
+		params.SessionID = value
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sessionId"})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAccounts(w, r, orgID, userID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetConsents operation middleware
+func (siw *ServerInterfaceWrapper) GetConsents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "orgId" -------------
+	var orgID OrganizationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", r.PathValue("orgId"), &orgID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "orgId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "userId" -------------
+	var userID MockUserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetConsentsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", r.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "page-size" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page-size", r.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page-size", Err: err})
+		return
+	}
+
+	var cookie *http.Cookie
+
+	if cookie, err = r.Cookie("sessionId"); err == nil {
+		var value SessionCookie
+		err = runtime.BindStyledParameterWithOptions("simple", "sessionId", cookie.Value, &value, runtime.BindStyledParameterOptions{Explode: true, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+			return
+		}
+		params.SessionID = value
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sessionId"})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetConsents(w, r, orgID, userID, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -264,6 +750,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/api/directory/callback", wrapper.HandleDirectoryCallback)
 	m.HandleFunc("POST "+options.BaseURL+"/api/logout", wrapper.LogoutUser)
 	m.HandleFunc("GET "+options.BaseURL+"/api/me", wrapper.GetCurrentUser)
+	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users", wrapper.GetMockUsers)
+	m.HandleFunc("POST "+options.BaseURL+"/api/orgs/{orgId}/users", wrapper.CreateMockUser)
+	m.HandleFunc("DELETE "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}", wrapper.DeleteMockUser)
+	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts", wrapper.GetAccounts)
+	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/consents", wrapper.GetConsents)
 
 	return m
 }
@@ -292,30 +783,48 @@ type HandleDirectoryCallbackResponseObject interface {
 	VisitHandleDirectoryCallbackResponse(w http.ResponseWriter) error
 }
 
+type HandleDirectoryCallback303ResponseHeaders struct {
+	Location  string
+	SetCookie string
+}
+
 type HandleDirectoryCallback303Response struct {
+	Headers HandleDirectoryCallback303ResponseHeaders
 }
 
 func (response HandleDirectoryCallback303Response) VisitHandleDirectoryCallbackResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.Header().Set("Set-Cookie", fmt.Sprint(response.Headers.SetCookie))
 	w.WriteHeader(303)
 	return nil
 }
 
 type LogoutUserRequestObject struct {
+	Params LogoutUserParams
 }
 
 type LogoutUserResponseObject interface {
 	VisitLogoutUserResponse(w http.ResponseWriter) error
 }
 
+type LogoutUser303ResponseHeaders struct {
+	Location  string
+	SetCookie string
+}
+
 type LogoutUser303Response struct {
+	Headers LogoutUser303ResponseHeaders
 }
 
 func (response LogoutUser303Response) VisitLogoutUserResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.Header().Set("Set-Cookie", fmt.Sprint(response.Headers.SetCookie))
 	w.WriteHeader(303)
 	return nil
 }
 
 type GetCurrentUserRequestObject struct {
+	Params GetCurrentUserParams
 }
 
 type GetCurrentUserResponseObject interface {
@@ -325,6 +834,99 @@ type GetCurrentUserResponseObject interface {
 type GetCurrentUser200JSONResponse UserResponse
 
 func (response GetCurrentUser200JSONResponse) VisitGetCurrentUserResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetMockUsersRequestObject struct {
+	OrgID  OrganizationID `json:"orgId"`
+	Params GetMockUsersParams
+}
+
+type GetMockUsersResponseObject interface {
+	VisitGetMockUsersResponse(w http.ResponseWriter) error
+}
+
+type GetMockUsers200JSONResponse MockUsersResponse
+
+func (response GetMockUsers200JSONResponse) VisitGetMockUsersResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateMockUserRequestObject struct {
+	OrgID  OrganizationID `json:"orgId"`
+	Params CreateMockUserParams
+	Body   *CreateMockUserJSONRequestBody
+}
+
+type CreateMockUserResponseObject interface {
+	VisitCreateMockUserResponse(w http.ResponseWriter) error
+}
+
+type CreateMockUser201JSONResponse MockUserResponse
+
+func (response CreateMockUser201JSONResponse) VisitCreateMockUserResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteMockUserRequestObject struct {
+	OrgID  OrganizationID `json:"orgId"`
+	UserID MockUserID     `json:"userId"`
+	Params DeleteMockUserParams
+}
+
+type DeleteMockUserResponseObject interface {
+	VisitDeleteMockUserResponse(w http.ResponseWriter) error
+}
+
+type DeleteMockUser204Response struct {
+}
+
+func (response DeleteMockUser204Response) VisitDeleteMockUserResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type GetAccountsRequestObject struct {
+	OrgID  OrganizationID `json:"orgId"`
+	UserID MockUserID     `json:"userId"`
+	Params GetAccountsParams
+}
+
+type GetAccountsResponseObject interface {
+	VisitGetAccountsResponse(w http.ResponseWriter) error
+}
+
+type GetAccounts200JSONResponse AccountsResponse
+
+func (response GetAccounts200JSONResponse) VisitGetAccountsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetConsentsRequestObject struct {
+	OrgID  OrganizationID `json:"orgId"`
+	UserID MockUserID     `json:"userId"`
+	Params GetConsentsParams
+}
+
+type GetConsentsResponseObject interface {
+	VisitGetConsentsResponse(w http.ResponseWriter) error
+}
+
+type GetConsents200JSONResponse ConsentsResponse
+
+func (response GetConsents200JSONResponse) VisitGetConsentsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
@@ -345,6 +947,21 @@ type StrictServerInterface interface {
 	// Get current user information
 	// (GET /api/me)
 	GetCurrentUser(ctx context.Context, request GetCurrentUserRequestObject) (GetCurrentUserResponseObject, error)
+	// List mock users in an organization
+	// (GET /api/orgs/{orgId}/users)
+	GetMockUsers(ctx context.Context, request GetMockUsersRequestObject) (GetMockUsersResponseObject, error)
+	// Create a new user in an organization
+	// (POST /api/orgs/{orgId}/users)
+	CreateMockUser(ctx context.Context, request CreateMockUserRequestObject) (CreateMockUserResponseObject, error)
+	// Delete a mock user in an organization
+	// (DELETE /api/orgs/{orgId}/users/{userId})
+	DeleteMockUser(ctx context.Context, request DeleteMockUserRequestObject) (DeleteMockUserResponseObject, error)
+	// Get accounts of a user
+	// (GET /api/orgs/{orgId}/users/{userId}/accounts)
+	GetAccounts(ctx context.Context, request GetAccountsRequestObject) (GetAccountsResponseObject, error)
+	// Get consents of a user
+	// (GET /api/orgs/{orgId}/users/{userId}/consents)
+	GetConsents(ctx context.Context, request GetConsentsRequestObject) (GetConsentsResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -427,8 +1044,10 @@ func (sh *strictHandler) HandleDirectoryCallback(w http.ResponseWriter, r *http.
 }
 
 // LogoutUser operation middleware
-func (sh *strictHandler) LogoutUser(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) LogoutUser(w http.ResponseWriter, r *http.Request, params LogoutUserParams) {
 	var request LogoutUserRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.LogoutUser(ctx, request.(LogoutUserRequestObject))
@@ -451,8 +1070,10 @@ func (sh *strictHandler) LogoutUser(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetCurrentUser operation middleware
-func (sh *strictHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request, params GetCurrentUserParams) {
 	var request GetCurrentUserRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.GetCurrentUser(ctx, request.(GetCurrentUserRequestObject))
@@ -474,18 +1095,179 @@ func (sh *strictHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// GetMockUsers operation middleware
+func (sh *strictHandler) GetMockUsers(w http.ResponseWriter, r *http.Request, orgID OrganizationID, params GetMockUsersParams) {
+	var request GetMockUsersRequestObject
+
+	request.OrgID = orgID
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMockUsers(ctx, request.(GetMockUsersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMockUsers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMockUsersResponseObject); ok {
+		if err := validResponse.VisitGetMockUsersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateMockUser operation middleware
+func (sh *strictHandler) CreateMockUser(w http.ResponseWriter, r *http.Request, orgID OrganizationID, params CreateMockUserParams) {
+	var request CreateMockUserRequestObject
+
+	request.OrgID = orgID
+	request.Params = params
+
+	var body CreateMockUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateMockUser(ctx, request.(CreateMockUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateMockUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateMockUserResponseObject); ok {
+		if err := validResponse.VisitCreateMockUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteMockUser operation middleware
+func (sh *strictHandler) DeleteMockUser(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params DeleteMockUserParams) {
+	var request DeleteMockUserRequestObject
+
+	request.OrgID = orgID
+	request.UserID = userID
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteMockUser(ctx, request.(DeleteMockUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteMockUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteMockUserResponseObject); ok {
+		if err := validResponse.VisitDeleteMockUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAccounts operation middleware
+func (sh *strictHandler) GetAccounts(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetAccountsParams) {
+	var request GetAccountsRequestObject
+
+	request.OrgID = orgID
+	request.UserID = userID
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAccounts(ctx, request.(GetAccountsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAccounts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAccountsResponseObject); ok {
+		if err := validResponse.VisitGetAccountsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetConsents operation middleware
+func (sh *strictHandler) GetConsents(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetConsentsParams) {
+	var request GetConsentsRequestObject
+
+	request.OrgID = orgID
+	request.UserID = userID
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetConsents(ctx, request.(GetConsentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetConsents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetConsentsResponseObject); ok {
+		if err := validResponse.VisitGetConsentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"z6IeAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

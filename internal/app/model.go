@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	cookieSessionId = "session_id"
+	cookieSessionId = "sessionId"
 	sessionValidity = 24 * time.Hour
 )
 

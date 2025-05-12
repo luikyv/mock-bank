@@ -28,11 +28,18 @@ paths:
       responses:
         '303':
           description: See Other - Redirect to the app
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            Set-Cookie:
+              $ref: '#/components/headers/SessionCookie'
 
   /api/me:
     get:
       summary: Get current user information
       operationId: getCurrentUser
+      parameters:
+        - $ref: '#/components/parameters/sessionCookie'
       responses:
         '200':
           description: Current user information
@@ -45,104 +52,74 @@ paths:
     post:
       summary: Logout the current user
       operationId: logoutUser
+      parameters:
+        - $ref: '#/components/parameters/sessionCookie'
       responses:
         '303':
           description: See Other - Redirect to the login page
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            Set-Cookie:
+              $ref: '#/components/headers/SessionCookie'
 
   /api/orgs/{orgId}/users:
     get:
-      summary: List users in an organization
-      operationId: listUsers
+      summary: List mock users in an organization
+      operationId: getMockUsers
       parameters:
-        - name: orgId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/sessionCookie'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
       responses:
         '200':
           description: List of users
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UsersResponse'
+                $ref: '#/components/schemas/MockUsersResponse'
     post:
       summary: Create a new user in an organization
-      operationId: createUser
+      operationId: createMockUser
       parameters:
-        - name: orgId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/sessionCookie'
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateUserRequest'
+              $ref: '#/components/schemas/CreateMockUserRequest'
       responses:
         '201':
           description: User created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserResponse'
+                $ref: '#/components/schemas/MockUserResponse'
 
   /api/orgs/{orgId}/users/{userId}:
-    get:
-      summary: Get user details
-      operationId: getUser
-      parameters:
-        - name: orgId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: userId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: User details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserResponse'
     delete:
-      summary: Delete a user
-      operationId: deleteUser
+      summary: Delete a mock user in an organization
+      operationId: deleteMockUser
       parameters:
-        - name: orgId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: userId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/mockUserId'
+        - $ref: '#/components/parameters/sessionCookie'
       responses:
         '204':
-          description: User deleted successfully
+          description: Mock user deleted
 
   /api/orgs/{orgId}/users/{userId}/accounts:
     get:
       summary: Get accounts of a user
-      operationId: getUserAccounts
+      operationId: getAccounts
       parameters:
-        - name: orgId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: userId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/mockUserId'
+        - $ref: '#/components/parameters/sessionCookie'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
       responses:
         '200':
           description: User accounts
@@ -154,18 +131,13 @@ paths:
   /api/orgs/{orgId}/users/{userId}/consents:
     get:
       summary: Get consents of a user
-      operationId: getUserConsents
+      operationId: getConsents
       parameters:
-        - name: orgId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: userId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/mockUserId'
+        - $ref: '#/components/parameters/sessionCookie'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
       responses:
         '200':
           description: User consents
@@ -178,9 +150,14 @@ components:
   schemas:
     UserResponse:
       type: object
+      required:
+        - data
       properties:
         data:
           type: object
+          required:
+            - username
+            - organizations
           properties:
             username:
               type: string
@@ -188,6 +165,9 @@ components:
               type: array
               items:
                 type: object
+                required:
+                  - id
+                  - name
                 properties:
                   id:
                     type: string
@@ -196,11 +176,18 @@ components:
 
     MockUsersResponse:
       type: object
+      required:
+        - data
       properties:
         data:
           type: array
           items:
             type: object
+            required:
+              - id
+              - name
+              - username
+              - cpf
             properties:
               id:
                 type: string
@@ -210,12 +197,21 @@ components:
                 type: string
               cpf:
                 type: string
-
+        meta:
+          $ref: '#/components/schemas/Meta'
+        links:
+          $ref: '#/components/schemas/Links'
     CreateMockUserRequest:
       type: object
+      required:
+        - data
       properties:
         data:
           type: object
+          required:
+            - username
+            - name
+            - cpf
           properties:
             username:
               type: string
@@ -225,23 +221,62 @@ components:
               type: string
             cpf:
               type: string
-
+    MockUserResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - id
+            - username
+            - name
+            - cpf
+          properties:
+            id:
+              type: string
+            username:
+              type: string
+            password:
+              type: string
+            name:
+              type: string
+            cpf:
+              type: string
     AccountsResponse:
       type: object
+      required:
+        - data
       properties:
         data:
           type: array
           items:
             type: object
+            required:
+              - accountId
+              - checkDigit
+              - number
+              - type
             properties:
               accountId:
                 type: string
-              balance:
-                type: number
-                format: float
-
+              branchCode:
+                type: string
+              checkDigit:
+                type: string
+              number:
+                type: string
+              type:
+                type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        links:
+          $ref: '#/components/schemas/Links'
     ConsentsResponse:
       type: object
+      required:
+        - data
       properties:
         data:
           type: array
@@ -281,12 +316,127 @@ components:
                 type: string
               clientId:
                 type: string
-
+        meta:
+          $ref: '#/components/schemas/Meta'
+        links:
+          $ref: '#/components/schemas/Links'
     AuthUrlResponse:
       type: object
+      required:
+        - data
       properties:
         data:
           type: object
+          required:
+            - url
           properties:
             url:
               type: string
+    Meta:
+      type: object
+      description: Meta informações referente à API requisitada.
+      required:
+        - totalRecords
+        - totalPages
+        - requestDateTime
+      properties:
+        totalRecords:
+          type: integer
+          format: int32
+          description: Número total de registros no resultado
+          example: 1
+        totalPages:
+          type: integer
+          format: int32
+          description: Número total de páginas no resultado
+          example: 1
+        requestDateTime:
+          description: 'Data e hora da consulta, conforme especificação RFC-3339, formato UTC.'
+          type: string
+          maxLength: 20
+          format: date
+          example: '2021-05-21T08:30:00Z'
+    Links:
+      type: object
+      description: Referências para outros recusos da API requisitada.
+      required:
+        - self
+      properties:
+        self:
+          type: string
+          format: url
+          maxLength: 2000
+          description: URI completo que gerou a resposta atual.
+          example: 'https://api.banco.com.br/open-banking/api/v2/resource'
+        first:
+          type: string
+          format: url
+          maxLength: 2000
+          description: URI da primeira página que originou essa lista de resultados. Restrição - Obrigatório quando não for a primeira página da resposta
+          example: 'https://api.banco.com.br/open-banking/api/v2/resource'
+        prev:
+          type: string
+          format: url
+          maxLength: 2000
+          description: "URI da página anterior dessa lista de resultados. Restrição - \tObrigatório quando não for a primeira página da resposta"
+          example: 'https://api.banco.com.br/open-banking/api/v2/resource'
+        next:
+          type: string
+          format: url
+          maxLength: 2000
+          description: URI da próxima página dessa lista de resultados. Restrição - Obrigatório quando não for a última página da resposta
+          example: 'https://api.banco.com.br/open-banking/api/v2/resource'
+        last:
+          type: string
+          format: url
+          maxLength: 2000
+          description: URI da última página dessa lista de resultados. Restrição - Obrigatório quando não for a última página da resposta
+          example: 'https://api.banco.com.br/open-banking/api/v2/resource'
+  parameters:
+    organizationId:
+      name: orgId
+      in: path
+      required: true
+      schema:
+        type: string
+    mockUserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+    sessionCookie:
+      name: sessionId
+      in: cookie
+      required: true
+      schema:
+        type: string
+    page:
+      name: page
+      in: query
+      description: Número da página que está sendo requisitada (o valor da primeira página é 1).
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+        maximum: 2147483647
+        format: int32
+    pageSize:
+      name: page-size
+      in: query
+      description: Quantidade total de registros por páginas.
+      schema:
+        type: integer
+        default: 25
+        minimum: 1
+        format: int32
+        maximum: 1000
+  headers:
+    Location:
+      description: URL to which the client is redirected
+      schema:
+        type: string
+    SessionCookie:
+      description: Session ID for authentication
+      schema:
+        type: string
