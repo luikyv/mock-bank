@@ -38,6 +38,10 @@ func NewError(code string, status int, description string) Error {
 	return err
 }
 
+func HandleError(w http.ResponseWriter, _ *http.Request, err error) {
+	WriteError(w, err)
+}
+
 func WriteError(w http.ResponseWriter, err error) {
 	var apiErr Error
 	if !errors.As(err, &apiErr) {

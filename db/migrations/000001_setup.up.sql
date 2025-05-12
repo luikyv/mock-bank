@@ -15,15 +15,13 @@ CREATE TABLE mock_users (
     username TEXT NOT NULL,
     name TEXT NOT NULL,
     cpf TEXT NOT NULL,
-
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),
-
-    INDEX idx_mock_users_org_id (org_id),
     UNIQUE (org_id, cpf),
     UNIQUE (org_id, username)
 );
+CREATE INDEX idx_mock_users_org_id ON mock_users (org_id);
 
 CREATE TABLE consents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -37,14 +35,12 @@ CREATE TABLE consents (
     client_id TEXT NOT NULL,
     rejected_by TEXT,
     rejection_reason TEXT,
-
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now(),
-
-    INDEX idx_consents_org_id_user_id (org_id, user_id),
-    INDEX idx_consents_org_id_client_id (org_id, client_id)
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
+CREATE INDEX idx_consents_org_id_user_id ON consents (org_id, user_id);
+CREATE INDEX idx_consents_org_id_client_id ON consents (org_id, client_id);
 
 CREATE TABLE consent_extensions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -56,13 +52,11 @@ CREATE TABLE consent_extensions (
     requested_at TIMESTAMPTZ NOT NULL,
     user_ip_address TEXT NOT NULL,
     user_agent TEXT NOT NULL,
-
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now(),
-
-    INDEX idx_consent_extensions_org_id_consent_id (org_id, consent_id)
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
+CREATE INDEX idx_consent_extensions_org_id_consent_id ON consent_extensions (org_id, consent_id);
 
 CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -76,24 +70,20 @@ CREATE TABLE accounts (
     overdraft_limit_contracted TEXT,
     overdraft_limit_used TEXT,
     overdraft_limit_unarranged TEXT,
-
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now(),
-
-    INDEX idx_accounts_org_id_user_id (org_id, user_id),
-    INDEX idx_accounts_org_id_number (org_id, number)
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
+CREATE INDEX idx_accounts_org_id_user_id ON accounts (org_id, user_id);
+CREATE INDEX idx_accounts_org_id_number ON accounts (org_id, number);
 
 CREATE TABLE consent_accounts (
     consent_id UUID NOT NULL REFERENCES consents(id) ON DELETE CASCADE,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     status TEXT NOT NULL,
-
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),
-
     PRIMARY KEY (consent_id, account_id)
 );
 
@@ -105,10 +95,8 @@ CREATE TABLE account_transactions (
     name TEXT NOT NULL,
     type TEXT NOT NULL,
     amount TEXT NOT NULL,
-
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now(),
-
-    INDEX idx_account_transactions_org_id_account_id (org_id, account_id)
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
+CREATE INDEX idx_account_transactions_org_id_account_id ON account_transactions (org_id, account_id);

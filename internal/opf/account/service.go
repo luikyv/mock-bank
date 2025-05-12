@@ -66,7 +66,7 @@ func (s Service) ConsentedAccount(ctx context.Context, consentID, accountID, org
 		Where(`account_id = ? AND consent_id = ? AND org_id = ? AND status = ?`, accountID, consentID, orgID, resource.StatusAvailable).
 		First(consentAcc).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errNotAllowed
+			return nil, ErrNotAllowed
 		}
 		return nil, err
 	}

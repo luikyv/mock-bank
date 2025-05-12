@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/luiky/mock-bank/internal/opf/consent"
 	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luiky/mock-bank/internal/timex"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -24,17 +26,17 @@ const (
 )
 
 var (
-	env               = getEnv("ENV", "LOCAL")
-	host              = getEnv("HOST", "https://mockbank.local")
-	appHost           = strings.Replace(host, "https://", "https://app.", 1)
-	apiHost           = strings.Replace(host, "https://", "https://api.", 1)
-	apiMTLSHost       = strings.Replace(host, "https://", "https://matls-api.", 1)
-	authHost          = strings.Replace(host, "https://", "https://auth.", 1)
-	authMTLSHost      = strings.Replace(host, "https://", "https://matls-auth.", 1)
-	directoryIssuer   = getEnv("DIRECTORY_ISSUER", "https://directory")
-	directoryClientID = getEnv("DIRECTORY_CLIENT_ID", "mockbank")
-	port              = getEnv("PORT", "80")
-	dbStringCon       = getEnv("DB_STRING", "postgres://admin:pass@localhost:5432/mockbank?sslmode=disable")
+	env                = getEnv("ENV", "LOCAL")
+	host               = getEnv("HOST", "https://mockbank.local")
+	appHost            = strings.Replace(host, "https://", "https://app.", 1)
+	apiHost            = strings.Replace(host, "https://", "https://api.", 1)
+	apiMTLSHost        = strings.Replace(host, "https://", "https://matls-api.", 1)
+	authHost           = strings.Replace(host, "https://", "https://auth.", 1)
+	authMTLSHost       = strings.Replace(host, "https://", "https://matls-auth.", 1)
+	directoryIssuer    = getEnv("DIRECTORY_ISSUER", "https://directory")
+	directoryClientID  = getEnv("DIRECTORY_CLIENT_ID", "mockbank")
+	port               = getEnv("PORT", "80")
+	dbConnectionString = getEnv("DB_STRING", "postgres://admin:pass@localhost:5432/mockbank?sslmode=disable")
 )
 
 func main() {
@@ -72,7 +74,25 @@ func main() {
 }
 
 func dbConnection() (*gorm.DB, error) {
-	return nil, nil
+	db, err := gorm.Open(postgres.Open(dbConnectionString), &gorm.Config{
+		NowFunc: timex.Now,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database instance: %w", err)
+	}
+
+	// Optional: Configure database connection pool
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetConnMaxLifetime(0)
+
+	fmt.Println("Successfully connected to the database!")
+	return db, nil
 }
 
 // getEnv retrieves an environment variable or returns a fallback value if not found

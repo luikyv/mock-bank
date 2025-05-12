@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -13,6 +14,8 @@ import (
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 )
+
+var _ StrictServerInterface = Server{}
 
 type Server struct {
 	host    string
@@ -39,7 +42,14 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			"consentsPostConsentsConsentIDExtends":   {Scopes: []goidc.Scope{consent.Scope, goidc.ScopeOpenID}},
 			"consentsGetConsentsConsentIDExtensions": {Scopes: []goidc.Scope{consent.Scope}},
 		}, s.op),
-	}, StrictHTTPServerOptions{})
+	}, StrictHTTPServerOptions{
+		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+		},
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			writeResponseError(w, err)
+		},
+	})
 	handler := Handler(strictHandler)
 	mux.Handle("/open-banking/consents/v3/", http.StripPrefix("/open-banking/consents/v3", handler))
 }
@@ -245,4 +255,46 @@ func (s Server) ConsentsGetConsentsConsentIDExtensions(ctx context.Context, req 
 	return ConsentsGetConsentsConsentIDExtensions200JSONResponse{N200ConsentsConsentIDReadExtensionsJSONResponse{Body: resp}}, nil
 }
 
-var _ StrictServerInterface = Server{}
+func writeResponseError(w http.ResponseWriter, err error) {
+	if errors.Is(err, consent.ErrAccessNotAllowed) {
+		api.WriteError(w, api.NewError("FORBIDDEN", http.StatusForbidden, consent.ErrAccessNotAllowed.Error()))
+		return
+	}
+
+	if errors.Is(err, consent.ErrExtensionNotAllowed) {
+		api.WriteError(w, api.NewError("FORBIDDEN", http.StatusForbidden, consent.ErrExtensionNotAllowed.Error()))
+		return
+	}
+
+	if errors.Is(err, consent.ErrInvalidPermissionGroup) {
+		api.WriteError(w, api.NewError("COMBINACAO_PERMISSOES_INCORRETA", http.StatusUnprocessableEntity, consent.ErrInvalidPermissionGroup.Error()))
+		return
+	}
+
+	if errors.Is(err, consent.ErrPersonalAndBusinessPermissionsTogether) {
+		api.WriteError(w, api.NewError("PERMISSAO_PF_PJ_EM_CONJUNTO", http.StatusUnprocessableEntity, consent.ErrPersonalAndBusinessPermissionsTogether.Error()))
+		return
+	}
+
+	if errors.Is(err, consent.ErrInvalidExpiration) {
+		api.WriteError(w, api.NewError("DATA_EXPIRACAO_INVALIDA", http.StatusUnprocessableEntity, consent.ErrInvalidExpiration.Error()))
+		return
+	}
+
+	if errors.Is(err, consent.ErrAlreadyRejected) {
+		api.WriteError(w, api.NewError("CONSENTIMENTO_EM_STATUS_REJEITADO", http.StatusUnprocessableEntity, consent.ErrAlreadyRejected.Error()))
+		return
+	}
+
+	if errors.Is(err, consent.ErrCannotExtendConsentNotAuthorized) {
+		api.WriteError(w, api.NewError("ESTADO_CONSENTIMENTO_INVALIDO", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentNotAuthorized.Error()))
+		return
+	}
+
+	if errors.Is(err, consent.ErrCannotExtendConsentForJointAccount) {
+		api.WriteError(w, api.NewError("DEPENDE_MULTIPLA_ALCADA", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentForJointAccount.Error()))
+		return
+	}
+
+	api.WriteError(w, api.NewError("INTERNAL_ERROR", http.StatusInternalServerError, "internal error"))
+}

@@ -114,9 +114,9 @@ func main() {
 	mockbankURL, _ := url.Parse("http://mockbank")
 	reverseProxy := httputil.NewSingleHostReverseProxy(mockbankURL)
 	mbHandler := mockbankHandler(reverseProxy, fallbackProxy)
-	mux.HandleFunc("auth.mockbank.local/api/", mbHandler)
-	mux.HandleFunc("matls-auth.mockbank.local/api/", mbHandler)
-	mux.HandleFunc("matls-api.mockbank.local/api/", mbHandler)
+	mux.HandleFunc("auth.mockbank.local/", mbHandler)
+	mux.HandleFunc("matls-auth.mockbank.local/", mbHandler)
+	mux.HandleFunc("matls-api.mockbank.local/", mbHandler)
 	mux.HandleFunc("app.mockbank.local/api/", mbHandler)
 
 	appURL, _ := url.Parse("http://host.docker.internal:8080")

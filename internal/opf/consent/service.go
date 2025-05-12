@@ -43,7 +43,7 @@ func (s Service) Consent(ctx context.Context, urn, orgID string) (*Consent, erro
 	}
 
 	if ctx.Value(api.CtxKeyClientID) != nil && ctx.Value(api.CtxKeyClientID) != c.ClientID {
-		return nil, errAccessNotAllowed
+		return nil, ErrAccessNotAllowed
 	}
 
 	if err := s.modify(ctx, c); err != nil {
@@ -59,7 +59,7 @@ func (s Service) Reject(ctx context.Context, urn, orgID string, by RejectedBy, r
 		return err
 	}
 	if c.Status == StatusRejected {
-		return errAlreadyRejected
+		return ErrAlreadyRejected
 	}
 
 	c.Status = StatusRejected
@@ -157,11 +157,11 @@ func validate(c *Consent) error {
 
 	now := timex.Now()
 	if c.ExpiresAt != nil && c.ExpiresAt.After(now.AddDate(1, 0, 0)) {
-		return errInvalidExpiration
+		return ErrInvalidExpiration
 	}
 
 	if c.ExpiresAt != nil && c.ExpiresAt.Before(now) {
-		return errInvalidExpiration
+		return ErrInvalidExpiration
 	}
 
 	return nil

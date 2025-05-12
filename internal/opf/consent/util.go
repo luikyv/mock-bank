@@ -33,7 +33,7 @@ permissionsLoop:
 
 		// Return an error if there is no group that contains requestedPermission
 		// and is fully present in requestedPermissions.
-		return errInvalidPermissionGroup
+		return ErrInvalidPermissionGroup
 	}
 
 	return validatePersonalAndBusinessPermissions(requestedPermissions)
@@ -50,7 +50,7 @@ func validatePersonalAndBusinessPermissions(requestedPermissions []Permission) e
 	)
 
 	if isPersonal && isBusiness {
-		return errPersonalAndBusinessPermissionsTogether
+		return ErrPersonalAndBusinessPermissionsTogether
 	}
 
 	return nil
@@ -58,15 +58,15 @@ func validatePersonalAndBusinessPermissions(requestedPermissions []Permission) e
 
 func validateExtension(c *Consent, ext *Extension) error {
 	if !c.IsAuthorized() {
-		return errCannotExtendConsentNotAuthorized
+		return ErrCannotExtendConsentNotAuthorized
 	}
 
 	if c.UserCPF != ext.UserCPF {
-		return errExtensionNotAllowed
+		return ErrExtensionNotAllowed
 	}
 
 	if c.BusinessCNPJ != "" && c.BusinessCNPJ != ext.BusinessCNPJ {
-		return errExtensionNotAllowed
+		return ErrExtensionNotAllowed
 	}
 
 	if ext.ExpiresAt == nil {
@@ -75,11 +75,11 @@ func validateExtension(c *Consent, ext *Extension) error {
 
 	now := timex.Now()
 	if ext.ExpiresAt.Before(now) || ext.ExpiresAt.After(now.AddDate(1, 0, 0)) {
-		return errInvalidExpiration
+		return ErrInvalidExpiration
 	}
 
 	if c.ExpiresAt != nil && !ext.ExpiresAt.After(*c.ExpiresAt) {
-		return errInvalidExpiration
+		return ErrInvalidExpiration
 	}
 
 	return nil

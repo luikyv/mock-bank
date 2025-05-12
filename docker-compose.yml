@@ -7,7 +7,7 @@ services:
       - DB_STRING=postgres://admin:pass@psql:5432/mockbank?sslmode=disable
     volumes:
       - ./keys/:/app/keys/
-  
+
   psql:
     image: postgres
     environment:
@@ -16,8 +16,6 @@ services:
       POSTGRES_DB: mockbank
     ports:
       - "5432:5432"
-    volumes:
-      - ./db/seeds/setup.sql:/docker-entrypoint-initdb.d/setup.sql
 
   mockgw:
     profiles:
@@ -96,7 +94,7 @@ services:
       options:
         max-size: "500k"
         max-file: "5"
-  
+
   cs-mongodb:
     image: mongo:latest
     ports:

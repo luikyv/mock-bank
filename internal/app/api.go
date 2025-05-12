@@ -15,6 +15,8 @@ import (
 	"github.com/rs/cors"
 )
 
+var _ StrictServerInterface = Server{}
+
 type Server struct {
 	host             string
 	service          Service
@@ -59,7 +61,8 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			http.MethodDelete,
 		},
 	})
-	mux.Handle("/api/", c.Handler(handler))
+	handler = c.Handler(handler)
+	mux.Handle("/api/", handler)
 }
 
 func writeError(w http.ResponseWriter, err error) {
@@ -341,5 +344,3 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 	}
 	return GetConsents200JSONResponse(resp), nil
 }
-
-var _ StrictServerInterface = Server{}

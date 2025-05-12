@@ -2,7 +2,9 @@ package v2
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/opf/account"
@@ -14,6 +16,8 @@ import (
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 )
+
+var _ StrictServerInterface = Server{}
 
 type Server struct {
 	host           string
@@ -32,7 +36,7 @@ func NewServer(host string, service account.Service, consentService consent.Serv
 }
 
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
-	handler := Handler(NewStrictHandler(s, []StrictMiddlewareFunc{
+	strictHandler := NewStrictHandlerWithOptions(s, []StrictMiddlewareFunc{
 		middleware.FAPIID(map[string]middleware.Options{
 			"accountsGetAccounts":                         {ErrorPagination: true},
 			"accountsGetAccountsAccountId":                {ErrorPagination: true},
@@ -57,7 +61,16 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			"accountsGetAccountsAccountIdTransactions":        {Permissions: []consent.Permission{consent.PermissionAccountsTransactionsRead}, ErrorPagination: true},
 			"accountsGetAccountsAccountIdTransactionsCurrent": {Permissions: []consent.Permission{consent.PermissionAccountsTransactionsRead}},
 		}, s.consentService),
-	}))
+	}, StrictHTTPServerOptions{
+		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+		},
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			isTransactionCurrent := strings.HasSuffix(r.URL.Path, "/transactions-current")
+			writeResponseError(w, err, !isTransactionCurrent)
+		},
+	})
+	handler := Handler(strictHandler)
 	mux.Handle("/open-banking/accounts/v2/", http.StripPrefix("/open-banking/accounts/v2", handler))
 }
 
@@ -276,4 +289,16 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 	return AccountsGetAccountsAccountIDTransactionsCurrent200JSONResponse{OKResponseAccountTransactionsJSONResponse{Body: resp}}, nil
 }
 
-var _ StrictServerInterface = Server{}
+func writeResponseError(w http.ResponseWriter, err error, pagination bool) {
+	if errors.Is(err, account.ErrNotAllowed) {
+		api.WriteError(w, api.NewError("FORBIDDEN", http.StatusForbidden, account.ErrNotAllowed.Error()).Pagination(pagination))
+		return
+	}
+
+	if errors.Is(err, account.ErrJointAccountPendingAuthorization) {
+		api.WriteError(w, api.NewError("STATUS_RESOURCE_PENDING_AUTHORISATION", http.StatusForbidden, account.ErrJointAccountPendingAuthorization.Error()).Pagination(pagination))
+		return
+	}
+
+	api.WriteError(w, err)
+}
