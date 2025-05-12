@@ -42,27 +42,15 @@ func NewServer(
 	}
 }
 
-func (app Server) RegisterRoutes(mux *http.ServeMux) {
-	appMux := http.NewServeMux()
+func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
-	appMux.Handle("GET /api/orgs/{org_id}/users", app.mockUsersHandler())
-	appMux.Handle("POST /api/orgs/{org_id}/users", app.createMockUserHandler())
-	appMux.Handle("GET /api/orgs/{org_id}/users/{user_id}", app.mockUserHandler())
-	appMux.Handle("DELETE /api/orgs/{org_id}/users/{user_id}", app.deleteMockUserHandler())
-	appMux.Handle("GET /api/orgs/{org_id}/users/{user_id}/accounts", app.accountsHandler())
-	appMux.Handle("GET /api/orgs/{org_id}/users/{user_id}/consents", app.consentsHandler())
-	appHandler := metaMiddleware(appMux, app.host)
-	appHandler = authMiddleware(appHandler, app.service)
-
-	authMux := http.NewServeMux()
-	authMux.Handle("GET /api/directory/auth-url", app.directoryAuthURLHandler())
-	authMux.Handle("GET /api/directory/callback", app.directoryCallbackHandler())
-	authMux.Handle("GET /api/me", app.userHandler())
-	authMux.Handle("POST /api/logout", app.logoutHandler())
-	authHandler := metaMiddleware(authMux, app.host)
+	handler := Handler(NewStrictHandler(s, []StrictMiddlewareFunc{
+		metaMiddleware(s.host),
+		authMiddleware(s.service),
+	}))
 
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{app.host},
+		AllowedOrigins:   []string{s.host},
 		AllowCredentials: true,
 		AllowedMethods: []string{
 			http.MethodHead,
@@ -71,8 +59,7 @@ func (app Server) RegisterRoutes(mux *http.ServeMux) {
 			http.MethodDelete,
 		},
 	})
-	mux.Handle("/api/orgs/{org_id}/", c.Handler(appHandler))
-	mux.Handle("/api/", c.Handler(authHandler))
+	mux.Handle("/api/", c.Handler(handler))
 }
 
 func writeError(w http.ResponseWriter, err error) {
@@ -90,7 +77,7 @@ func writeError(w http.ResponseWriter, err error) {
 }
 
 func (s Server) GetDirectoryAuthURL(ctx context.Context, request GetDirectoryAuthURLRequestObject) (GetDirectoryAuthURLResponseObject, error) {
-	authURL, err := s.directoryService.authURL(r.Context())
+	authURL, err := s.directoryService.authURL(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +115,8 @@ func (s Server) HandleDirectoryCallback(ctx context.Context, req HandleDirectory
 }
 
 func (s Server) LogoutUser(ctx context.Context, req LogoutUserRequestObject) (LogoutUserResponseObject, error) {
-	_ = s.service.deleteSession(ctx, req.Params.SessionID)
+	sessionID := ctx.Value(api.CtxKeySessionID).(string)
+	_ = s.service.deleteSession(ctx, sessionID)
 
 	headers := LogoutUser303ResponseHeaders{
 		SetCookie: (&http.Cookie{
@@ -145,7 +133,8 @@ func (s Server) LogoutUser(ctx context.Context, req LogoutUserRequestObject) (Lo
 }
 
 func (s Server) GetCurrentUser(ctx context.Context, req GetCurrentUserRequestObject) (GetCurrentUserResponseObject, error) {
-	session, err := s.service.session(ctx, req.Params.SessionID)
+	sessionID := ctx.Value(api.CtxKeySessionID).(string)
+	session, err := s.service.session(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}

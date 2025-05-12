@@ -38,8 +38,8 @@ paths:
     get:
       summary: Get current user information
       operationId: getCurrentUser
-      parameters:
-        - $ref: '#/components/parameters/sessionCookie'
+      security:
+        - SessionCookie: []
       responses:
         '200':
           description: Current user information
@@ -52,8 +52,8 @@ paths:
     post:
       summary: Logout the current user
       operationId: logoutUser
-      parameters:
-        - $ref: '#/components/parameters/sessionCookie'
+      security:
+        - SessionCookie: []
       responses:
         '303':
           description: See Other - Redirect to the login page
@@ -67,9 +67,10 @@ paths:
     get:
       summary: List mock users in an organization
       operationId: getMockUsers
+      security:
+        - SessionCookie: []
       parameters:
         - $ref: '#/components/parameters/organizationId'
-        - $ref: '#/components/parameters/sessionCookie'
         - $ref: '#/components/parameters/page'
         - $ref: '#/components/parameters/pageSize'
       responses:
@@ -82,9 +83,10 @@ paths:
     post:
       summary: Create a new user in an organization
       operationId: createMockUser
+      security:
+        - SessionCookie: []
       parameters:
         - $ref: '#/components/parameters/organizationId'
-        - $ref: '#/components/parameters/sessionCookie'
       requestBody:
         content:
           application/json:
@@ -102,10 +104,11 @@ paths:
     delete:
       summary: Delete a mock user in an organization
       operationId: deleteMockUser
+      security:
+        - SessionCookie: []
       parameters:
         - $ref: '#/components/parameters/organizationId'
         - $ref: '#/components/parameters/mockUserId'
-        - $ref: '#/components/parameters/sessionCookie'
       responses:
         '204':
           description: Mock user deleted
@@ -114,10 +117,11 @@ paths:
     get:
       summary: Get accounts of a user
       operationId: getAccounts
+      security:
+        - SessionCookie: []
       parameters:
         - $ref: '#/components/parameters/organizationId'
         - $ref: '#/components/parameters/mockUserId'
-        - $ref: '#/components/parameters/sessionCookie'
         - $ref: '#/components/parameters/page'
         - $ref: '#/components/parameters/pageSize'
       responses:
@@ -132,10 +136,11 @@ paths:
     get:
       summary: Get consents of a user
       operationId: getConsents
+      security:
+        - SessionCookie: []
       parameters:
         - $ref: '#/components/parameters/organizationId'
         - $ref: '#/components/parameters/mockUserId'
-        - $ref: '#/components/parameters/sessionCookie'
         - $ref: '#/components/parameters/page'
         - $ref: '#/components/parameters/pageSize'
       responses:
@@ -405,12 +410,6 @@ components:
       required: true
       schema:
         type: string
-    sessionCookie:
-      name: sessionId
-      in: cookie
-      required: true
-      schema:
-        type: string
     page:
       name: page
       in: query
@@ -440,3 +439,9 @@ components:
       description: Session ID for authentication
       schema:
         type: string
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: sessionId
+      description: Session ID for authentication

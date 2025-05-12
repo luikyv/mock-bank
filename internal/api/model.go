@@ -8,6 +8,7 @@ import (
 	"github.com/luiky/mock-bank/internal/timex"
 )
 
+// TODO: Split this.
 type ContextKey string
 
 const (
@@ -18,50 +19,13 @@ const (
 	CtxKeyInteractionID ContextKey = "interaction_id"
 	CtxKeyRequestURL    ContextKey = "request_url"
 	CtxKeyOrgID         ContextKey = "org_id"
-)
-
-const (
-	maxPageSize int = 25
+	CtxKeySessionID     ContextKey = "session_id"
 )
 
 const (
 	HeaderCustomerIPAddress = "X-FAPI-Customer-IP-Address"
 	HeaderCustomerUserAgent = "X-Customer-User-Agent"
 )
-
-// // TODO: Remove this.
-// func NewPagination(r *http.Request) (page.Pagination, error) {
-// 	pageNumber := 1
-// 	pageSize := maxPageSize
-
-// 	// Get "page" query parameter and convert it to an integer.
-// 	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
-// 		if p, err := strconv.Atoi(pageStr); err == nil {
-// 			pageNumber = p
-// 		}
-// 	}
-
-// 	if pageNumber < 1 {
-// 		return page.Pagination{}, NewError("INVALID_PARAMETER", http.StatusBadRequest, "invalid page number")
-// 	}
-
-// 	// Get "page-size" query parameter and convert it to an integer.
-// 	if pageSizeStr := r.URL.Query().Get("page-size"); pageSizeStr != "" {
-// 		if ps, err := strconv.Atoi(pageSizeStr); err == nil {
-// 			pageSize = ps
-// 		}
-// 	}
-
-// 	if pageSize < 0 || pageSize > 1000 {
-// 		return page.Pagination{}, NewError("INVALID_PARAMETER", http.StatusBadRequest, "invalid page size")
-// 	}
-
-// 	if pageSize > maxPageSize {
-// 		pageSize = maxPageSize
-// 	}
-
-// 	return page.NewPagination(pageNumber, pageSize), nil
-// }
 
 type Links struct {
 	First string `json:"first,omitempty"`
