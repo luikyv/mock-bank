@@ -11,6 +11,12 @@ import (
 func authMiddleware(service Service) strictnethttp.StrictHTTPMiddlewareFunc {
 	return func(next strictnethttp.StrictHTTPHandlerFunc, operationID string) strictnethttp.StrictHTTPHandlerFunc {
 		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (response interface{}, err error) {
+			// TODO: Review this.
+			orgID := r.PathValue("org_id")
+			if orgID == "" {
+				return next(ctx, w, r, req)
+			}
+
 			cookie, err := r.Cookie(cookieSessionId)
 			if err != nil {
 				return nil, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "session not found")
@@ -19,11 +25,6 @@ func authMiddleware(service Service) strictnethttp.StrictHTTPMiddlewareFunc {
 			session, err := service.session(r.Context(), cookie.Value)
 			if err != nil {
 				return nil, err
-			}
-
-			orgID := r.PathValue("org_id")
-			if orgID == "" {
-				return next(ctx, w, r, req)
 			}
 
 			if _, ok := session.Organizations[orgID]; !ok {

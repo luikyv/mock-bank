@@ -28,6 +28,33 @@ const (
 	SessionCookieScopes = "SessionCookie.Scopes"
 )
 
+// AccountRequest defines model for AccountRequest.
+type AccountRequest struct {
+	Data struct {
+		AutomaticallyInvestedAmount string  `json:"automaticallyInvestedAmount"`
+		AvailableAmount             string  `json:"availableAmount"`
+		BlockedAmount               string  `json:"blockedAmount"`
+		Number                      string  `json:"number"`
+		OverdraftLimitContracted    *string `json:"overdraftLimitContracted,omitempty"`
+		OverdraftLimitUnarraged     *string `json:"overdraftLimitUnarraged,omitempty"`
+		OverdraftLimitUsed          *string `json:"overdraftLimitUsed,omitempty"`
+		Subtype                     string  `json:"subtype"`
+		Type                        string  `json:"type"`
+	} `json:"data"`
+}
+
+// AccountResponse defines model for AccountResponse.
+type AccountResponse struct {
+	Data struct {
+		AccountID  string  `json:"accountId"`
+		BranchCode *string `json:"branchCode,omitempty"`
+		CheckDigit string  `json:"checkDigit"`
+		CompeCode  string  `json:"compeCode"`
+		Number     string  `json:"number"`
+		Type       string  `json:"type"`
+	} `json:"data"`
+}
+
 // AccountsResponse defines model for AccountsResponse.
 type AccountsResponse struct {
 	Data []struct {
@@ -66,8 +93,8 @@ type ConsentsResponse struct {
 	Meta  *api.Meta  `json:"meta,omitempty"`
 }
 
-// CreateMockUserRequest defines model for CreateMockUserRequest.
-type CreateMockUserRequest struct {
+// MockUserRequest defines model for MockUserRequest.
+type MockUserRequest struct {
 	Data struct {
 		Cpf      string  `json:"cpf"`
 		Name     string  `json:"name"`
@@ -155,7 +182,13 @@ type GetConsentsParams struct {
 }
 
 // CreateMockUserJSONRequestBody defines body for CreateMockUser for application/json ContentType.
-type CreateMockUserJSONRequestBody = CreateMockUserRequest
+type CreateMockUserJSONRequestBody = MockUserRequest
+
+// UpdateMockUserJSONRequestBody defines body for UpdateMockUser for application/json ContentType.
+type UpdateMockUserJSONRequestBody = MockUserRequest
+
+// CreateAccountJSONRequestBody defines body for CreateAccount for application/json ContentType.
+type CreateAccountJSONRequestBody = AccountRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -180,9 +213,15 @@ type ServerInterface interface {
 	// Delete a mock user in an organization
 	// (DELETE /api/orgs/{orgId}/users/{userId})
 	DeleteMockUser(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID)
+	// Update a user in an organization
+	// (PUT /api/orgs/{orgId}/users/{userId})
+	UpdateMockUser(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID)
 	// Get accounts of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/accounts)
 	GetAccounts(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetAccountsParams)
+	// Create a new account
+	// (POST /api/orgs/{orgId}/users/{userId}/accounts)
+	CreateAccount(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID)
 	// Get consents of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/consents)
 	GetConsents(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetConsentsParams)
@@ -406,6 +445,46 @@ func (siw *ServerInterfaceWrapper) DeleteMockUser(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// UpdateMockUser operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMockUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "orgId" -------------
+	var orgID OrganizationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", r.PathValue("orgId"), &orgID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "orgId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "userId" -------------
+	var userID MockUserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMockUser(w, r, orgID, userID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAccounts operation middleware
 func (siw *ServerInterfaceWrapper) GetAccounts(w http.ResponseWriter, r *http.Request) {
 
@@ -456,6 +535,46 @@ func (siw *ServerInterfaceWrapper) GetAccounts(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAccounts(w, r, orgID, userID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAccount operation middleware
+func (siw *ServerInterfaceWrapper) CreateAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "orgId" -------------
+	var orgID OrganizationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", r.PathValue("orgId"), &orgID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "orgId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "userId" -------------
+	var userID MockUserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAccount(w, r, orgID, userID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -645,7 +764,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users", wrapper.GetMockUsers)
 	m.HandleFunc("POST "+options.BaseURL+"/api/orgs/{orgId}/users", wrapper.CreateMockUser)
 	m.HandleFunc("DELETE "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}", wrapper.DeleteMockUser)
+	m.HandleFunc("PUT "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}", wrapper.UpdateMockUser)
 	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts", wrapper.GetAccounts)
+	m.HandleFunc("POST "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts", wrapper.CreateAccount)
 	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/consents", wrapper.GetConsents)
 
 	return m
@@ -783,6 +904,25 @@ func (response DeleteMockUser204Response) VisitDeleteMockUserResponse(w http.Res
 	return nil
 }
 
+type UpdateMockUserRequestObject struct {
+	OrgID  OrganizationID `json:"orgId"`
+	UserID MockUserID     `json:"userId"`
+	Body   *UpdateMockUserJSONRequestBody
+}
+
+type UpdateMockUserResponseObject interface {
+	VisitUpdateMockUserResponse(w http.ResponseWriter) error
+}
+
+type UpdateMockUser200JSONResponse MockUserResponse
+
+func (response UpdateMockUser200JSONResponse) VisitUpdateMockUserResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetAccountsRequestObject struct {
 	OrgID  OrganizationID `json:"orgId"`
 	UserID MockUserID     `json:"userId"`
@@ -798,6 +938,25 @@ type GetAccounts200JSONResponse AccountsResponse
 func (response GetAccounts200JSONResponse) VisitGetAccountsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAccountRequestObject struct {
+	OrgID  OrganizationID `json:"orgId"`
+	UserID MockUserID     `json:"userId"`
+	Body   *CreateAccountJSONRequestBody
+}
+
+type CreateAccountResponseObject interface {
+	VisitCreateAccountResponse(w http.ResponseWriter) error
+}
+
+type CreateAccount201JSONResponse AccountResponse
+
+func (response CreateAccount201JSONResponse) VisitCreateAccountResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -844,9 +1003,15 @@ type StrictServerInterface interface {
 	// Delete a mock user in an organization
 	// (DELETE /api/orgs/{orgId}/users/{userId})
 	DeleteMockUser(ctx context.Context, request DeleteMockUserRequestObject) (DeleteMockUserResponseObject, error)
+	// Update a user in an organization
+	// (PUT /api/orgs/{orgId}/users/{userId})
+	UpdateMockUser(ctx context.Context, request UpdateMockUserRequestObject) (UpdateMockUserResponseObject, error)
 	// Get accounts of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/accounts)
 	GetAccounts(ctx context.Context, request GetAccountsRequestObject) (GetAccountsResponseObject, error)
+	// Create a new account
+	// (POST /api/orgs/{orgId}/users/{userId}/accounts)
+	CreateAccount(ctx context.Context, request CreateAccountRequestObject) (CreateAccountResponseObject, error)
 	// Get consents of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/consents)
 	GetConsents(ctx context.Context, request GetConsentsRequestObject) (GetConsentsResponseObject, error)
@@ -1066,6 +1231,40 @@ func (sh *strictHandler) DeleteMockUser(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// UpdateMockUser operation middleware
+func (sh *strictHandler) UpdateMockUser(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID) {
+	var request UpdateMockUserRequestObject
+
+	request.OrgID = orgID
+	request.UserID = userID
+
+	var body UpdateMockUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMockUser(ctx, request.(UpdateMockUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMockUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMockUserResponseObject); ok {
+		if err := validResponse.VisitUpdateMockUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetAccounts operation middleware
 func (sh *strictHandler) GetAccounts(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetAccountsParams) {
 	var request GetAccountsRequestObject
@@ -1087,6 +1286,40 @@ func (sh *strictHandler) GetAccounts(w http.ResponseWriter, r *http.Request, org
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetAccountsResponseObject); ok {
 		if err := validResponse.VisitGetAccountsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateAccount operation middleware
+func (sh *strictHandler) CreateAccount(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID) {
+	var request CreateAccountRequestObject
+
+	request.OrgID = orgID
+	request.UserID = userID
+
+	var body CreateAccountJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateAccount(ctx, request.(CreateAccountRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateAccount")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateAccountResponseObject); ok {
+		if err := validResponse.VisitCreateAccountResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1125,31 +1358,34 @@ func (sh *strictHandler) GetConsents(w http.ResponseWriter, r *http.Request, org
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"JZ473R2Kzauhu1wu/w0AAP//UE8IV24lAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

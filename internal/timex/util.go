@@ -15,7 +15,6 @@ var (
 	brazilLocation, _ = time.LoadLocation("America/Sao_Paulo")
 )
 
-// TODO: Add db functions.
 type DateTime struct {
 	time.Time
 }

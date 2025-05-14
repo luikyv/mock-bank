@@ -46,8 +46,8 @@ func (s Service) Authorize(ctx context.Context, accIDs []string, consentID uuid.
 	})
 }
 
-func (s Service) Create(ctx context.Context, acc *Account) error {
-	if err := s.db.WithContext(ctx).Create(acc).Error; err != nil {
+func (s Service) Save(ctx context.Context, acc *Account) error {
+	if err := s.db.WithContext(ctx).Save(acc).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return ErrAlreadyExists
 		}

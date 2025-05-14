@@ -18,8 +18,8 @@ func NewService(db *gorm.DB) Service {
 	}
 }
 
-func (s Service) Create(ctx context.Context, u *User) error {
-	if err := s.db.WithContext(ctx).Create(u).Error; err != nil {
+func (s Service) Save(ctx context.Context, u *User) error {
+	if err := s.db.WithContext(ctx).Where("id = ? AND org_id = ?", u.ID, u.OrgID).Save(u).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return ErrAlreadyExists
 		}

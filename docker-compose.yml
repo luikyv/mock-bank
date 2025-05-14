@@ -4,7 +4,7 @@ services:
       - main
     build: .
     environment:
-      - DB_STRING=postgres://admin:pass@psql:5432/mockbank?sslmode=disable
+      - DB_CONNECTION_STRING=postgres://admin:pass@psql:5432/mockbank?sslmode=disable
     volumes:
       - ./keys/:/app/keys/
 

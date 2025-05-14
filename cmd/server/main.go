@@ -29,14 +29,13 @@ var (
 	env                = getEnv("ENV", "LOCAL")
 	host               = getEnv("HOST", "https://mockbank.local")
 	appHost            = strings.Replace(host, "https://", "https://app.", 1)
-	apiHost            = strings.Replace(host, "https://", "https://api.", 1)
 	apiMTLSHost        = strings.Replace(host, "https://", "https://matls-api.", 1)
 	authHost           = strings.Replace(host, "https://", "https://auth.", 1)
 	authMTLSHost       = strings.Replace(host, "https://", "https://matls-auth.", 1)
 	directoryIssuer    = getEnv("DIRECTORY_ISSUER", "https://directory")
 	directoryClientID  = getEnv("DIRECTORY_CLIENT_ID", "mockbank")
 	port               = getEnv("PORT", "80")
-	dbConnectionString = getEnv("DB_STRING", "postgres://admin:pass@localhost:5432/mockbank?sslmode=disable")
+	dbConnectionString = getEnv("DB_CONNECTION_STRING", "postgres://admin:pass@localhost:5432/mockbank?sslmode=disable")
 )
 
 func main() {

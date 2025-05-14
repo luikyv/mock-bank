@@ -12,10 +12,10 @@ type Options struct {
 	ErrorPagination bool
 }
 
-func Meta(host string) strictnethttp.StrictHTTPMiddlewareFunc {
+func Meta(baseURL string) strictnethttp.StrictHTTPMiddlewareFunc {
 	return func(next strictnethttp.StrictHTTPHandlerFunc, operationID string) strictnethttp.StrictHTTPHandlerFunc {
 		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (response any, err error) {
-			ctx = context.WithValue(ctx, api.CtxKeyRequestURL, host+r.URL.RequestURI())
+			ctx = context.WithValue(ctx, api.CtxKeyRequestURL, baseURL+r.URL.RequestURI())
 			return next(ctx, w, r, req)
 		}
 	}

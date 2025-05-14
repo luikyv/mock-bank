@@ -37,22 +37,6 @@ func NewServer(host string, service account.Service, consentService consent.Serv
 
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	strictHandler := NewStrictHandlerWithOptions(s, []StrictMiddlewareFunc{
-		middleware.FAPIID(map[string]middleware.Options{
-			"accountsGetAccounts":                         {ErrorPagination: true},
-			"accountsGetAccountsAccountId":                {ErrorPagination: true},
-			"accountsGetAccountsAccountIdBalances":        {ErrorPagination: true},
-			"accountsGetAccountsAccountIdOverdraftLimits": {ErrorPagination: true},
-			"accountsGetAccountsAccountIdTransactions":    {ErrorPagination: true},
-		}),
-		middleware.Meta(s.host),
-		middleware.AuthScopes(map[string]middleware.AuthOptions{
-			"accountsGetAccounts":                             {Scopes: []goidc.Scope{goidc.ScopeOpenID, consent.ScopeID}, ErrorPagination: true},
-			"accountsGetAccountsAccountId":                    {Scopes: []goidc.Scope{goidc.ScopeOpenID, consent.ScopeID}, ErrorPagination: true},
-			"accountsGetAccountsAccountIdBalances":            {Scopes: []goidc.Scope{goidc.ScopeOpenID, consent.ScopeID}, ErrorPagination: true},
-			"accountsGetAccountsAccountIdOverdraftLimits":     {Scopes: []goidc.Scope{goidc.ScopeOpenID, consent.ScopeID}, ErrorPagination: true},
-			"accountsGetAccountsAccountIdTransactions":        {Scopes: []goidc.Scope{goidc.ScopeOpenID, consent.ScopeID}, ErrorPagination: true},
-			"accountsGetAccountsAccountIdTransactionsCurrent": {Scopes: []goidc.Scope{goidc.ScopeOpenID, consent.ScopeID}},
-		}, s.op),
 		consent.PermissionMiddleware(map[string]consent.PermissionOptions{
 			"accountsGetAccounts":                             {Permissions: []consent.Permission{consent.PermissionAccountsRead}, ErrorPagination: true},
 			"accountsGetAccountsAccountId":                    {Permissions: []consent.Permission{consent.PermissionAccountsRead}, ErrorPagination: true},
@@ -61,6 +45,22 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			"accountsGetAccountsAccountIdTransactions":        {Permissions: []consent.Permission{consent.PermissionAccountsTransactionsRead}, ErrorPagination: true},
 			"accountsGetAccountsAccountIdTransactionsCurrent": {Permissions: []consent.Permission{consent.PermissionAccountsTransactionsRead}},
 		}, s.consentService),
+		middleware.AuthScopes(map[string]middleware.AuthOptions{
+			"accountsGetAccounts":                             {Scopes: []goidc.Scope{goidc.ScopeOpenID, consent.ScopeID}, ErrorPagination: true},
+			"accountsGetAccountsAccountId":                    {Scopes: []goidc.Scope{goidc.ScopeOpenID, consent.ScopeID}, ErrorPagination: true},
+			"accountsGetAccountsAccountIdBalances":            {Scopes: []goidc.Scope{goidc.ScopeOpenID, consent.ScopeID}, ErrorPagination: true},
+			"accountsGetAccountsAccountIdOverdraftLimits":     {Scopes: []goidc.Scope{goidc.ScopeOpenID, consent.ScopeID}, ErrorPagination: true},
+			"accountsGetAccountsAccountIdTransactions":        {Scopes: []goidc.Scope{goidc.ScopeOpenID, consent.ScopeID}, ErrorPagination: true},
+			"accountsGetAccountsAccountIdTransactionsCurrent": {Scopes: []goidc.Scope{goidc.ScopeOpenID, consent.ScopeID}},
+		}, s.op),
+		middleware.Meta(s.host + "/open-banking/accounts/v2"),
+		middleware.FAPIID(map[string]middleware.Options{
+			"accountsGetAccounts":                         {ErrorPagination: true},
+			"accountsGetAccountsAccountId":                {ErrorPagination: true},
+			"accountsGetAccountsAccountIdBalances":        {ErrorPagination: true},
+			"accountsGetAccountsAccountIdOverdraftLimits": {ErrorPagination: true},
+			"accountsGetAccountsAccountIdTransactions":    {ErrorPagination: true},
+		}),
 	}, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
@@ -262,7 +262,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 
 	resp := ResponseAccountTransactions{
 		Data:  []AccountTransactionsData{},
-		Meta:  *api.NewPaginatedMeta(txs),
+		Meta:  *api.NewMeta(),
 		Links: *api.NewPaginatedLinks(reqURL, txs),
 	}
 	for _, tx := range txs.Records {

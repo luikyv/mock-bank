@@ -24,6 +24,7 @@ run:
 
 # Runs only the MockBank dependencies necessary for local development. With this
 # command the MockBank server can run and be debugged in the local host.
+# TODO: Change it to debug.
 run-dev:
 	@docker-compose --profile dev up
 

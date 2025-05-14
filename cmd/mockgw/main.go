@@ -80,7 +80,7 @@ func main() {
 
 		idToken, _ := jwt.Signed(joseSigner).Claims(idTokenClaims).Serialize()
 
-		http.Redirect(w, r, fmt.Sprintf("https://api.mockbank.local/app/directory/callback?id_token=%s", idToken), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("https://app.mockbank.local/api/directory/callback?id_token=%s", idToken), http.StatusSeeOther)
 	})
 
 	mux.HandleFunc("GET directory/participants", func(w http.ResponseWriter, r *http.Request) {

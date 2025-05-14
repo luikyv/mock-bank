@@ -4,17 +4,19 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/timex"
 )
 
 func ID(scopes string) (string, bool) {
+	var urn string
 	for _, s := range strings.Split(scopes, " ") {
 		if ScopeID.Matches(s) {
-			return strings.Replace(s, "consent:", "", 1), true
+			urn = strings.Replace(s, "consent:", "", 1)
+			break
 		}
 	}
-	return "", false
+	id := strings.TrimPrefix(urn, urnPrefix)
+	return id, id != ""
 }
 
 func validatePermissions(requestedPermissions []Permission) error {
@@ -103,8 +105,4 @@ func containsAny[T comparable](slice1 []T, slice2 ...T) bool {
 	}
 
 	return false
-}
-
-func consentID() string {
-	return urnPrefix + uuid.NewString()
 }

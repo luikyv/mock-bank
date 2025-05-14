@@ -32,11 +32,11 @@ INSERT INTO accounts (
   created_at,
   updated_at
 ) VALUES (
-  '22222222-2222-2222-2222-222222222222', -- fixed account ID
-  '11111111-1111-1111-1111-111111111111', -- references the mock user above
-  '0001234567',
-  'checking',
-  'standard',
+  '92792126019929279212650822221989319252576',
+  '11111111-1111-1111-1111-111111111111',
+  '94088392',
+  'CONTA_DEPOSITO_A_VISTA',
+  'INDIVIDUAL',
   '1000.00',
   '0.00',
   '0.00',

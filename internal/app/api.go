@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/opf/account"
 	"github.com/luiky/mock-bank/internal/opf/consent"
@@ -59,6 +60,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			http.MethodGet,
 			http.MethodPost,
 			http.MethodDelete,
+			http.MethodPut,
 		},
 	})
 	handler = c.Handler(handler)
@@ -211,7 +213,7 @@ func (s Server) CreateMockUser(ctx context.Context, req CreateMockUserRequestObj
 		CPF:      req.Body.Data.Cpf,
 		OrgID:    req.OrgID,
 	}
-	if err := s.userService.Create(ctx, u); err != nil {
+	if err := s.userService.Save(ctx, u); err != nil {
 		return nil, err
 	}
 
@@ -232,12 +234,78 @@ func (s Server) CreateMockUser(ctx context.Context, req CreateMockUserRequestObj
 	return CreateMockUser201JSONResponse(resp), nil
 }
 
+func (s Server) UpdateMockUser(ctx context.Context, req UpdateMockUserRequestObject) (UpdateMockUserResponseObject, error) {
+	u := &user.User{
+		ID:       uuid.MustParse(req.UserID),
+		Username: req.Body.Data.Username,
+		Name:     req.Body.Data.Name,
+		CPF:      req.Body.Data.Cpf,
+		OrgID:    req.OrgID,
+	}
+	if err := s.userService.Save(ctx, u); err != nil {
+		return nil, err
+	}
+
+	resp := MockUserResponse{
+		Data: struct {
+			Cpf      string  `json:"cpf"`
+			ID       string  `json:"id"`
+			Name     string  `json:"name"`
+			Password *string `json:"password,omitempty"`
+			Username string  `json:"username"`
+		}{
+			Cpf:      u.CPF,
+			ID:       u.ID.String(),
+			Name:     u.Name,
+			Username: u.Name,
+		},
+	}
+	return UpdateMockUser200JSONResponse(resp), nil
+}
+
 func (s Server) DeleteMockUser(ctx context.Context, req DeleteMockUserRequestObject) (DeleteMockUserResponseObject, error) {
 	if err := s.userService.Delete(ctx, req.UserID, req.OrgID); err != nil {
 		return nil, err
 	}
 
 	return DeleteMockUser204Response{}, nil
+}
+
+func (s Server) CreateAccount(ctx context.Context, req CreateAccountRequestObject) (CreateAccountResponseObject, error) {
+	acc := &account.Account{
+		Number:                      req.Body.Data.Number,
+		Type:                        account.Type(req.Body.Data.Type),
+		SubType:                     account.SubType(req.Body.Data.Subtype),
+		AvailableAmount:             req.Body.Data.AvailableAmount,
+		BlockedAmount:               req.Body.Data.BlockedAmount,
+		AutomaticallyInvestedAmount: req.Body.Data.AutomaticallyInvestedAmount,
+		OrgID:                       req.OrgID,
+		UserID:                      req.UserID,
+	}
+	if err := s.accountService.Save(ctx, acc); err != nil {
+		return nil, err
+	}
+
+	defaultBranch := account.DefaultBranch
+	resp := AccountResponse{
+		Data: struct {
+			AccountID  string  `json:"accountId"`
+			BranchCode *string `json:"branchCode,omitempty"`
+			CheckDigit string  `json:"checkDigit"`
+			CompeCode  string  `json:"compeCode"`
+			Number     string  `json:"number"`
+			Type       string  `json:"type"`
+		}{
+			AccountID:  acc.ID,
+			BranchCode: &defaultBranch,
+			CheckDigit: account.DefaultCheckDigit,
+			CompeCode:  account.DefaultCompeCode,
+			Number:     acc.Number,
+			Type:       string(acc.Type),
+		},
+	}
+
+	return CreateAccount201JSONResponse(resp), nil
 }
 
 func (s Server) GetAccounts(ctx context.Context, req GetAccountsRequestObject) (GetAccountsResponseObject, error) {

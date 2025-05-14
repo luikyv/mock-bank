@@ -33,8 +33,6 @@ func NewServer(host string, service consent.Service, op *provider.Provider) Serv
 
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	strictHandler := NewStrictHandlerWithOptions(s, []StrictMiddlewareFunc{
-		middleware.FAPIID(nil),
-		middleware.Meta(s.host),
 		middleware.AuthScopes(map[string]middleware.AuthOptions{
 			"consentsPostConsents":                   {Scopes: []goidc.Scope{consent.Scope}},
 			"consentsGetConsentsConsentID":           {Scopes: []goidc.Scope{consent.Scope}},
@@ -42,6 +40,8 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			"consentsPostConsentsConsentIDExtends":   {Scopes: []goidc.Scope{consent.Scope, goidc.ScopeOpenID}},
 			"consentsGetConsentsConsentIDExtensions": {Scopes: []goidc.Scope{consent.Scope}},
 		}, s.op),
+		middleware.Meta(s.host + "/open-banking/consents/v3"),
+		middleware.FAPIID(nil),
 	}, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))

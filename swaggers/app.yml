@@ -91,7 +91,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateMockUserRequest'
+              $ref: '#/components/schemas/MockUserRequest'
       responses:
         '201':
           description: User created
@@ -101,6 +101,26 @@ paths:
                 $ref: '#/components/schemas/MockUserResponse'
 
   /api/orgs/{orgId}/users/{userId}:
+    put:
+      summary: Update a user in an organization
+      operationId: updateMockUser
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/mockUserId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MockUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockUserResponse'
     delete:
       summary: Delete a mock user in an organization
       operationId: deleteMockUser
@@ -114,6 +134,26 @@ paths:
           description: Mock user deleted
 
   /api/orgs/{orgId}/users/{userId}/accounts:
+    post:
+      summary: Create a new account
+      operationId: createAccount
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/mockUserId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountRequest'
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
     get:
       summary: Get accounts of a user
       operationId: getAccounts
@@ -206,7 +246,7 @@ components:
           $ref: '#/components/schemas/Meta'
         links:
           $ref: '#/components/schemas/Links'
-    CreateMockUserRequest:
+    MockUserRequest:
       type: object
       required:
         - data
@@ -248,6 +288,66 @@ components:
             name:
               type: string
             cpf:
+              type: string
+    AccountRequest:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - number
+            - type
+            - subtype
+            - availableAmount
+            - blockedAmount
+            - automaticallyInvestedAmount
+          properties:
+            number:
+              type: string
+              maxLength: 20
+            type:
+              type: string
+            subtype:
+              type: string
+            availableAmount:
+              type: string
+            blockedAmount:
+              type: string
+            automaticallyInvestedAmount:
+              type: string
+            overdraftLimitContracted:
+              type: string
+            overdraftLimitUsed:
+              type: string
+            overdraftLimitUnarraged:
+              type: string
+    AccountResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - accountId
+            - compeCode
+            - checkDigit
+            - number
+            - type
+          properties:
+            accountId:
+              type: string
+            compeCode:
+              type: string
+            branchCode:
+              type: string
+            checkDigit:
+              type: string
+            number:
+              type: string
+            type:
               type: string
     AccountsResponse:
       type: object
