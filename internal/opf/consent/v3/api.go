@@ -5,53 +5,88 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/google/uuid"
+
 	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/opf"
 	"github.com/luiky/mock-bank/internal/opf/consent"
 	"github.com/luiky/mock-bank/internal/opf/middleware"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timex"
-	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
+	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 )
 
-var _ StrictServerInterface = Server{}
-
 type Server struct {
-	host    string
+	baseURL string
 	service consent.Service
 	op      *provider.Provider
 }
 
 func NewServer(host string, service consent.Service, op *provider.Provider) Server {
 	return Server{
-		host:    host,
+		baseURL: host + "/open-banking/consents/v3",
 		service: service,
 		op:      op,
 	}
 }
 
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
-	strictHandler := NewStrictHandlerWithOptions(s, []StrictMiddlewareFunc{
-		middleware.AuthScopes(map[string]middleware.AuthOptions{
-			"consentsPostConsents":                   {Scopes: []goidc.Scope{consent.Scope}},
-			"consentsGetConsentsConsentID":           {Scopes: []goidc.Scope{consent.Scope}},
-			"consentsDeleteConsentsConsentID":        {Scopes: []goidc.Scope{consent.Scope}},
-			"consentsPostConsentsConsentIDExtends":   {Scopes: []goidc.Scope{consent.Scope, goidc.ScopeOpenID}},
-			"consentsGetConsentsConsentIDExtensions": {Scopes: []goidc.Scope{consent.Scope}},
-		}, s.op),
-		middleware.Meta(s.host + "/open-banking/consents/v3"),
-		middleware.FAPIID(nil),
-	}, StrictHTTPServerOptions{
-		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+	consentMux := http.NewServeMux()
+
+	spec, err := GetSwagger()
+	if err != nil {
+		panic(err)
+	}
+	spec.Servers = nil
+	swaggerMiddleware := netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
+		Options: openapi3filter.Options{
+			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
+				return nil
+			},
 		},
+		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
+			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
+		},
+	})
+
+	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeResponseError(w, err)
 		},
 	})
-	handler := Handler(strictHandler)
-	mux.Handle("/open-banking/consents/v3/", http.StripPrefix("/open-banking/consents/v3", handler))
+	wrapper := ServerInterfaceWrapper{
+		Handler:            strictHandler,
+		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, middleware.FAPIIDFunc(nil)},
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+		},
+	}
+
+	var handler http.Handler
+
+	handler = http.HandlerFunc(wrapper.ConsentsPostConsents)
+	handler = middleware.Auth(handler, s.op, consent.Scope)
+	consentMux.Handle("POST /consents", handler)
+
+	handler = http.HandlerFunc(wrapper.ConsentsDeleteConsentsConsentID)
+	handler = middleware.Auth(handler, s.op, consent.Scope)
+	consentMux.Handle("DELETE /consents/{consentId}", handler)
+
+	handler = http.HandlerFunc(wrapper.ConsentsGetConsentsConsentID)
+	handler = middleware.Auth(handler, s.op, consent.Scope)
+	consentMux.Handle("GET /consents/{consentId}", handler)
+
+	handler = http.HandlerFunc(wrapper.ConsentsPostConsentsConsentIDExtends)
+	handler = middleware.Auth(handler, s.op, consent.Scope)
+	consentMux.Handle("POST /consents/{consentId}/extends", handler)
+
+	handler = http.HandlerFunc(wrapper.ConsentsGetConsentsConsentIDExtensions)
+	handler = middleware.Auth(handler, s.op, consent.Scope)
+	consentMux.Handle("GET /consents/{consentId}/extensions", handler)
+
+	mux.Handle("/open-banking/consents/v3/", http.StripPrefix("/open-banking/consents/v3", consentMux))
 }
 
 func (s Server) ConsentsPostConsents(ctx context.Context, req ConsentsPostConsentsRequestObject) (ConsentsPostConsentsResponseObject, error) {
@@ -64,8 +99,8 @@ func (s Server) ConsentsPostConsents(ctx context.Context, req ConsentsPostConsen
 		UserCPF:     req.Body.Data.LoggedUser.Document.Identification,
 		Permissions: perms,
 		ExpiresAt:   &req.Body.Data.ExpirationDateTime.Time,
-		ClientID:    ctx.Value(api.CtxKeyClientID).(string),
-		OrgID:       ctx.Value(api.CtxKeyOrgID).(string),
+		ClientID:    ctx.Value(opf.CtxKeyClientID).(string),
+		OrgID:       ctx.Value(opf.CtxKeyOrgID).(string),
 	}
 	if err := s.service.Create(ctx, c); err != nil {
 		return nil, err
@@ -90,7 +125,7 @@ func (s Server) ConsentsPostConsents(ctx context.Context, req ConsentsPostConsen
 			CreationDateTime:     timex.NewDateTime(c.CreatedAt),
 			StatusUpdateDateTime: timex.NewDateTime(c.StatusUpdatedAt),
 		},
-		Links: api.NewLinks(s.host + "/open-banking/consents/v3/consents/" + c.URN()),
+		Links: api.NewLinks(s.baseURL + "/consents/" + c.URN()),
 		Meta:  api.NewMeta(),
 	}
 	if c.ExpiresAt != nil {
@@ -102,7 +137,7 @@ func (s Server) ConsentsPostConsents(ctx context.Context, req ConsentsPostConsen
 }
 
 func (s Server) ConsentsGetConsentsConsentID(ctx context.Context, req ConsentsGetConsentsConsentIDRequestObject) (ConsentsGetConsentsConsentIDResponseObject, error) {
-	orgID := ctx.Value(api.CtxKeyOrgID).(string)
+	orgID := ctx.Value(opf.CtxKeyOrgID).(string)
 	c, err := s.service.Consent(ctx, req.ConsentID, orgID)
 	if err != nil {
 		return nil, err
@@ -134,7 +169,7 @@ func (s Server) ConsentsGetConsentsConsentID(ctx context.Context, req ConsentsGe
 			Status:               ResponseConsentReadDataStatus(c.Status),
 			StatusUpdateDateTime: timex.NewDateTime(c.StatusUpdatedAt),
 		},
-		Links: api.NewLinks(s.host + "/open-banking/consents/v3/consents/" + c.URN()),
+		Links: api.NewLinks(s.baseURL + "/consents/" + c.URN()),
 		Meta:  api.NewMeta(),
 	}
 	if c.ExpiresAt != nil {
@@ -156,7 +191,7 @@ func (s Server) ConsentsGetConsentsConsentID(ctx context.Context, req ConsentsGe
 }
 
 func (s Server) ConsentsDeleteConsentsConsentID(ctx context.Context, req ConsentsDeleteConsentsConsentIDRequestObject) (ConsentsDeleteConsentsConsentIDResponseObject, error) {
-	orgID := ctx.Value(api.CtxKeyOrgID).(string)
+	orgID := ctx.Value(opf.CtxKeyOrgID).(string)
 	if err := s.service.Delete(ctx, req.ConsentID, orgID); err != nil {
 		return nil, err
 	}
@@ -165,8 +200,8 @@ func (s Server) ConsentsDeleteConsentsConsentID(ctx context.Context, req Consent
 }
 
 func (s Server) ConsentsPostConsentsConsentIDExtends(ctx context.Context, req ConsentsPostConsentsConsentIDExtendsRequestObject) (ConsentsPostConsentsConsentIDExtendsResponseObject, error) {
-	orgID := ctx.Value(api.CtxKeyOrgID).(string)
-	consentID := ctx.Value(api.CtxKeyConsentID).(string)
+	orgID := ctx.Value(opf.CtxKeyOrgID).(string)
+	consentID := ctx.Value(opf.CtxKeyConsentID).(string)
 	ext := &consent.Extension{
 		ConsentID:     uuid.MustParse(consentID),
 		UserAgent:     req.Params.XCustomerUserAgent,
@@ -207,8 +242,7 @@ func (s Server) ConsentsPostConsentsConsentIDExtends(ctx context.Context, req Co
 
 func (s Server) ConsentsGetConsentsConsentIDExtensions(ctx context.Context, req ConsentsGetConsentsConsentIDExtensionsRequestObject) (ConsentsGetConsentsConsentIDExtensionsResponseObject, error) {
 
-	orgID := ctx.Value(api.CtxKeyOrgID).(string)
-	reqURL := ctx.Value(api.CtxKeyRequestURL).(string)
+	orgID := ctx.Value(opf.CtxKeyOrgID).(string)
 	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
 	exts, err := s.service.Extensions(ctx, req.ConsentID, orgID, pag)
 	if err != nil {
@@ -216,7 +250,7 @@ func (s Server) ConsentsGetConsentsConsentIDExtensions(ctx context.Context, req 
 	}
 
 	resp := ResponseConsentReadExtensions{
-		Links: api.NewPaginatedLinks(reqURL, exts),
+		Links: api.NewPaginatedLinks(s.baseURL+"/consents/"+req.ConsentID+"/extensions", exts),
 		Meta:  api.NewPaginatedMeta(exts),
 	}
 	for _, ext := range exts.Records {

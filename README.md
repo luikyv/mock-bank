@@ -9,14 +9,10 @@ mock backend: https://matls-api.mockbank.local
 ## TODO
 
 - Add rules to DCR.
-- Delete accounts.
 - Transactions.
 - Directory sso.
 - Resources.
-- Add swagger validation.
 - Improve error handling.
 - Add logs.
 - https://github.com/unrolled/secure.
-- directory.local
 - Add fapi ip.
-- make debug

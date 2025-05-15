@@ -34,7 +34,7 @@ func HandleGrantFunc(op *provider.Provider, consentService consent.Service) goid
 		orgID := client.CustomAttribute("org_id").(string)
 		gi.AdditionalTokenClaims["org_id"] = orgID
 
-		consentID, ok := consent.ID(gi.ActiveScopes)
+		consentID, ok := consent.IDFromScopes(gi.ActiveScopes)
 		if !ok {
 			return nil
 		}

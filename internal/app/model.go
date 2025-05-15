@@ -11,6 +11,13 @@ import (
 	"github.com/luiky/mock-bank/internal/timex"
 )
 
+type ContextKey string
+
+const (
+	CtxKeyOrgID     ContextKey = "org_id"
+	CtxKeySessionID ContextKey = "session_id"
+)
+
 const (
 	cookieSessionId = "sessionId"
 	sessionValidity = 24 * time.Hour

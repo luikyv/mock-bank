@@ -7,16 +7,13 @@ import (
 	"github.com/luiky/mock-bank/internal/timex"
 )
 
-func ID(scopes string) (string, bool) {
-	var urn string
+func IDFromScopes(scopes string) (string, bool) {
 	for _, s := range strings.Split(scopes, " ") {
 		if ScopeID.Matches(s) {
-			urn = strings.Replace(s, "consent:", "", 1)
-			break
+			return strings.TrimPrefix(s, "consent:"+URNPrefix), true
 		}
 	}
-	id := strings.TrimPrefix(urn, urnPrefix)
-	return id, id != ""
+	return "", false
 }
 
 func validatePermissions(requestedPermissions []Permission) error {

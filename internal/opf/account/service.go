@@ -60,7 +60,7 @@ func (s Service) createConsent(ctx context.Context, consentAcc *ConsentAccount) 
 	return s.db.WithContext(ctx).Create(consentAcc).Error
 }
 
-func (s Service) ConsentedAccount(ctx context.Context, consentID, accountID, orgID string) (*Account, error) {
+func (s Service) ConsentedAccount(ctx context.Context, accountID, consentID, orgID string) (*Account, error) {
 	consentAcc := &ConsentAccount{}
 	if err := s.db.WithContext(ctx).
 		Preload("Account").
@@ -130,6 +130,10 @@ func (s Service) ConsentedAccounts(ctx context.Context, consentID, orgID string,
 		accs = append(accs, consentAcc.Account)
 	}
 	return page.New(accs, pag, int(total)), nil
+}
+
+func (s Service) Delete(ctx context.Context, id, orgID string) error {
+	return s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).Delete(&Account{}).Error
 }
 
 func (s Service) CreateTransaction(ctx context.Context, tx *Transaction) error {

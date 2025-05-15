@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/opf"
 	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timex"
@@ -42,7 +42,7 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 		return nil, err
 	}
 
-	if ctx.Value(api.CtxKeyClientID) != nil && ctx.Value(api.CtxKeyClientID) != c.ClientID {
+	if ctx.Value(opf.CtxKeyClientID) != nil && ctx.Value(opf.CtxKeyClientID) != c.ClientID {
 		return nil, ErrAccessNotAllowed
 	}
 
@@ -173,7 +173,7 @@ func (s Service) save(ctx context.Context, c *Consent) error {
 }
 
 func (s Service) consent(ctx context.Context, id, orgID string) (*Consent, error) {
-	id = strings.TrimPrefix(id, urnPrefix)
+	id = strings.TrimPrefix(id, URNPrefix)
 	c := &Consent{}
 	err := s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).First(c).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -207,7 +207,7 @@ func (s Service) saveExtension(ctx context.Context, ext *Extension) error {
 }
 
 func (s Service) Extensions(ctx context.Context, consentURN, orgID string, pag page.Pagination) (page.Page[*Extension], error) {
-	consentID := strings.TrimPrefix(consentURN, urnPrefix)
+	consentID := strings.TrimPrefix(consentURN, URNPrefix)
 	query := s.db.WithContext(ctx).Model(&Extension{}).Where("consent_id = ? AND org_id = ?", consentID, orgID)
 
 	var extensions []*Extension

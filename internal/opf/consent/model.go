@@ -14,8 +14,8 @@ import (
 
 const (
 	DefaultUserDocumentRelation      = "CPF"
+	URNPrefix                        = "urn:mockbank:"
 	maxTimeAwaitingAuthorizationSecs = 3600
-	urnPrefix                        = "urn:mockbank:"
 )
 
 var (
@@ -44,7 +44,7 @@ type Consent struct {
 }
 
 func (c Consent) URN() string {
-	return urnPrefix + c.ID.String()
+	return URNPrefix + c.ID.String()
 }
 
 // HasAuthExpired returns true if the status is [StatusAwaitingAuthorization] and

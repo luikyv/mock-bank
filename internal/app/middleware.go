@@ -31,17 +31,8 @@ func authMiddleware(service Service) strictnethttp.StrictHTTPMiddlewareFunc {
 				return nil, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid org id")
 			}
 
-			ctx = context.WithValue(ctx, api.CtxKeyOrgID, orgID)
-			ctx = context.WithValue(ctx, api.CtxKeySessionID, session.ID)
-			return next(ctx, w, r, req)
-		}
-	}
-}
-
-func metaMiddleware(host string) strictnethttp.StrictHTTPMiddlewareFunc {
-	return func(next strictnethttp.StrictHTTPHandlerFunc, operationID string) strictnethttp.StrictHTTPHandlerFunc {
-		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (response any, err error) {
-			ctx = context.WithValue(ctx, api.CtxKeyRequestURL, host+r.URL.RequestURI())
+			ctx = context.WithValue(ctx, CtxKeyOrgID, orgID)
+			ctx = context.WithValue(ctx, CtxKeySessionID, session.ID)
 			return next(ctx, w, r, req)
 		}
 	}

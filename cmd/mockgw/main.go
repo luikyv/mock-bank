@@ -47,12 +47,14 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET directory/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET directory.local/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Request directory openid configuration")
 		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, "/mocks/directory_well_known.json")
 	})
 
-	mux.HandleFunc("GET directory/jwks", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET directory.local/jwks", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Request directory jwks")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		var jwks jose.JSONWebKeySet
@@ -62,7 +64,8 @@ func main() {
 		_ = json.NewEncoder(w).Encode(jwks)
 	})
 
-	mux.HandleFunc("POST directory/token", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST directory.local/token", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Request directory token")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = io.WriteString(w, `{
@@ -71,7 +74,8 @@ func main() {
 		}`)
 	})
 
-	mux.HandleFunc("GET directory/authorize", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET directory.local/authorize", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Request directory authorize")
 		key := directoryJWKS.Keys[0]
 		joseSigner, _ := jose.NewSigner(jose.SigningKey{
 			Algorithm: jose.SignatureAlgorithm(key.Algorithm),
@@ -83,12 +87,14 @@ func main() {
 		http.Redirect(w, r, fmt.Sprintf("https://app.mockbank.local/api/directory/callback?id_token=%s", idToken), http.StatusSeeOther)
 	})
 
-	mux.HandleFunc("GET directory/participants", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET directory.local/participants", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Request directory participants")
 		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, "/mocks/participants.json")
 	})
 
-	mux.HandleFunc("GET directory/organisations/{org_id}/softwarestatements/{ss_id}/assertion", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET directory.local/organisations/{org_id}/softwarestatements/{ss_id}/assertion", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Request directory software statement")
 		key := directoryJWKS.Keys[0]
 		joseSigner, _ := jose.NewSigner(jose.SigningKey{
 			Algorithm: jose.SignatureAlgorithm(key.Algorithm),
@@ -102,7 +108,8 @@ func main() {
 		_, _ = io.WriteString(w, ssa)
 	})
 
-	mux.HandleFunc("GET keystore/{org_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET keystore.local/{org_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Request keystore org id jwks")
 		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, "/mocks/client.jwks")
 	})
@@ -124,7 +131,7 @@ func main() {
 
 	// Serve participant information over HTTP because the Conformance Suite
 	// does not accept self-signed certificates.
-	http.HandleFunc("GET directory/participants", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("GET directory.local/participants", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, "/mocks/participants.json")
 	})

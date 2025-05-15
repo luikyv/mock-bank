@@ -6,40 +6,34 @@ import (
 	"net/http"
 
 	"github.com/luiky/mock-bank/internal/api"
-	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
+	"github.com/luiky/mock-bank/internal/opf"
 )
 
-type PermissionOptions struct {
-	Permissions     []Permission
-	ErrorPagination bool
-}
+func PermissionMiddleware(next http.Handler, consentService Service, permissions ...Permission) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		scopes := r.Context().Value(opf.CtxKeyScopes).(string)
+		orgID := r.Context().Value(opf.CtxKeyOrgID).(string)
 
-func PermissionMiddleware(optsMap map[string]PermissionOptions, consentService Service) strictnethttp.StrictHTTPMiddlewareFunc {
-	return func(next strictnethttp.StrictHTTPHandlerFunc, operationID string) strictnethttp.StrictHTTPHandlerFunc {
-		opts := optsMap[operationID]
-		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (res any, err error) {
-			scopes := ctx.Value(api.CtxKeyScopes).(string)
-			orgID := ctx.Value(api.CtxKeyOrgID).(string)
-
-			id, _ := ID(scopes)
-			consent, err := consentService.Consent(ctx, id, orgID)
-			if err != nil {
-				slog.DebugContext(r.Context(), "the token is not active")
-				return nil, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(opts.ErrorPagination)
-			}
-
-			if !consent.IsAuthorized() {
-				slog.DebugContext(r.Context(), "the consent is not authorized")
-				return nil, api.NewError("INVALID_STATUS", http.StatusUnauthorized, "the consent is not authorized").Pagination(opts.ErrorPagination)
-			}
-
-			if !consent.HasPermissions(opts.Permissions) {
-				slog.DebugContext(r.Context(), "the consent doesn't have the required permissions")
-				return nil, api.NewError("INVALID_STATUS", http.StatusForbidden, "the consent is missing permissions").Pagination(opts.ErrorPagination)
-			}
-
-			ctx = context.WithValue(ctx, api.CtxKeyConsentID, id)
-			return next(ctx, w, r, req)
+		consentID, _ := IDFromScopes(scopes)
+		consent, err := consentService.Consent(r.Context(), consentID, orgID)
+		if err != nil {
+			slog.DebugContext(r.Context(), "the token is not active")
+			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token"))
+			return
 		}
-	}
+
+		if !consent.IsAuthorized() {
+			slog.DebugContext(r.Context(), "the consent is not authorized")
+			api.WriteError(w, api.NewError("INVALID_STATUS", http.StatusUnauthorized, "the consent is not authorized"))
+			return
+		}
+
+		if !consent.HasPermissions(permissions) {
+			slog.DebugContext(r.Context(), "the consent doesn't have the required permissions")
+			api.WriteError(w, api.NewError("INVALID_STATUS", http.StatusForbidden, "the consent is missing permissions"))
+		}
+
+		r = r.WithContext(context.WithValue(r.Context(), opf.CtxKeyConsentID, consentID))
+		next.ServeHTTP(w, r)
+	})
 }

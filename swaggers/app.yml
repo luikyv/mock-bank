@@ -172,6 +172,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/AccountsResponse'
 
+  /api/orgs/{orgId}/users/{userId}/accounts/{accountId}:
+    delete:
+      summary: Delete an account
+      operationId: deleteAccount
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/mockUserId'
+        - $ref: '#/components/parameters/accountId'
+      responses:
+        '204':
+          description: Account deleted
+
   /api/orgs/{orgId}/users/{userId}/consents:
     get:
       summary: Get consents of a user
@@ -506,6 +520,12 @@ components:
         type: string
     mockUserId:
       name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+    accountId:
+      name: accountId
       in: path
       required: true
       schema:

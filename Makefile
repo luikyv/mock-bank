@@ -22,21 +22,20 @@ tools:
 run:
 	@docker-compose --profile main up
 
-# Runs only the MockBank dependencies necessary for local development. With this
+# Runs only the MockBank dependencies necessary for debugging. With this
 # command the MockBank server can run and be debugged in the local host.
-# TODO: Change it to debug.
-run-dev:
-	@docker-compose --profile dev up
+run-debug:
+	@docker-compose --profile debug up
 
-# Runs the local development environment with both MockBank and the Conformance
+# Runs the local debug environment with both MockBank and the Conformance
 # Suite. With this command the MockBank server can run and be debugged in the
 # local host with the Conformance Suite.
-run-dev-with-cs:
-	@docker-compose --profile dev --profile conformance up
+run-debug-with-cs:
+	@docker-compose --profile debug --profile conformance up
 
 # Run the Conformance Suite.
 run-cs:
-	@docker compose --profile conformance up
+	@docker-compose --profile conformance up
 
 # Generate certificates, private keys, and JWKS files for both the server and clients.
 keys:
@@ -116,8 +115,8 @@ cs-config:
 	        "brazilOrganizationId": "76b370e3-def5-4798-8b6a-915cb5d6dd74", \
 	      }, \
 		  "directory": { \
-		    "discoveryUrl": "https://directory/.well-known/openid-configuration", \
-		    "apibase": "https://directory", \
+		    "discoveryUrl": "https://directory.local/.well-known/openid-configuration", \
+		    "apibase": "https://directory.local", \
 		    "client_id": "random_client" \
 		  } \
 	    }' > cs_config.json

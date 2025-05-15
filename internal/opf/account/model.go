@@ -1,6 +1,8 @@
 package account
 
 import (
+	"crypto/rand"
+	"math/big"
 	"net/http"
 	"time"
 
@@ -13,9 +15,13 @@ import (
 )
 
 const (
-	DefaultCompeCode  string = "001"
-	DefaultBranch     string = "0001"
-	DefaultCheckDigit string = "1"
+	DefaultCompeCode    string = "001"
+	DefaultBranch       string = "0001"
+	DefaultCheckDigit   string = "1"
+	IDLength            int    = 50
+	TransactionIDLength int    = 80
+	numberBytes                = "0123456789"
+	letterBytes                = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 )
 
 var (
@@ -59,7 +65,7 @@ type Account struct {
 }
 
 func (acc *Account) BeforeCreate(tx *gorm.DB) error {
-	acc.ID = newID(90)
+	acc.ID = newID(IDLength)
 	return nil
 }
 
@@ -98,7 +104,7 @@ func (Transaction) TableName() string {
 }
 
 func (t *Transaction) BeforeCreate(tx *gorm.DB) error {
-	t.ID = "TX" + newID(50)
+	t.ID = newTransactionID(TransactionIDLength)
 	return nil
 }
 
@@ -179,4 +185,28 @@ func NewTransactionFilter(from, to *timex.Date, current bool) (TransactionFilter
 	}
 
 	return filter, nil
+}
+
+func newID(length int) string {
+	b := make([]byte, length)
+	for i := range b {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(numberBytes))))
+		if err != nil {
+			panic(err)
+		}
+		b[i] = numberBytes[n.Int64()]
+	}
+	return string(b)
+}
+
+func newTransactionID(length int) string {
+	b := make([]byte, length)
+	for i := range b {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterBytes))))
+		if err != nil {
+			panic(err)
+		}
+		b[i] = letterBytes[n.Int64()]
+	}
+	return "TX" + string(b)
 }

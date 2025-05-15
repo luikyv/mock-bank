@@ -48,7 +48,6 @@ func NewServer(
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	handler := Handler(NewStrictHandler(s, []StrictMiddlewareFunc{
-		metaMiddleware(s.host),
 		authMiddleware(s.service),
 	}))
 
@@ -120,7 +119,7 @@ func (s Server) HandleDirectoryCallback(ctx context.Context, req HandleDirectory
 }
 
 func (s Server) LogoutUser(ctx context.Context, req LogoutUserRequestObject) (LogoutUserResponseObject, error) {
-	sessionID := ctx.Value(api.CtxKeySessionID).(string)
+	sessionID := ctx.Value(CtxKeySessionID).(string)
 	_ = s.service.deleteSession(ctx, sessionID)
 
 	headers := LogoutUser303ResponseHeaders{
@@ -138,7 +137,7 @@ func (s Server) LogoutUser(ctx context.Context, req LogoutUserRequestObject) (Lo
 }
 
 func (s Server) GetCurrentUser(ctx context.Context, req GetCurrentUserRequestObject) (GetCurrentUserResponseObject, error) {
-	sessionID := ctx.Value(api.CtxKeySessionID).(string)
+	sessionID := ctx.Value(CtxKeySessionID).(string)
 	session, err := s.service.session(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -172,7 +171,6 @@ func (s Server) GetCurrentUser(ctx context.Context, req GetCurrentUserRequestObj
 }
 
 func (s Server) GetMockUsers(ctx context.Context, req GetMockUsersRequestObject) (GetMockUsersResponseObject, error) {
-	reqURL := ctx.Value(api.CtxKeyRequestURL).(string)
 	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
 
 	us, err := s.userService.Users(ctx, req.OrgID, pag)
@@ -188,7 +186,7 @@ func (s Server) GetMockUsers(ctx context.Context, req GetMockUsersRequestObject)
 			Username string `json:"username"`
 		}{},
 		Meta:  api.NewPaginatedMeta(us),
-		Links: api.NewPaginatedLinks(reqURL, us),
+		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users", us),
 	}
 	for _, u := range us.Records {
 		resp.Data = append(resp.Data, struct {
@@ -308,8 +306,14 @@ func (s Server) CreateAccount(ctx context.Context, req CreateAccountRequestObjec
 	return CreateAccount201JSONResponse(resp), nil
 }
 
+func (s Server) DeleteAccount(ctx context.Context, req DeleteAccountRequestObject) (DeleteAccountResponseObject, error) {
+	if err := s.accountService.Delete(ctx, req.AccountID, req.UserID); err != nil {
+		return nil, err
+	}
+	return DeleteAccount204Response{}, nil
+}
+
 func (s Server) GetAccounts(ctx context.Context, req GetAccountsRequestObject) (GetAccountsResponseObject, error) {
-	reqURL := ctx.Value(api.CtxKeyRequestURL).(string)
 	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
 	accs, err := s.accountService.Accounts(ctx, req.UserID, req.OrgID, pag)
 	if err != nil {
@@ -325,7 +329,7 @@ func (s Server) GetAccounts(ctx context.Context, req GetAccountsRequestObject) (
 			Type       string  `json:"type"`
 		}{},
 		Meta:  api.NewPaginatedMeta(accs),
-		Links: api.NewPaginatedLinks(reqURL, accs),
+		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID+"/accounts", accs),
 	}
 	for _, acc := range accs.Records {
 		branchCode := account.DefaultBranch
@@ -348,7 +352,6 @@ func (s Server) GetAccounts(ctx context.Context, req GetAccountsRequestObject) (
 }
 
 func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (GetConsentsResponseObject, error) {
-	reqURL := ctx.Value(api.CtxKeyRequestURL).(string)
 	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
 	cs, err := s.consentService.Consents(ctx, req.UserID, req.OrgID, pag)
 	if err != nil {
@@ -369,7 +372,7 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 			UserID               string          `json:"userId"`
 		}{},
 		Meta:  api.NewPaginatedMeta(cs),
-		Links: api.NewPaginatedLinks(reqURL, cs),
+		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID+"/consents", cs),
 	}
 	for _, c := range cs.Records {
 		data := struct {

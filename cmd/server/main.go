@@ -10,11 +10,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/app"
 	"github.com/luiky/mock-bank/internal/opf"
 	"github.com/luiky/mock-bank/internal/opf/account"
+	accountv2 "github.com/luiky/mock-bank/internal/opf/account/v2"
 	"github.com/luiky/mock-bank/internal/opf/consent"
+	consentv3 "github.com/luiky/mock-bank/internal/opf/consent/v3"
 	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luiky/mock-bank/internal/timex"
 	"gorm.io/driver/postgres"
@@ -32,7 +33,7 @@ var (
 	apiMTLSHost        = strings.Replace(host, "https://", "https://matls-api.", 1)
 	authHost           = strings.Replace(host, "https://", "https://auth.", 1)
 	authMTLSHost       = strings.Replace(host, "https://", "https://matls-auth.", 1)
-	directoryIssuer    = getEnv("DIRECTORY_ISSUER", "https://directory")
+	directoryIssuer    = getEnv("DIRECTORY_ISSUER", "https://directory.local")
 	directoryClientID  = getEnv("DIRECTORY_CLIENT_ID", "mockbank")
 	port               = getEnv("PORT", "80")
 	dbConnectionString = getEnv("DB_CONNECTION_STRING", "postgres://admin:pass@localhost:5432/mockbank?sslmode=disable")
@@ -64,8 +65,9 @@ func main() {
 	mux := http.NewServeMux()
 
 	op.RegisterRoutes(mux)
-	opf.NewServer(apiMTLSHost, consentService, accountService, op).RegisterRoutes(mux)
 	app.NewServer(appHost, appService, directoryService, userService, consentService, accountService).RegisterRoutes(mux)
+	consentv3.NewServer(apiMTLSHost, consentService, op).RegisterRoutes(mux)
+	accountv2.NewServer(apiMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
 
 	if err := http.ListenAndServe(":"+port, mux); err != http.ErrServerClosed {
 		log.Fatal(err)
@@ -112,11 +114,15 @@ type logCtxHandler struct {
 }
 
 func (h *logCtxHandler) Handle(ctx context.Context, r slog.Record) error {
-	if interactionID, ok := ctx.Value(api.CtxKeyInteractionID).(string); ok {
+	if interactionID, ok := ctx.Value(opf.CtxKeyInteractionID).(string); ok {
 		r.AddAttrs(slog.String("interaction_id", interactionID))
 	}
 
-	if orgID, ok := ctx.Value(api.CtxKeyOrgID).(string); ok {
+	if orgID, ok := ctx.Value(opf.CtxKeyOrgID).(string); ok {
+		r.AddAttrs(slog.String("org_id", orgID))
+	}
+
+	if orgID, ok := ctx.Value(app.CtxKeyOrgID).(string); ok {
 		r.AddAttrs(slog.String("org_id", orgID))
 	}
 

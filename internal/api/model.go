@@ -8,20 +8,6 @@ import (
 	"github.com/luiky/mock-bank/internal/timex"
 )
 
-// TODO: Split this.
-type ContextKey string
-
-const (
-	CtxKeyClientID      ContextKey = "client_id"
-	CtxKeySubject       ContextKey = "subject"
-	CtxKeyScopes        ContextKey = "scopes"
-	CtxKeyConsentID     ContextKey = "consent_id"
-	CtxKeyInteractionID ContextKey = "interaction_id"
-	CtxKeyRequestURL    ContextKey = "request_url"
-	CtxKeyOrgID         ContextKey = "org_id"
-	CtxKeySessionID     ContextKey = "session_id"
-)
-
 const (
 	HeaderCustomerIPAddress = "X-FAPI-Customer-IP-Address"
 	HeaderCustomerUserAgent = "X-Customer-User-Agent"

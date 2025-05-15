@@ -121,7 +121,7 @@ func (a authenticator) authenticate(w http.ResponseWriter, r *http.Request, sess
 func (a authenticator) setUp(r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
 	orgID := as.StoredParameter(paramOrgID).(string)
 
-	consentID, ok := consent.ID(as.Scopes)
+	consentID, ok := consent.IDFromScopes(as.Scopes)
 	if !ok {
 		return goidc.StatusFailure, errors.New("missing consent ID")
 	}

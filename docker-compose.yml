@@ -19,7 +19,7 @@ services:
 
   mockgw:
     profiles:
-      - dev
+      - debug
       - main
     build:
       context: ./cmd/mockgw
@@ -44,8 +44,8 @@ services:
           - matls-auth.mockbank.local
           - api.mockbank.local
           - matls-api.mockbank.local
-          - directory
-          - keystore
+          - directory.local
+          - keystore.local
 
   cs-httpd:
     profiles:
@@ -85,7 +85,7 @@ services:
       --fintechlabs.base_mtls_url=https://localhost.emobix.co.uk:8444
       --fintechlabs.devmode=true
       --fintechlabs.startredir=true
-      --fintechlabs.yacs.directory.uri=http://directory/participants
+      --fintechlabs.yacs.directory.uri=http://directory.local/participants
     depends_on:
       - cs-mongodb
     logging:

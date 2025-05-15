@@ -17,11 +17,11 @@ CREATE TABLE mock_users (
     cpf TEXT NOT NULL,
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now(),
-    UNIQUE (org_id, cpf),
-    UNIQUE (org_id, username)
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX idx_mock_users_org_id ON mock_users (org_id);
+CREATE UNIQUE INDEX idx_mock_users_org_id_cpf ON mock_users (org_id, cpf);
+CREATE UNIQUE INDEX idx_mock_users_org_id_username ON mock_users (org_id, username);
 
 CREATE TABLE consents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -75,7 +75,7 @@ CREATE TABLE accounts (
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX idx_accounts_org_id_user_id ON accounts (org_id, user_id);
-CREATE INDEX idx_accounts_org_id_number ON accounts (org_id, number);
+CREATE UNIQUE INDEX idx_accounts_org_id_number ON accounts (org_id, number);
 
 CREATE TABLE consent_accounts (
     consent_id UUID NOT NULL REFERENCES consents(id) ON DELETE CASCADE,
