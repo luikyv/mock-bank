@@ -15,6 +15,8 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
@@ -29,6 +31,15 @@ func main() {
 	var directoryJWKS jose.JSONWebKeySet
 	if err := json.Unmarshal(directoryJWKSBytes, &directoryJWKS); err != nil {
 		log.Fatal("failed to parse directory jwks:", err)
+	}
+
+	keystoreJWKSBytes, err := os.ReadFile("/mocks/keystore_jwks.json")
+	if err != nil {
+		log.Fatal("failed to read keystore jwks:", err)
+	}
+	var keystoreJWKS jose.JSONWebKeySet
+	if err := json.Unmarshal(keystoreJWKSBytes, &keystoreJWKS); err != nil {
+		log.Fatal("failed to parse keystore jwks:", err)
 	}
 
 	idTokenBytes, err := os.ReadFile("/mocks/id_token.json")
@@ -95,12 +106,13 @@ func main() {
 
 	mux.HandleFunc("GET directory.local/organisations/{org_id}/softwarestatements/{ss_id}/assertion", func(w http.ResponseWriter, r *http.Request) {
 		log.Println("Request directory software statement")
-		key := directoryJWKS.Keys[0]
+		key := keystoreJWKS.Keys[0]
 		joseSigner, _ := jose.NewSigner(jose.SigningKey{
 			Algorithm: jose.SignatureAlgorithm(key.Algorithm),
 			Key:       key,
 		}, (&jose.SignerOptions{}).WithType("JWT"))
 
+		ssClaims["iat"] = time.Now().Unix()
 		ssa, _ := jwt.Signed(joseSigner).Claims(ssClaims).Serialize()
 
 		w.Header().Set("Content-Type", "application/jwt")
@@ -108,10 +120,21 @@ func main() {
 		_, _ = io.WriteString(w, ssa)
 	})
 
-	mux.HandleFunc("GET keystore.local/{org_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Request keystore org id jwks")
+	mux.HandleFunc("GET keystore.local/{org_id}/{software_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Request keystore client jwks")
 		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, "/mocks/client.jwks")
+	})
+
+	mux.HandleFunc("GET keystore.local/", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Request keystore jwks")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		var jwks jose.JSONWebKeySet
+		for _, key := range keystoreJWKS.Keys {
+			jwks.Keys = append(jwks.Keys, key.Public())
+		}
+		_ = json.NewEncoder(w).Encode(jwks)
 	})
 
 	// Reverse proxy fallback.
@@ -149,23 +172,48 @@ func main() {
 	if ok := clientCAPool.AppendCertsFromPEM(caCertPEM); !ok {
 		log.Fatal("Failed to append client CA certs")
 	}
+	serverCert, err := tls.LoadX509KeyPair("/mocks/server.crt", "/mocks/server.key")
+	if err != nil {
+		log.Fatalf("failed to load server certificate: %v", err)
+	}
 	server := &http.Server{
 		Addr:    ":443",
 		Handler: mux,
 		TLSConfig: &tls.Config{
-			ClientCAs:  clientCAPool,
-			ClientAuth: tls.VerifyClientCertIfGiven,
+			GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+				log.Printf("picking tls config for %s\n", hello.ServerName)
+				cfg := &tls.Config{
+					Certificates: []tls.Certificate{serverCert},
+					ClientAuth:   tls.NoClientCert,
+					MinVersion:   tls.VersionTLS12,
+				}
+				if strings.HasPrefix(hello.ServerName, "matls-") {
+					log.Println("mtls is required")
+					cfg.ClientAuth = tls.RequireAndVerifyClientCert
+					cfg.ClientCAs = clientCAPool
+				}
+				return cfg, nil
+			},
 		},
 	}
-	if err := server.ListenAndServeTLS("/mocks/server.crt", "/mocks/server.key"); err != http.ErrServerClosed {
+	if err := server.ListenAndServeTLS("", ""); err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }
 
 func mockbankHandler(reverseProxy, fallbackProxy *httputil.ReverseProxy) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.TLS == nil {
+			log.Println("No TLS connection established")
+		} else if len(r.TLS.PeerCertificates) == 0 {
+			log.Println("TLS established but no client certificate presented")
+		} else {
+			log.Println("Client certificate received:", r.TLS.PeerCertificates[0].Subject)
+		}
+
 		// Extract client certificate if available.
 		if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+			log.Println("client certificate found, forwarding it")
 			clientCert := r.TLS.PeerCertificates[0]
 			pemBytes := pem.EncodeToMemory(&pem.Block{
 				Type:  "CERTIFICATE",

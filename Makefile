@@ -1,6 +1,8 @@
 .PHONY: keys
 
 DSN="postgres://admin:pass@localhost:5432/mockbank?sslmode=disable"
+ORG_ID="00000000-0000-0000-0000-000000000000"
+SOFTWARE_ID="11111111-1111-1111-1111-111111111111"
 
 setup:
 	@make keys
@@ -24,13 +26,13 @@ run:
 
 # Runs only the MockBank dependencies necessary for debugging. With this
 # command the MockBank server can run and be debugged in the local host.
-run-debug:
+debug:
 	@docker-compose --profile debug up
 
 # Runs the local debug environment with both MockBank and the Conformance
 # Suite. With this command the MockBank server can run and be debugged in the
 # local host with the Conformance Suite.
-run-debug-with-cs:
+debug-with-cs:
 	@docker-compose --profile debug --profile conformance up
 
 # Run the Conformance Suite.
@@ -39,7 +41,7 @@ run-cs:
 
 # Generate certificates, private keys, and JWKS files for both the server and clients.
 keys:
-	@go run cmd/keymaker/main.go
+	@go run cmd/keymaker/main.go --org_id=$(ORG_ID) --software_id=$(SOFTWARE_ID)
 
 models:
 	@oapi-codegen -config ./swaggers/config.yml -package app -o ./internal/app/api_gen.go ./swaggers/app.yml
@@ -112,9 +114,10 @@ cs-config:
 			"discoveryUrl": "https://auth.mockbank.local/.well-known/openid-configuration" \
 	      }, \
 		  "resource": { \
-	        "brazilOrganizationId": "76b370e3-def5-4798-8b6a-915cb5d6dd74", \
+	        "brazilOrganizationId": "00000000-0000-0000-0000-000000000000", \
 	      }, \
 		  "directory": { \
+		  	"keystore": "https://keystore.local", \
 		    "discoveryUrl": "https://directory.local/.well-known/openid-configuration", \
 		    "apibase": "https://directory.local", \
 		    "client_id": "random_client" \

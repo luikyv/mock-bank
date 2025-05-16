@@ -8,7 +8,6 @@ mock backend: https://matls-api.mockbank.local
 
 ## TODO
 
-- Add rules to DCR.
 - Transactions.
 - Directory sso.
 - Resources.
@@ -16,3 +15,4 @@ mock backend: https://matls-api.mockbank.local
 - Add logs.
 - https://github.com/unrolled/secure.
 - Add fapi ip.
+- Check account owner is resource owner.

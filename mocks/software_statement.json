@@ -1,9 +1,36 @@
 {
-    "software_redirect_uris": [
-      "https://localhost.emobix.co.uk:8443/test/a/mockbank/callback"
-    ],
-    "software_api_webhook_uris": [
-      "https://localhost.emobix.co.uk:8443/test-mtls/a/mockbank"
-    ],
-    "software_jwks_uri": "https://keystore/application.jwks"
+  "software_mode": "Live",
+  "software_redirect_uris": [
+    "https://localhost.emobix.co.uk:8443/test/a/mockbank/callback"
+  ],
+  "software_statement_roles": [
+    {
+      "role": "DADOS",
+      "authorisation_domain": "Open Banking Brasil ",
+      "status": "Active"
+    },
+    {
+      "role": "PAGTO",
+      "authorisation_domain": "Open Banking Brasil ",
+      "status": "Active"
+    }
+  ],
+  "software_client_name": "Mockbank Client",
+  "org_status": "Active",
+  "iss": "Open Banking Open Banking Brasil sandbox SSA issuer",
+  "software_id": "11111111-1111-1111-1111-111111111111",
+  "software_status": "Active",
+  "software_environment": "Sandbox",
+  "software_version": "1.00",
+  "software_api_webhook_uris": [
+  ],
+  "org_name": "MockBank",
+  "software_client_id": "11111111-1111-1111-1111-111111111111",
+  "org_id": "00000000-0000-0000-0000-000000000000",
+  "org_number": "00000000000000",
+  "software_jwks_uri": "https://keystore.local/00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111/application.jwks",
+  "software_roles": [
+    "DADOS",
+    "PAGTO"
+  ]
 }

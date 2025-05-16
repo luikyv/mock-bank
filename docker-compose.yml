@@ -33,6 +33,7 @@ services:
       - ./mocks/directory_well_known.json:/mocks/directory_well_known.json
       - ./mocks/id_token.json:/mocks/id_token.json
       - ./mocks/software_statement.json:/mocks/software_statement.json
+      - ./mocks/keystore_jwks.json:/mocks/keystore_jwks.json
     ports:
       - 443:443
     networks:

@@ -6,8 +6,10 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/json"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"log"
 	"math/big"
@@ -20,25 +22,33 @@ import (
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
 
+var (
+	oidUID = asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 1}
+)
+
 func main() {
 	_, filename, _, _ := runtime.Caller(0)
-	sourceDir := filepath.Dir(filename)
-	keysDir := filepath.Join(sourceDir, "../../keys")
+	workingDir := filepath.Dir(filename)
+	keysDir := filepath.Join(workingDir, "../../keys")
 	// Create the "keys" directory if it doesn't exist.
 	err := os.MkdirAll(keysDir, os.ModePerm)
 	if err != nil {
 		log.Fatalf("Failed to create keys directory: %v", err)
 	}
 
+	orgID := flag.String("org_id", uuid.NewString(), "Organization ID")
+	softwareID := flag.String("software_id", uuid.NewString(), "Software ID")
+	flag.Parse()
+
 	serverCert, serverKey := generateServerCert("server", keysDir)
 	generateJWKS("server", serverCert, serverKey, keysDir)
 
 	caCert, caKey := generateCACert("client_ca", keysDir)
 
-	clientOneCert, clientOneKey := generateClientCert("client_one", caCert, caKey, keysDir)
+	clientOneCert, clientOneKey := generateCert("client_one", *softwareID, *orgID, caCert, caKey, keysDir)
 	generateJWKS("client_one", clientOneCert, clientOneKey, keysDir)
 
-	clientTwoCert, clientTwoKey := generateClientCert("client_two", caCert, caKey, keysDir)
+	clientTwoCert, clientTwoKey := generateCert("client_two", *softwareID, *orgID, caCert, caKey, keysDir)
 	generateJWKS("client_two", clientTwoCert, clientTwoKey, keysDir)
 }
 
@@ -51,7 +61,7 @@ func generateServerCert(name, dir string) (*x509.Certificate, *rsa.PrivateKey) {
 		NotBefore:   time.Now(),
 		NotAfter:    time.Now().Add(365 * 24 * time.Hour),
 		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
 
 	return generateSelfSignedCert(name, certTemplate, dir)
@@ -108,9 +118,8 @@ func generateSelfSignedCert(
 	return template, key
 }
 
-// Generates a client certificate signed by the CA.
-func generateClientCert(
-	name string,
+func generateCert(
+	name, softwareID, orgID string,
 	caCert *x509.Certificate,
 	caKey *rsa.PrivateKey,
 	dir string,
@@ -126,7 +135,14 @@ func generateClientCert(
 	clientCert := &x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().UnixNano()),
 		Subject: pkix.Name{
-			CommonName: name,
+			CommonName:         softwareID,
+			OrganizationalUnit: []string{orgID},
+			ExtraNames: []pkix.AttributeTypeAndValue{
+				{
+					Type:  oidUID,
+					Value: softwareID,
+				},
+			},
 		},
 		NotBefore:   time.Now(),
 		NotAfter:    time.Now().Add(365 * 24 * time.Hour),

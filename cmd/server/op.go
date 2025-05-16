@@ -78,11 +78,11 @@ func openidProvider(
 		provider.WithTokenOptions(oidc.TokenOptionsFunc()),
 		provider.WithAuthorizationCodeGrant(),
 		provider.WithImplicitGrant(),
-		provider.WithRefreshTokenGrant(oidc.ShoudIssueRefreshTokenFunc(), 600),
+		provider.WithRefreshTokenGrant(oidc.ShoudIssueRefreshToken, 600),
 		provider.WithClientCredentialsGrant(),
 		provider.WithTokenAuthnMethods(goidc.ClientAuthnPrivateKeyJWT),
 		provider.WithPrivateKeyJWTSignatureAlgs(goidc.PS256),
-		provider.WithMTLS(authMTLSHost, oidc.ClientCertFunc()),
+		provider.WithMTLS(authMTLSHost, oidc.ClientCert),
 		provider.WithTLSCertTokenBindingRequired(),
 		provider.WithPAR(60),
 		provider.WithJAR(goidc.PS256),
@@ -101,8 +101,13 @@ func openidProvider(
 		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(op, consentService)),
 		provider.WithPolicy(oidc.Policy(templatesDirPath, authHost, userService,
 			consentService, accountService)),
-		provider.WithNotifyErrorFunc(oidc.LogErrorFunc()),
-		provider.WithDCR(oidc.DCRFunc(Scopes), nil),
+		provider.WithNotifyErrorFunc(oidc.LogError),
+		provider.WithDCR(oidc.DCRFunc(oidc.DCRConfig{
+			Scopes:     Scopes,
+			SSURL:      ssJWKSURL,
+			SSIssuer:   ssIssuer,
+			HTTPClient: httpClient(),
+		}), nil),
 		provider.WithHTTPClientFunc(httpClientFunc()),
 	); err != nil {
 		return nil, err
@@ -118,6 +123,7 @@ func client(clientID string, keysDir string) *goidc.Client {
 	}
 
 	privateJWKS := privateJWKS(filepath.Join(keysDir, clientID+".jwks"))
+	publicJWKS := privateJWKS.Public()
 	return &goidc.Client{
 		ID: clientID,
 		ClientMeta: goidc.ClientMeta{
@@ -136,11 +142,11 @@ func client(clientID string, keysDir string) *goidc.Client {
 				goidc.ResponseTypeCode,
 				goidc.ResponseTypeCodeAndIDToken,
 			},
-			PublicJWKS:           privateJWKS.Public(),
+			PublicJWKS:           &publicJWKS,
 			IDTokenKeyEncAlg:     goidc.RSA_OAEP,
 			IDTokenContentEncAlg: goidc.A128CBC_HS256,
 			CustomAttributes: map[string]any{
-				oidc.ClientAttrOrgID: OrgID,
+				oidc.ClientAttrOrgID: orgID,
 			},
 		},
 	}
