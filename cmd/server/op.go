@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
@@ -57,8 +58,16 @@ func openidProvider(
 
 	templatesDirPath := filepath.Join(sourceDir, "../../templates")
 	// TODO: This will cause problems for the docker file.
+	// Seed the db instead.
 	keysDir := filepath.Join(sourceDir, "../../keys")
 	serverJWKS := privateJWKS(filepath.Join(keysDir, "server.jwks"))
+
+	loginTemplate := filepath.Join(templatesDirPath, "/login.html")
+	consentTemplate := filepath.Join(templatesDirPath, "/consent.html")
+	tmpl, err := template.ParseFiles(loginTemplate, consentTemplate)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	op, err := provider.New(
 		goidc.ProfileFAPI1,
@@ -99,7 +108,7 @@ func openidProvider(
 		provider.WithStaticClient(client("client_one", keysDir)),
 		provider.WithStaticClient(client("client_two", keysDir)),
 		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(op, consentService)),
-		provider.WithPolicy(oidc.Policy(templatesDirPath, authHost, userService,
+		provider.WithPolicy(oidc.Policy(authHost, tmpl, userService,
 			consentService, accountService)),
 		provider.WithNotifyErrorFunc(oidc.LogError),
 		provider.WithDCR(oidc.DCRFunc(oidc.DCRConfig{

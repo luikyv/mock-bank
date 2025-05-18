@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/luiky/mock-bank/internal/opf/resource"
 	"github.com/luiky/mock-bank/internal/page"
 	"gorm.io/gorm"
@@ -19,7 +20,7 @@ func NewService(db *gorm.DB) Service {
 	return Service{db: db}
 }
 
-func (s Service) Authorize(ctx context.Context, accIDs []string, consentID uuid.UUID) error {
+func (s Service) Authorize(ctx context.Context, accIDs []uuid.UUID, consentID uuid.UUID) error {
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, accID := range accIDs {
 			var acc Account
@@ -49,6 +50,9 @@ func (s Service) Authorize(ctx context.Context, accIDs []string, consentID uuid.
 func (s Service) Save(ctx context.Context, acc *Account) error {
 	if err := s.db.WithContext(ctx).Save(acc).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrAlreadyExists
+		}
+		if pgerr, ok := err.(*pgconn.PgError); ok && pgerr.Code == "23505" {
 			return ErrAlreadyExists
 		}
 		return err

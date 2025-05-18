@@ -19,7 +19,5 @@
   },
   "nonce": "gXGldLyaaty",
   "aud": "mockbank",
-  "exp": 9999999999,
-  "iat": 1694522484,
-  "iss": "https://directory"
+  "iss": "https://directory.local"
 }

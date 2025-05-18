@@ -3,13 +3,12 @@ package oidc
 import (
 	"errors"
 	"html/template"
-	"log"
 	"log/slog"
 	"net/http"
-	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/opf/account"
 	"github.com/luiky/mock-bank/internal/opf/consent"
 	"github.com/luiky/mock-bank/internal/opf/user"
@@ -18,20 +17,12 @@ import (
 )
 
 func Policy(
-	templatesDir, baseURL string,
+	baseURL string,
+	tmpl *template.Template,
 	userService user.Service,
 	consentService consent.Service,
 	accountService account.Service,
 ) goidc.AuthnPolicy {
-
-	// TODO: Move this to main.
-	loginTemplate := filepath.Join(templatesDir, "/login.html")
-	consentTemplate := filepath.Join(templatesDir, "/consent.html")
-	tmpl, err := template.ParseFiles(loginTemplate, consentTemplate)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	authenticator := authenticator{
 		tmpl:           tmpl,
 		baseURL:        baseURL,
@@ -112,7 +103,7 @@ func (a authenticator) authenticate(w http.ResponseWriter, r *http.Request, sess
 	}
 
 	if session.StoredParameter(paramStepID) == stepIDFinishFlow {
-		return a.finishFlow(session)
+		return a.finishFlow(r, session)
 	}
 
 	return goidc.StatusFailure, errors.New("access denied")
@@ -160,25 +151,25 @@ func (a authenticator) setUp(r *http.Request, as *goidc.AuthnSession) (goidc.Aut
 }
 
 func (a authenticator) login(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
-
+	orgID := as.StoredParameter(paramOrgID).(string)
+	consentID := as.StoredParameter(paramConsentID).(string)
 	_ = r.ParseForm()
 
 	isLogin := r.PostFormValue(loginFormParam)
 	if isLogin == "" {
+		slog.InfoContext(r.Context(), "rendering login page")
 		return a.executeTemplate(w, "login.html", authnPage{
 			CallbackID: as.CallbackID,
 		})
 	}
 
 	if isLogin != "true" {
-		orgID := as.StoredParameter(paramOrgID).(string)
-		consentID := as.StoredParameter(paramConsentID).(string)
 		_ = a.consentService.Reject(r.Context(), consentID, orgID, consent.RejectedByUser, consent.RejectionReasonCustomerManuallyRejected)
 		return goidc.StatusFailure, errors.New("consent not granted")
 	}
 
 	username := r.PostFormValue(usernameFormParam)
-	user, err := a.userService.UserByUsername(r.Context(), username, as.StoredParameter(paramOrgID).(string))
+	user, err := a.userService.UserByUsername(r.Context(), username, orgID)
 	if err != nil {
 		return a.executeTemplate(w, "login.html", authnPage{
 			CallbackID: as.CallbackID,
@@ -204,6 +195,7 @@ func (a authenticator) grantConsent(w http.ResponseWriter, r *http.Request, as *
 
 	isConsented := r.PostFormValue(consentFormParam)
 	if isConsented == "" {
+		slog.InfoContext(r.Context(), "rendering consent page")
 		return a.renderConsentPage(w, r, as)
 	}
 
@@ -220,13 +212,16 @@ func (a authenticator) grantConsent(w http.ResponseWriter, r *http.Request, as *
 		return goidc.StatusFailure, err
 	}
 
-	slog.Debug("authorizing consent", "consent_id", c.ID)
+	slog.InfoContext(r.Context(), "authorizing consent", "consent_id", c.ID)
 	if err := a.consentService.Authorize(r.Context(), c); err != nil {
 		return goidc.StatusFailure, err
 	}
 
-	accountIDs := r.Form[accountsFormParam]
-	slog.Debug("authorizing accounts", "consent_id", c.ID, "accounts", accountIDs)
+	var accountIDs []uuid.UUID
+	for _, accID := range r.Form[accountsFormParam] {
+		accountIDs = append(accountIDs, uuid.MustParse(accID))
+	}
+	slog.InfoContext(r.Context(), "authorizing accounts", "accounts", accountIDs, "consent_id", c.ID)
 	if err := a.accountService.Authorize(r.Context(), accountIDs, c.ID); err != nil {
 		return goidc.StatusFailure, err
 	}
@@ -247,6 +242,7 @@ func (a authenticator) renderConsentPage(w http.ResponseWriter, r *http.Request,
 		userID := as.StoredParameter(paramUserID).(string)
 		orgID := as.StoredParameter(paramOrgID).(string)
 		accs, err := a.accountService.AllAccounts(r.Context(), userID, orgID)
+		slog.InfoContext(r.Context(), "rendering consent page with accounts", "accounts", accs)
 		if err != nil {
 			page.Error = "Could not load the user accounts"
 			return a.executeTemplate(w, "consent.html", page)
@@ -260,7 +256,8 @@ func (a authenticator) renderConsentPage(w http.ResponseWriter, r *http.Request,
 	return a.executeTemplate(w, "consent.html", page)
 }
 
-func (a authenticator) finishFlow(session *goidc.AuthnSession) (goidc.AuthnStatus, error) {
+func (a authenticator) finishFlow(r *http.Request, session *goidc.AuthnSession) (goidc.AuthnStatus, error) {
+	slog.InfoContext(r.Context(), "auth flow finished, filling oauth session")
 	session.SetUserID(session.StoredParameter(paramUserID).(string))
 	session.GrantScopes(session.Scopes)
 	session.SetIDTokenClaimACR(ACROpenBankingLOA2)

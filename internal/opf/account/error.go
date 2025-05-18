@@ -1,6 +1,8 @@
 package account
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	ErrAlreadyExists                    = errors.New("account already exists")

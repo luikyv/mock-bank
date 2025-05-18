@@ -93,6 +93,8 @@ func main() {
 			Key:       key,
 		}, (&jose.SignerOptions{}).WithType("JWT"))
 
+		idTokenClaims["iat"] = time.Now().Unix()
+		idTokenClaims["exp"] = time.Now().Unix() + 60
 		idToken, _ := jwt.Signed(joseSigner).Claims(idTokenClaims).Serialize()
 
 		http.Redirect(w, r, fmt.Sprintf("https://app.mockbank.local/api/directory/callback?id_token=%s", idToken), http.StatusSeeOther)

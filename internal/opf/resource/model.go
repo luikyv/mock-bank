@@ -1,7 +1,8 @@
 package resource
 
 import (
-	"github.com/google/uuid"
+	"time"
+
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
 
@@ -24,22 +25,16 @@ const (
 )
 
 type Resource struct {
-	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	ConsentID  string
 	ResourceID string
 	Status     Status
-	Type       Type
+	Type       Type `gorm:"column:resource_type"`
+
+	OrgID     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (Resource) TableName() string {
 	return "consent_resources"
-}
-
-func New(resourceID, consentID string, status Status, resourceType Type) *Resource {
-	return &Resource{
-		ResourceID: resourceID,
-		ConsentID:  consentID,
-		Status:     status,
-		Type:       resourceType,
-	}
 }

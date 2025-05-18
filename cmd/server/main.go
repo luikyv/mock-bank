@@ -16,6 +16,8 @@ import (
 	accountv2 "github.com/luiky/mock-bank/internal/opf/account/v2"
 	"github.com/luiky/mock-bank/internal/opf/consent"
 	consentv3 "github.com/luiky/mock-bank/internal/opf/consent/v3"
+	"github.com/luiky/mock-bank/internal/opf/resource"
+	resourcev3 "github.com/luiky/mock-bank/internal/opf/resource/v3"
 	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luiky/mock-bank/internal/timex"
 	"gorm.io/driver/postgres"
@@ -53,6 +55,7 @@ func main() {
 	appService := app.NewService(db, directoryService)
 	userService := user.NewService(db)
 	consentService := consent.NewService(db, userService)
+	resouceService := resource.NewService(db)
 	accountService := account.NewService(db)
 
 	op, err := openidProvider(db, userService, consentService, accountService)
@@ -66,6 +69,7 @@ func main() {
 	op.RegisterRoutes(mux)
 	app.NewServer(appHost, appService, directoryService, userService, consentService, accountService).RegisterRoutes(mux)
 	consentv3.NewServer(apiMTLSHost, consentService, op).RegisterRoutes(mux)
+	resourcev3.NewServer(apiMTLSHost, resouceService, consentService, op).RegisterRoutes(mux)
 	accountv2.NewServer(apiMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
 
 	if err := http.ListenAndServe(":"+port, mux); err != http.ErrServerClosed {
@@ -123,6 +127,14 @@ func (h *logCtxHandler) Handle(ctx context.Context, r slog.Record) error {
 
 	if orgID, ok := ctx.Value(app.CtxKeyOrgID).(string); ok {
 		r.AddAttrs(slog.String("org_id", orgID))
+	}
+
+	if interactionID, ok := ctx.Value(app.CtxKeyInteractionID).(string); ok {
+		r.AddAttrs(slog.String("interaction_id", interactionID))
+	}
+
+	if sessionID, ok := ctx.Value(app.CtxKeySessionID).(string); ok {
+		r.AddAttrs(slog.String("session_id", sessionID))
 	}
 
 	return h.Handler.Handle(ctx, r)

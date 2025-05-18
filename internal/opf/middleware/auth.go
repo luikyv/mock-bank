@@ -13,7 +13,7 @@ import (
 	"github.com/luikyv/go-oidc/pkg/provider"
 )
 
-func Auth(next http.Handler, op *provider.Provider, scopes ...goidc.Scope) http.Handler {
+func AuthHandler(next http.Handler, op *provider.Provider, scopes ...goidc.Scope) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if r.Header.Get(HeaderXFAPIInteractionID) != "" {
@@ -23,7 +23,7 @@ func Auth(next http.Handler, op *provider.Provider, scopes ...goidc.Scope) http.
 		tokenInfo, err := op.TokenInfoFromRequest(w, r)
 		if err != nil {
 			slog.DebugContext(r.Context(), "the token is not active")
-			api.WriteJSON(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(true), http.StatusUnauthorized)
+			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(true))
 			return
 		}
 
@@ -36,7 +36,7 @@ func Auth(next http.Handler, op *provider.Provider, scopes ...goidc.Scope) http.
 		tokenScopes := strings.Split(tokenInfo.Scopes, " ")
 		if !areScopesValid(scopes, tokenScopes) {
 			slog.DebugContext(r.Context(), "invalid scopes", slog.String("token_scopes", tokenInfo.Scopes))
-			api.WriteJSON(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "token missing scopes").Pagination(true), http.StatusUnauthorized)
+			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "token missing scopes").Pagination(true))
 			return
 		}
 

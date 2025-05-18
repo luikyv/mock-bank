@@ -14,8 +14,9 @@ import (
 type ContextKey string
 
 const (
-	CtxKeyOrgID     ContextKey = "org_id"
-	CtxKeySessionID ContextKey = "session_id"
+	CtxKeyOrgID         ContextKey = "org_id"
+	CtxKeySessionID     ContextKey = "session_id"
+	CtxKeyInteractionID ContextKey = "interaction_id"
 )
 
 const (
@@ -26,7 +27,7 @@ const (
 type Session struct {
 	ID            uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Username      string
-	Organizations Organizations `gorm:"column:organizations;type:jsonb;not null"`
+	Organizations Organizations `gorm:"type:jsonb"`
 
 	CreatedAt time.Time
 	ExpiresAt time.Time

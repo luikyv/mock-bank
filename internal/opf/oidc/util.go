@@ -28,6 +28,19 @@ const (
 	oidUID           = "2.5.4.45"
 )
 
+var (
+	ssJWKcacheTime      = 1 * time.Hour
+	ssJWKSMu            sync.Mutex
+	ssJWKSCache         *goidc.JSONWebKeySet
+	ssJWKSLastFetchedAt time.Time
+)
+
+func TokenOptionsFunc() goidc.TokenOptionsFunc {
+	return func(gi goidc.GrantInfo, c *goidc.Client) goidc.TokenOptions {
+		return goidc.NewJWTTokenOptions(goidc.PS256, 300)
+	}
+}
+
 func HandleGrantFunc(op *provider.Provider, consentService consent.Service) goidc.HandleGrantFunc {
 	return func(r *http.Request, gi *goidc.GrantInfo) error {
 		if gi.AdditionalTokenClaims == nil {
@@ -106,38 +119,6 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 		scopeIDs = append(scopeIDs, scope.ID)
 	}
 
-	ssJWKcacheTime := 1 * time.Hour
-	var ssJWKSMu sync.Mutex
-	var ssJWKSCache *goidc.JSONWebKeySet
-	var ssJWKSLastFetchedAt time.Time
-	ssJWKS := func() (goidc.JSONWebKeySet, error) {
-		ssJWKSMu.Lock()
-		defer ssJWKSMu.Unlock()
-
-		if ssJWKSCache != nil && timex.Now().Before(ssJWKSLastFetchedAt.Add(ssJWKcacheTime)) {
-			return *ssJWKSCache, nil
-		}
-
-		resp, err := config.HTTPClient.Get(config.SSURL)
-		if err != nil {
-			return goidc.JSONWebKeySet{}, err
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			return goidc.JSONWebKeySet{}, fmt.Errorf("keystore jwks unexpected status code: %d", resp.StatusCode)
-		}
-
-		var jwks goidc.JSONWebKeySet
-		if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
-			return goidc.JSONWebKeySet{}, fmt.Errorf("failed to decode keystore jwks response: %w", err)
-		}
-
-		ssJWKSCache = &jwks
-		ssJWKSLastFetchedAt = timex.Now()
-		return jwks, nil
-	}
-
 	return func(r *http.Request, _ string, c *goidc.ClientMeta) error {
 		clientCert, err := ClientCert(r)
 		if err != nil {
@@ -149,7 +130,7 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 			return goidc.NewError(goidc.ErrorCodeInvalidClientMetadata, "software statement is required")
 		}
 
-		jwks, err := ssJWKS()
+		jwks, err := fetchSoftwareStatementJWKS(config.SSURL, config.HTTPClient)
 		if err != nil {
 			return goidc.NewError(goidc.ErrorCodeInternalError, "could not fetch the keystore jwks")
 		}
@@ -230,8 +211,30 @@ func extractUID(cert *x509.Certificate) string {
 	return ""
 }
 
-func TokenOptionsFunc() goidc.TokenOptionsFunc {
-	return func(gi goidc.GrantInfo, c *goidc.Client) goidc.TokenOptions {
-		return goidc.NewJWTTokenOptions(goidc.PS256, 300)
+func fetchSoftwareStatementJWKS(ssURL string, httpClient *http.Client) (goidc.JSONWebKeySet, error) {
+	ssJWKSMu.Lock()
+	defer ssJWKSMu.Unlock()
+
+	if ssJWKSCache != nil && timex.Now().Before(ssJWKSLastFetchedAt.Add(ssJWKcacheTime)) {
+		return *ssJWKSCache, nil
 	}
+
+	resp, err := httpClient.Get(ssURL)
+	if err != nil {
+		return goidc.JSONWebKeySet{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return goidc.JSONWebKeySet{}, fmt.Errorf("keystore jwks unexpected status code: %d", resp.StatusCode)
+	}
+
+	var jwks goidc.JSONWebKeySet
+	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+		return goidc.JSONWebKeySet{}, fmt.Errorf("failed to decode keystore jwks response: %w", err)
+	}
+
+	ssJWKSCache = &jwks
+	ssJWKSLastFetchedAt = timex.Now()
+	return jwks, nil
 }

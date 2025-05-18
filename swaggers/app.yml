@@ -343,26 +343,7 @@ components:
         - data
       properties:
         data:
-          type: object
-          required:
-            - accountId
-            - compeCode
-            - checkDigit
-            - number
-            - type
-          properties:
-            accountId:
-              type: string
-            compeCode:
-              type: string
-            branchCode:
-              type: string
-            checkDigit:
-              type: string
-            number:
-              type: string
-            type:
-              type: string
+          $ref: "#/components/schemas/AccountData"
     AccountsResponse:
       type: object
       required:
@@ -371,27 +352,45 @@ components:
         data:
           type: array
           items:
-            type: object
-            required:
-              - accountId
-              - checkDigit
-              - number
-              - type
-            properties:
-              accountId:
-                type: string
-              branchCode:
-                type: string
-              checkDigit:
-                type: string
-              number:
-                type: string
-              type:
-                type: string
+            $ref: "#/components/schemas/AccountData"
         meta:
           $ref: '#/components/schemas/Meta'
         links:
           $ref: '#/components/schemas/Links'
+    AccountData:
+      type: object
+      required:
+        - accountId
+        - compeCode
+        - branchCode
+        - checkDigit
+        - number
+        - type
+        - subtype
+        - availableAmount
+        - blockedAmount
+        - automaticallyInvestedAmount
+      properties:
+        accountId:
+          type: string
+        compeCode:
+          type: string
+        branchCode:
+          type: string
+        checkDigit:
+          type: string
+        number:
+          type: string
+        type:
+          type: string
+        subtype:
+          type: string
+        availableAmount:
+          type: string
+        blockedAmount:
+          type: string
+        automaticallyInvestedAmount:
+          type: string
     ConsentsResponse:
       type: object
       required:

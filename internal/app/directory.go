@@ -74,7 +74,7 @@ func (ds DirectoryService) idToken(_ context.Context, idTkn string) (directoryID
 	var idToken directoryIDToken
 	var idTokenClaims jwt.Claims
 	if err := parsedIDTkn.Claims(jwks.ToJOSE(), &idToken, &idTokenClaims); err != nil {
-		return directoryIDToken{}, fmt.Errorf("invalid id token: %w", err)
+		return directoryIDToken{}, fmt.Errorf("invalid id token signature: %w", err)
 	}
 
 	if idTokenClaims.Expiry == nil {
@@ -85,7 +85,7 @@ func (ds DirectoryService) idToken(_ context.Context, idTkn string) (directoryID
 		Issuer:      ds.issuer,
 		AnyAudience: []string{ds.clientID},
 	}); err != nil {
-		return directoryIDToken{}, fmt.Errorf("invalid id token: %w", err)
+		return directoryIDToken{}, fmt.Errorf("invalid id token claims: %w", err)
 	}
 
 	return idToken, nil

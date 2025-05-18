@@ -10,9 +10,7 @@ mock backend: https://matls-api.mockbank.local
 
 - Transactions.
 - Directory sso.
-- Resources.
 - Improve error handling.
 - Add logs.
 - https://github.com/unrolled/secure.
-- Add fapi ip.
 - Check account owner is resource owner.

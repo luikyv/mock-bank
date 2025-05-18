@@ -30,7 +30,7 @@ var (
 
 type ConsentAccount struct {
 	ConsentID uuid.UUID
-	AccountID string
+	AccountID uuid.UUID
 	Status    resource.Status
 
 	OrgID     string
@@ -45,7 +45,7 @@ func (ConsentAccount) TableName() string {
 }
 
 type Account struct {
-	ID                          string `gorm:"primaryKey"`
+	ID                          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	UserID                      string
 	Number                      string
 	Type                        Type
@@ -62,11 +62,6 @@ type Account struct {
 	UpdatedAt time.Time
 
 	Transactions []*Transaction `gorm:"foreignKey:account_id"`
-}
-
-func (acc *Account) BeforeCreate(tx *gorm.DB) error {
-	acc.ID = newID(IDLength)
-	return nil
 }
 
 type Type string
@@ -185,18 +180,6 @@ func NewTransactionFilter(from, to *timex.Date, current bool) (TransactionFilter
 	}
 
 	return filter, nil
-}
-
-func newID(length int) string {
-	b := make([]byte, length)
-	for i := range b {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(numberBytes))))
-		if err != nil {
-			panic(err)
-		}
-		b[i] = numberBytes[n.Int64()]
-	}
-	return string(b)
 }
 
 func newTransactionID(length int) string {

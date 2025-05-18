@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/opf/account"
@@ -13,6 +14,7 @@ import (
 	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timex"
+	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"github.com/rs/cors"
 )
 
@@ -47,9 +49,69 @@ func NewServer(
 
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
-	handler := Handler(NewStrictHandler(s, []StrictMiddlewareFunc{
-		authMiddleware(s.service),
-	}))
+	appMux := http.NewServeMux()
+
+	spec, err := GetSwagger()
+	if err != nil {
+		panic(err)
+	}
+	spec.Servers = nil
+	swaggerMiddleware := netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
+		Options: openapi3filter.Options{
+			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
+				return nil
+			},
+		},
+		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
+			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
+		},
+	})
+
+	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			writeResponseError(w, err)
+		},
+	})
+	wrapper := ServerInterfaceWrapper{
+		Handler:            strictHandler,
+		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, interactionIDMiddleware},
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+		},
+	}
+
+	var handler http.Handler
+
+	appMux.HandleFunc("GET /api/directory/auth-url", wrapper.GetDirectoryAuthURL)
+	appMux.HandleFunc("GET /api/directory/callback", wrapper.HandleDirectoryCallback)
+	appMux.HandleFunc("POST /api/logout", wrapper.LogoutUser)
+
+	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.GetCurrentUser), s.service)
+	appMux.Handle("GET /api/me", handler)
+
+	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.GetMockUsers), s.service)
+	appMux.Handle("GET /api/orgs/{orgId}/users", handler)
+
+	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.CreateMockUser), s.service)
+	appMux.Handle("POST /api/orgs/{orgId}/users", handler)
+
+	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.DeleteMockUser), s.service)
+	appMux.Handle("DELETE /api/orgs/{orgId}/users/{userId}", handler)
+
+	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.UpdateMockUser), s.service)
+	appMux.Handle("PUT /api/orgs/{orgId}/users/{userId}", handler)
+
+	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.GetAccounts), s.service)
+	appMux.Handle("GET /api/orgs/{orgId}/users/{userId}/accounts", handler)
+
+	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.CreateAccount), s.service)
+	appMux.Handle("POST /api/orgs/{orgId}/users/{userId}/accounts", handler)
+
+	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.DeleteAccount), s.service)
+	appMux.Handle("DELETE /api/orgs/{orgId}/users/{userId}/accounts/{accountId}", handler)
+
+	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.GetConsents), s.service)
+	appMux.Handle("GET /api/orgs/{orgId}/users/{userId}/consents", handler)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{s.host},
@@ -62,11 +124,10 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			http.MethodPut,
 		},
 	})
-	handler = c.Handler(handler)
-	mux.Handle("/api/", handler)
+	mux.Handle("/api/", c.Handler(appMux))
 }
 
-func writeError(w http.ResponseWriter, err error) {
+func writeResponseError(w http.ResponseWriter, err error) {
 	if errors.Is(err, errSessionNotFound) {
 		api.WriteError(w, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, err.Error()))
 		return
@@ -74,6 +135,11 @@ func writeError(w http.ResponseWriter, err error) {
 
 	if errors.Is(err, user.ErrAlreadyExists) {
 		api.WriteError(w, api.NewError("USER_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
+		return
+	}
+
+	if errors.Is(err, account.ErrAlreadyExists) {
+		api.WriteError(w, api.NewError("ACCOUNT_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
 		return
 	}
 
@@ -284,22 +350,18 @@ func (s Server) CreateAccount(ctx context.Context, req CreateAccountRequestObjec
 		return nil, err
 	}
 
-	defaultBranch := account.DefaultBranch
 	resp := AccountResponse{
-		Data: struct {
-			AccountID  string  `json:"accountId"`
-			BranchCode *string `json:"branchCode,omitempty"`
-			CheckDigit string  `json:"checkDigit"`
-			CompeCode  string  `json:"compeCode"`
-			Number     string  `json:"number"`
-			Type       string  `json:"type"`
-		}{
-			AccountID:  acc.ID,
-			BranchCode: &defaultBranch,
-			CheckDigit: account.DefaultCheckDigit,
-			CompeCode:  account.DefaultCompeCode,
-			Number:     acc.Number,
-			Type:       string(acc.Type),
+		Data: AccountData{
+			AccountID:                   acc.ID.String(),
+			AutomaticallyInvestedAmount: acc.AutomaticallyInvestedAmount,
+			AvailableAmount:             acc.AvailableAmount,
+			BlockedAmount:               acc.BlockedAmount,
+			BranchCode:                  account.DefaultBranch,
+			CheckDigit:                  account.DefaultCheckDigit,
+			CompeCode:                   account.DefaultCompeCode,
+			Number:                      acc.Number,
+			Subtype:                     string(acc.SubType),
+			Type:                        string(acc.Type),
 		},
 	}
 
@@ -307,7 +369,7 @@ func (s Server) CreateAccount(ctx context.Context, req CreateAccountRequestObjec
 }
 
 func (s Server) DeleteAccount(ctx context.Context, req DeleteAccountRequestObject) (DeleteAccountResponseObject, error) {
-	if err := s.accountService.Delete(ctx, req.AccountID, req.UserID); err != nil {
+	if err := s.accountService.Delete(ctx, req.AccountID, req.OrgID); err != nil {
 		return nil, err
 	}
 	return DeleteAccount204Response{}, nil
@@ -321,30 +383,22 @@ func (s Server) GetAccounts(ctx context.Context, req GetAccountsRequestObject) (
 	}
 
 	resp := AccountsResponse{
-		Data: []struct {
-			AccountID  string  `json:"accountId"`
-			BranchCode *string `json:"branchCode,omitempty"`
-			CheckDigit string  `json:"checkDigit"`
-			Number     string  `json:"number"`
-			Type       string  `json:"type"`
-		}{},
+		Data:  []AccountData{},
 		Meta:  api.NewPaginatedMeta(accs),
 		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID+"/accounts", accs),
 	}
 	for _, acc := range accs.Records {
-		branchCode := account.DefaultBranch
-		resp.Data = append(resp.Data, struct {
-			AccountID  string  `json:"accountId"`
-			BranchCode *string `json:"branchCode,omitempty"`
-			CheckDigit string  `json:"checkDigit"`
-			Number     string  `json:"number"`
-			Type       string  `json:"type"`
-		}{
-			AccountID:  acc.ID,
-			BranchCode: &branchCode,
-			CheckDigit: account.DefaultCheckDigit,
-			Number:     acc.Number,
-			Type:       string(acc.Type),
+		resp.Data = append(resp.Data, AccountData{
+			AccountID:                   acc.ID.String(),
+			AutomaticallyInvestedAmount: acc.AutomaticallyInvestedAmount,
+			AvailableAmount:             acc.AvailableAmount,
+			BlockedAmount:               acc.BlockedAmount,
+			BranchCode:                  account.DefaultBranch,
+			CheckDigit:                  account.DefaultCheckDigit,
+			CompeCode:                   account.DefaultCompeCode,
+			Number:                      acc.Number,
+			Subtype:                     string(acc.SubType),
+			Type:                        string(acc.Type),
 		})
 	}
 

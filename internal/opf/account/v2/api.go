@@ -63,7 +63,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	})
 	wrapper := ServerInterfaceWrapper{
 		Handler:            strictHandler,
-		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, middleware.FAPIIDFunc(nil)},
+		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, middleware.FAPIID(nil)},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
@@ -73,32 +73,32 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccounts)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsRead)
-	handler = middleware.Auth(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountID)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsRead)
-	handler = middleware.Auth(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDBalances)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsBalanceRead)
-	handler = middleware.Auth(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/balances", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDOverdraftLimits)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsOverdraftLimitsRead)
-	handler = middleware.Auth(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/overdraft-limits", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDTransactions)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsTransactionsRead)
-	handler = middleware.Auth(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/transactions", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDTransactionsCurrent)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsTransactionsRead)
-	handler = middleware.Auth(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/transactions-current", handler)
 
 	mux.Handle("/open-banking/accounts/v2/", http.StripPrefix("/open-banking/accounts/v2", accountMux))
@@ -122,7 +122,7 @@ func (s Server) AccountsGetAccounts(ctx context.Context, req AccountsGetAccounts
 	defaultBranch := account.DefaultBranch
 	for _, acc := range accs.Records {
 		resp.Data = append(resp.Data, AccountData{
-			AccountID:   acc.ID,
+			AccountID:   acc.ID.String(),
 			BranchCode:  &defaultBranch,
 			BrandName:   opf.MockBankBrand,
 			CheckDigit:  account.DefaultCheckDigit,
@@ -244,7 +244,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 
 	resp := ResponseAccountTransactions{
 		Data:  []AccountTransactionsData{},
-		Meta:  *api.NewPaginatedMeta(txs),
+		Meta:  *api.NewMeta(),
 		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts/"+req.AccountID+"/transactions", txs),
 	}
 	for _, tx := range txs.Records {

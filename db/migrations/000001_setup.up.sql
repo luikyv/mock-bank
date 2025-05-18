@@ -59,7 +59,7 @@ CREATE TABLE consent_extensions (
 CREATE INDEX idx_consent_extensions_org_id_consent_id ON consent_extensions (org_id, consent_id);
 
 CREATE TABLE accounts (
-    id TEXT PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES mock_users(id),
     number TEXT NOT NULL,
     type TEXT NOT NULL,
@@ -79,7 +79,7 @@ CREATE UNIQUE INDEX idx_accounts_org_id_number ON accounts (org_id, number);
 
 CREATE TABLE consent_accounts (
     consent_id UUID NOT NULL REFERENCES consents(id) ON DELETE CASCADE,
-    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     status TEXT NOT NULL,
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -89,7 +89,7 @@ CREATE TABLE consent_accounts (
 
 CREATE TABLE account_transactions (
     id TEXT PRIMARY KEY,
-    account_id TEXT NOT NULL REFERENCES accounts(id),
+    account_id UUID NOT NULL REFERENCES accounts(id),
     status TEXT NOT NULL,
     movement_type TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -100,3 +100,14 @@ CREATE TABLE account_transactions (
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX idx_account_transactions_org_id_account_id ON account_transactions (org_id, account_id);
+
+CREATE OR REPLACE VIEW consent_resources AS
+SELECT
+    'ACCOUNT' AS resource_type,
+    consent_id,
+    account_id AS resource_id,
+    status,
+    org_id,
+    created_at,
+    updated_at
+FROM consent_accounts;

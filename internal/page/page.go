@@ -1,7 +1,7 @@
 package page
 
 const (
-	defaultPageSize = 10
+	defaultPageSize = 25
 )
 
 type Page[T any] struct {

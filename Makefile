@@ -47,10 +47,14 @@ models:
 	@oapi-codegen -config ./swaggers/config.yml -package app -o ./internal/app/api_gen.go ./swaggers/app.yml
 	@oapi-codegen -config ./swaggers/config.yml -package v3 -o ./internal/opf/consent/v3/api_gen.go ./swaggers/consents_v3.yml
 	@oapi-codegen -config ./swaggers/config.yml -package v2 -o ./internal/opf/account/v2/api_gen.go ./swaggers/accounts_v2.yml
+	@oapi-codegen -config ./swaggers/config.yml -package v3 -o ./internal/opf/resource/v3/api_gen.go ./swaggers/resources_v3.yml
 
 # Build the MockBank Docker Image.
 build-mockbank:
 	@docker-compose build mockbank
+
+build-mockgw:
+	@docker-compose build mockgw
 
 db-migrations:
 	@migrate -path ./db/migrations -database $(DSN) up

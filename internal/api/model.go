@@ -29,10 +29,10 @@ func NewLinks(self string) *Links {
 
 // NewPaginatedLinks generates pagination links (self, first, prev, next, last) based on
 // the current page information and the requested URL.
-func NewPaginatedLinks[T any](requestedURL string, page page.Page[T]) *Links {
+func NewPaginatedLinks[T any](self string, page page.Page[T]) *Links {
 	// Helper function to construct a URL with query parameters for pagination.
 	buildURL := func(pageNumber int) string {
-		u, _ := url.Parse(requestedURL)
+		u, _ := url.Parse(self)
 		query := u.Query()
 		query.Set("page", strconv.Itoa(pageNumber))
 		query.Set("page-size", strconv.Itoa(page.Size))
@@ -42,7 +42,7 @@ func NewPaginatedLinks[T any](requestedURL string, page page.Page[T]) *Links {
 
 	// Populate the Links struct.
 	links := &Links{
-		Self: requestedURL,
+		Self: self,
 	}
 
 	// If the current page is not the first, generate the "first" and "previous"
