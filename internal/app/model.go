@@ -21,7 +21,9 @@ const (
 
 const (
 	cookieSessionId = "sessionId"
+	cookieNonce     = "nonce"
 	sessionValidity = 24 * time.Hour
+	nonceValidity   = 15 * time.Minute
 )
 
 type Session struct {
@@ -45,7 +47,7 @@ func (o Organizations) Value() (driver.Value, error) {
 	return json.Marshal(o)
 }
 
-func (o *Organizations) Scan(value interface{}) error {
+func (o *Organizations) Scan(value any) error {
 	bytes, ok := value.([]byte)
 	if !ok {
 		return fmt.Errorf("failed to convert value to []byte")
@@ -55,6 +57,7 @@ func (o *Organizations) Scan(value interface{}) error {
 
 type directoryIDToken struct {
 	Sub     string `json:"sub"`
+	Nonce   string `json:"nonce"`
 	Profile struct {
 		OrgAccessDetails map[string]struct {
 			Name    string `json:"organisation_name"`
@@ -64,7 +67,8 @@ type directoryIDToken struct {
 }
 
 type directoryWellKnown struct {
-	AuthEndpoint   string                    `json:"authorization_endpoint"`
-	JWKSURI        string                    `json:"jwks_uri"`
-	IDTokenSigAlgs []jose.SignatureAlgorithm `json:"id_token_signing_alg_values_supported"`
+	AuthEndpoint       string                    `json:"authorization_endpoint"`
+	PushedAuthEndpoint string                    `json:"pushed_authorization_request_endpoint"`
+	JWKSURI            string                    `json:"jwks_uri"`
+	IDTokenSigAlgs     []jose.SignatureAlgorithm `json:"id_token_signing_alg_values_supported"`
 }

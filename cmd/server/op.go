@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto"
 	"encoding/json"
 	"html/template"
 	"io"
@@ -44,6 +45,7 @@ var Scopes = []goidc.Scope{
 
 func openidProvider(
 	_ *gorm.DB,
+	signer crypto.Signer,
 	userService user.Service,
 	consentService consent.Service,
 	accountService account.Service,
@@ -57,10 +59,6 @@ func openidProvider(
 	sourceDir := filepath.Dir(filename)
 
 	templatesDirPath := filepath.Join(sourceDir, "../../templates")
-	// TODO: This will cause problems for the docker file.
-	// Seed the db instead.
-	keysDir := filepath.Join(sourceDir, "../../keys")
-	serverJWKS := privateJWKS(filepath.Join(keysDir, "server.jwks"))
 
 	loginTemplate := filepath.Join(templatesDirPath, "/login.html")
 	consentTemplate := filepath.Join(templatesDirPath, "/consent.html")
@@ -69,20 +67,28 @@ func openidProvider(
 		log.Fatal(err)
 	}
 
-	op, err := provider.New(
-		goidc.ProfileFAPI1,
-		authHost,
-		func(_ context.Context) (goidc.JSONWebKeySet, error) {
-			return serverJWKS, nil
-		},
-	)
+	op, err := provider.New(goidc.ProfileFAPI1, authHost, func(_ context.Context) (goidc.JSONWebKeySet, error) {
+		return goidc.JSONWebKeySet{
+			Keys: []goidc.JSONWebKey{{
+				KeyID:     "signer",
+				Key:       signer.Public(),
+				Use:       string(goidc.KeyUsageSignature),
+				Algorithm: string(goidc.PS256),
+			}},
+		}, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if err := op.WithOptions(
+
+	opts := []provider.ProviderOption{
+		// TODO.
 		// provider.WithClientStorage(oidc.NewClientManager(db)),
 		// provider.WithAuthnSessionStorage(oidc.NewAuthnSessionManager(db)),
 		// provider.WithGrantSessionStorage(oidc.NewGrantSessionManager(db)),
+		provider.WithSignerFunc(func(ctx context.Context, alg goidc.SignatureAlgorithm) (kid string, s crypto.Signer, err error) {
+			return "signer", signer, nil
+		}),
 		provider.WithScopes(Scopes...),
 		provider.WithTokenOptions(oidc.TokenOptionsFunc()),
 		provider.WithAuthorizationCodeGrant(),
@@ -105,8 +111,6 @@ func openidProvider(
 		provider.WithUserInfoEncryption(goidc.RSA_OAEP),
 		provider.WithIDTokenSignatureAlgs(goidc.PS256),
 		provider.WithIDTokenEncryption(goidc.RSA_OAEP),
-		provider.WithStaticClient(client("client_one", keysDir)),
-		provider.WithStaticClient(client("client_two", keysDir)),
 		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(op, consentService)),
 		provider.WithPolicy(oidc.Policy(authHost, tmpl, userService,
 			consentService, accountService)),
@@ -118,7 +122,14 @@ func openidProvider(
 			HTTPClient: httpClient(),
 		}), nil),
 		provider.WithHTTPClientFunc(httpClientFunc()),
-	); err != nil {
+	}
+	if env == LocalEnvironment {
+		// TODO: Seed the db instead.
+		keysDir := filepath.Join(sourceDir, "../../keys")
+		opts = append(opts, provider.WithStaticClient(client("client_one", keysDir)),
+			provider.WithStaticClient(client("client_two", keysDir)))
+	}
+	if err := op.WithOptions(opts...); err != nil {
 		return nil, err
 	}
 

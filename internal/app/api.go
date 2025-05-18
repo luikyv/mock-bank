@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -84,6 +85,9 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	appMux.HandleFunc("GET /api/directory/auth-url", wrapper.GetDirectoryAuthURL)
 	appMux.HandleFunc("GET /api/directory/callback", wrapper.HandleDirectoryCallback)
+	appMux.HandleFunc("GET /api/directory/jwks", func(w http.ResponseWriter, r *http.Request) {
+		api.WriteJSON(w, s.directoryService.publicJWKS(), http.StatusOK)
+	})
 	appMux.HandleFunc("POST /api/logout", wrapper.LogoutUser)
 
 	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.GetCurrentUser), s.service)
@@ -147,9 +151,23 @@ func writeResponseError(w http.ResponseWriter, err error) {
 }
 
 func (s Server) GetDirectoryAuthURL(ctx context.Context, request GetDirectoryAuthURLRequestObject) (GetDirectoryAuthURLResponseObject, error) {
-	authURL, err := s.directoryService.authURL(ctx)
+
+	authURL, nonceHash, err := s.directoryService.authURL(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	headers := GetDirectoryAuthURL200ResponseHeaders{
+		SetCookie: (&http.Cookie{
+			Name:     cookieNonce,
+			Value:    nonceHash,
+			Path:     "/api/directory/callback",
+			Expires:  timex.Now().Add(nonceValidity),
+			HttpOnly: true,
+			Secure:   true,
+			Domain:   strings.TrimPrefix(s.host, "https://"),
+			SameSite: http.SameSiteStrictMode,
+		}).String(),
 	}
 
 	resp := AuthURLResponse{
@@ -159,12 +177,11 @@ func (s Server) GetDirectoryAuthURL(ctx context.Context, request GetDirectoryAut
 			URL: authURL,
 		},
 	}
-	return GetDirectoryAuthURL200JSONResponse(resp), nil
+	return GetDirectoryAuthURL200JSONResponse{Headers: headers, Body: resp}, nil
 }
 
 func (s Server) HandleDirectoryCallback(ctx context.Context, req HandleDirectoryCallbackRequestObject) (HandleDirectoryCallbackResponseObject, error) {
-	// TODO: Validate nonce, exp, ...
-	session, err := s.service.createSession(ctx, req.Params.IDToken)
+	session, err := s.service.createSession(ctx, req.Params.IDToken, req.Params.Nonce)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +194,8 @@ func (s Server) HandleDirectoryCallback(ctx context.Context, req HandleDirectory
 			Expires:  timex.Now().Add(sessionValidity),
 			HttpOnly: true,
 			Secure:   true,
-			Domain:   s.host,
+			Domain:   strings.TrimPrefix(s.host, "https://"),
+			SameSite: http.SameSiteLaxMode,
 		}).String(),
 		Location: s.host + "/",
 	}
@@ -196,6 +214,8 @@ func (s Server) LogoutUser(ctx context.Context, req LogoutUserRequestObject) (Lo
 			MaxAge:   -1,
 			HttpOnly: true,
 			Secure:   true,
+			Domain:   strings.TrimPrefix(s.host, "https://"),
+			SameSite: http.SameSiteStrictMode,
 		}).String(),
 		Location: s.host + "/",
 	}

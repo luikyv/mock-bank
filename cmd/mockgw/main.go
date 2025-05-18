@@ -23,6 +23,7 @@ import (
 )
 
 func main() {
+	nonce := ""
 
 	directoryJWKSBytes, err := os.ReadFile("/mocks/directory_jwks.json")
 	if err != nil {
@@ -33,7 +34,7 @@ func main() {
 		log.Fatal("failed to parse directory jwks:", err)
 	}
 
-	keystoreJWKSBytes, err := os.ReadFile("/mocks/keystore_jwks.json")
+	keystoreJWKSBytes, err := os.ReadFile("/mocks/software_statement_jwks.json")
 	if err != nil {
 		log.Fatal("failed to read keystore jwks:", err)
 	}
@@ -59,13 +60,13 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET directory.local/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Request directory openid configuration")
+		log.Println("request directory openid configuration")
 		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, "/mocks/directory_well_known.json")
 	})
 
 	mux.HandleFunc("GET directory.local/jwks", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Request directory jwks")
+		log.Println("request directory jwks")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		var jwks jose.JSONWebKeySet
@@ -76,7 +77,7 @@ func main() {
 	})
 
 	mux.HandleFunc("POST directory.local/token", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Request directory token")
+		log.Println("request directory token")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = io.WriteString(w, `{
@@ -86,7 +87,7 @@ func main() {
 	})
 
 	mux.HandleFunc("GET directory.local/authorize", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Request directory authorize")
+		log.Println("request directory authorize")
 		key := directoryJWKS.Keys[0]
 		joseSigner, _ := jose.NewSigner(jose.SigningKey{
 			Algorithm: jose.SignatureAlgorithm(key.Algorithm),
@@ -95,19 +96,35 @@ func main() {
 
 		idTokenClaims["iat"] = time.Now().Unix()
 		idTokenClaims["exp"] = time.Now().Unix() + 60
+		idTokenClaims["nonce"] = nonce
 		idToken, _ := jwt.Signed(joseSigner).Claims(idTokenClaims).Serialize()
 
 		http.Redirect(w, r, fmt.Sprintf("https://app.mockbank.local/api/directory/callback?id_token=%s", idToken), http.StatusSeeOther)
 	})
 
+	mux.HandleFunc("POST directory.local/par", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("request directory par")
+
+		_ = r.ParseForm()
+		nonce = r.Form.Get("nonce")
+		log.Printf("nonce received: %s", nonce)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, `{
+			"request_uri": "urn:ietf:params:oauth:request_uri:random_uri",
+			"expires_in": 60
+		}`)
+	})
+
 	mux.HandleFunc("GET directory.local/participants", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Request directory participants")
+		log.Println("request directory participants")
 		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, "/mocks/participants.json")
 	})
 
 	mux.HandleFunc("GET directory.local/organisations/{org_id}/softwarestatements/{ss_id}/assertion", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Request directory software statement")
+		log.Println("request directory software statement")
 		key := keystoreJWKS.Keys[0]
 		joseSigner, _ := jose.NewSigner(jose.SigningKey{
 			Algorithm: jose.SignatureAlgorithm(key.Algorithm),
@@ -123,13 +140,13 @@ func main() {
 	})
 
 	mux.HandleFunc("GET keystore.local/{org_id}/{software_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Request keystore client jwks")
+		log.Println("request keystore client jwks")
 		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, "/mocks/client.jwks")
 	})
 
 	mux.HandleFunc("GET keystore.local/", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Request keystore jwks")
+		log.Println("request keystore jwks")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		var jwks jose.JSONWebKeySet

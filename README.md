@@ -9,8 +9,7 @@ mock backend: https://matls-api.mockbank.local
 ## TODO
 
 - Transactions.
-- Directory sso.
 - Improve error handling.
 - Add logs.
+- KMS.
 - https://github.com/unrolled/secure.
-- Check account owner is resource owner.

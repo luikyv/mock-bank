@@ -142,7 +142,7 @@ func (p Permissions) Value() (driver.Value, error) {
 	return pq.StringArray(strs).Value()
 }
 
-func (p *Permissions) Scan(src interface{}) error {
+func (p *Permissions) Scan(src any) error {
 	var strs pq.StringArray
 	if err := strs.Scan(src); err != nil {
 		return err

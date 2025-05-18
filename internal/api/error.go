@@ -68,7 +68,7 @@ func WriteError(w http.ResponseWriter, err error) {
 		errResp.Meta = NewSingleRecordMeta()
 	}
 
-	writeJSON(w, errResp, apiErr.statusCode)
+	WriteJSON(w, errResp, apiErr.statusCode)
 }
 
 type response struct {

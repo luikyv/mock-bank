@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/luiky/mock-bank/internal/app"
+	"github.com/luiky/mock-bank/internal/joseutil"
 	"github.com/luiky/mock-bank/internal/opf"
 	"github.com/luiky/mock-bank/internal/opf/account"
 	accountv2 "github.com/luiky/mock-bank/internal/opf/account/v2"
@@ -24,8 +25,14 @@ import (
 	"gorm.io/gorm"
 )
 
+type Environment string
+
+const (
+	LocalEnvironment Environment = "LOCAL"
+)
+
 var (
-	env                = getEnv("ENV", "LOCAL")
+	env                = getEnv("ENV", LocalEnvironment)
 	orgID              = getEnv("ORG_ID", "00000000-0000-0000-0000-000000000000")
 	host               = getEnv("HOST", "https://mockbank.local")
 	appHost            = strings.Replace(host, "https://", "https://app.", 1)
@@ -50,15 +57,19 @@ func main() {
 		log.Fatalf("failed to connect mongo database: %v", err)
 	}
 
+	// Keys.
+	opSigner := joseutil.NewSigner()
+	directorySigner := joseutil.NewSigner()
+
 	// Services.
-	directoryService := app.NewDirectoryService(directoryIssuer, directoryClientID, httpClient())
+	directoryService := app.NewDirectoryService(directoryIssuer, directoryClientID, appHost+"/api/directory/callback", directorySigner, httpClient())
 	appService := app.NewService(db, directoryService)
 	userService := user.NewService(db)
 	consentService := consent.NewService(db, userService)
 	resouceService := resource.NewService(db)
 	accountService := account.NewService(db)
 
-	op, err := openidProvider(db, userService, consentService, accountService)
+	op, err := openidProvider(db, opSigner, userService, consentService, accountService)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -89,9 +100,9 @@ func dbConnection() (*gorm.DB, error) {
 }
 
 // getEnv retrieves an environment variable or returns a fallback value if not found
-func getEnv(key, fallback string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
+func getEnv[T ~string](key, fallback T) T {
+	if value, exists := os.LookupEnv(string(key)); exists {
+		return T(value)
 	}
 	return fallback
 }
@@ -142,7 +153,7 @@ func (h *logCtxHandler) Handle(ctx context.Context, r slog.Record) error {
 
 func httpClient() *http.Client {
 	tlsConfig := &tls.Config{}
-	if env == "LOCAL" {
+	if env == LocalEnvironment {
 		tlsConfig.InsecureSkipVerify = true
 	}
 	return &http.Client{

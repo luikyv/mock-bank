@@ -21,8 +21,8 @@ func NewService(db *gorm.DB, directoryService DirectoryService) Service {
 	}
 }
 
-func (s Service) createSession(ctx context.Context, idToken string) (*Session, error) {
-	idTkn, err := s.directoryService.idToken(ctx, idToken)
+func (s Service) createSession(ctx context.Context, idToken, nonceHash string) (*Session, error) {
+	idTkn, err := s.directoryService.idToken(ctx, idToken, nonceHash)
 	if err != nil {
 		return nil, err
 	}

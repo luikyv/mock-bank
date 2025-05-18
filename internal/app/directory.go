@@ -2,15 +2,24 @@ package app
 
 import (
 	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
+	"github.com/google/uuid"
+	"github.com/luiky/mock-bank/internal/joseutil"
 	"github.com/luiky/mock-bank/internal/timex"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
@@ -28,34 +37,104 @@ var (
 )
 
 type DirectoryService struct {
-	issuer     string
-	clientID   string
-	httpClient *http.Client
+	issuer      string
+	clientID    string
+	redirectURI string
+	signer      crypto.Signer
+	httpClient  *http.Client
 }
 
-func NewDirectoryService(issuer string, clientID string, httpClient *http.Client) DirectoryService {
+func NewDirectoryService(issuer, clientID, redirectURI string, signer crypto.Signer, httpClient *http.Client) DirectoryService {
 	return DirectoryService{
-		issuer:     issuer,
-		clientID:   clientID,
-		httpClient: httpClient,
+		issuer:      issuer,
+		clientID:    clientID,
+		redirectURI: redirectURI,
+		signer:      signer,
+		httpClient:  httpClient,
 	}
 }
 
-func (ds DirectoryService) authURL(_ context.Context) (string, error) {
+func (ds DirectoryService) authURL(ctx context.Context) (uri string, nonceHash string, err error) {
+	nonce, nonceHash := generateNonce()
+	reqURI, err := ds.requestURI(ctx, nonce)
+	if err != nil {
+		return "", "", err
+	}
+
+	wellKnown, err := ds.wellKnown()
+	if err != nil {
+		return "", "", err
+	}
+
+	authURL, _ := url.Parse(wellKnown.AuthEndpoint)
+	query := authURL.Query()
+	query.Set("client_id", ds.clientID)
+	query.Set("request_uri", reqURI)
+	query.Set("response_type", "id_token")
+	query.Set("scope", "openid")
+	query.Set("redirect_uri", ds.redirectURI)
+	query.Set("nonce", nonce)
+	authURL.RawQuery = query.Encode()
+	return authURL.String(), nonceHash, nil
+}
+
+func (ds DirectoryService) requestURI(ctx context.Context, nonce string) (string, error) {
 	wellKnown, err := ds.wellKnown()
 	if err != nil {
 		return "", err
 	}
 
-	authURL, _ := url.Parse(wellKnown.AuthEndpoint)
-	query := authURL.Query()
-	query.Set("request_uri", "random_req_uri")
-	authURL.RawQuery = query.Encode()
+	now := timex.Timestamp()
+	claims := map[string]any{
+		"iss": ds.clientID,
+		"sub": ds.clientID,
+		"aud": wellKnown.PushedAuthEndpoint,
+		"jti": uuid.NewString(),
+		"iat": now,
+		"exp": now + 300,
+	}
 
-	return authURL.String(), nil
+	clientAssertion, err := joseutil.Sign(claims, ds.signer)
+	if err != nil {
+		return "", fmt.Errorf("could not sign the client assertion")
+	}
+
+	form := url.Values{}
+	form.Set("client_id", ds.clientID)
+	form.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+	form.Set("client_assertion", clientAssertion)
+	form.Set("response_type", "id_token")
+	form.Set("scope", "openid")
+	form.Set("redirect_uri", ds.redirectURI)
+	form.Set("nonce", nonce)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, wellKnown.PushedAuthEndpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("error creating par request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := ds.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("par request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("par endpoint returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		RequestURI string `json:"request_uri"`
+		ExpiresIn  int    `json:"expires_in"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("error decoding par response: %w", err)
+	}
+
+	return result.RequestURI, nil
 }
 
-func (ds DirectoryService) idToken(_ context.Context, idTkn string) (directoryIDToken, error) {
+func (ds DirectoryService) idToken(_ context.Context, idTkn, nonceHash string) (directoryIDToken, error) {
 	wellKnown, err := ds.wellKnown()
 	if err != nil {
 		return directoryIDToken{}, fmt.Errorf("failed to fetch the directory well known for decoding id token: %w", err)
@@ -77,8 +156,12 @@ func (ds DirectoryService) idToken(_ context.Context, idTkn string) (directoryID
 		return directoryIDToken{}, fmt.Errorf("invalid id token signature: %w", err)
 	}
 
+	if idTokenClaims.IssuedAt == nil {
+		return directoryIDToken{}, errors.New("id token iat claim is missing")
+	}
+
 	if idTokenClaims.Expiry == nil {
-		return directoryIDToken{}, errors.New("id token expiration is missing")
+		return directoryIDToken{}, errors.New("id token exp claim is missing")
 	}
 
 	if err := idTokenClaims.Validate(jwt.Expected{
@@ -86,6 +169,11 @@ func (ds DirectoryService) idToken(_ context.Context, idTkn string) (directoryID
 		AnyAudience: []string{ds.clientID},
 	}); err != nil {
 		return directoryIDToken{}, fmt.Errorf("invalid id token claims: %w", err)
+	}
+
+	h := sha256.Sum256([]byte(idToken.Nonce))
+	if nonceHash != hex.EncodeToString(h[:]) {
+		return directoryIDToken{}, fmt.Errorf("invalid id token nonce")
 	}
 
 	return idToken, nil
@@ -153,4 +241,23 @@ func (ds DirectoryService) jwks() (goidc.JSONWebKeySet, error) {
 	directoryJWKSCache = &jwks
 	directoryJWKSLastFetchedAt = timex.Now()
 	return jwks, nil
+}
+
+func (ds DirectoryService) publicJWKS() jose.JSONWebKeySet {
+	return jose.JSONWebKeySet{
+		Keys: []jose.JSONWebKey{{
+			KeyID:     "signer",
+			Algorithm: string(jose.PS256),
+			Key:       ds.signer.Public(),
+		}},
+	}
+}
+
+func generateNonce() (nonce, nonceHash string) {
+	b := make([]byte, 32)
+	_, _ = rand.Read(b)
+
+	nonce = base64.RawURLEncoding.EncodeToString(b)
+	h := sha256.Sum256([]byte(nonce))
+	return nonce, hex.EncodeToString(h[:])
 }

@@ -15,6 +15,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthUrlResponse'
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/NonceCookie'
 
   /api/directory/callback:
     get:
@@ -22,6 +25,11 @@ paths:
       parameters:
         - name: id_token
           in: query
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: cookie
           required: true
           schema:
             type: string
@@ -556,6 +564,10 @@ components:
         type: string
     SessionCookie:
       description: Session ID for authentication
+      schema:
+        type: string
+    NonceCookie:
+      description: Nonce for authentication
       schema:
         type: string
   securitySchemes:
