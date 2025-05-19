@@ -195,6 +195,9 @@ type UpdateMockUserJSONRequestBody = MockUserRequest
 // CreateAccountJSONRequestBody defines body for CreateAccount for application/json ContentType.
 type CreateAccountJSONRequestBody = AccountRequest
 
+// UpdateAccountJSONRequestBody defines body for UpdateAccount for application/json ContentType.
+type UpdateAccountJSONRequestBody = AccountRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Get the authentication URL for the directory service
@@ -230,6 +233,9 @@ type ServerInterface interface {
 	// Delete an account
 	// (DELETE /api/orgs/{orgId}/users/{userId}/accounts/{accountId})
 	DeleteAccount(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, accountID AccountID)
+	// Update an account
+	// (PUT /api/orgs/{orgId}/users/{userId}/accounts/{accountId})
+	UpdateAccount(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, accountID AccountID)
 	// Get consents of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/consents)
 	GetConsents(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetConsentsParams)
@@ -657,6 +663,55 @@ func (siw *ServerInterfaceWrapper) DeleteAccount(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// UpdateAccount operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "orgId" -------------
+	var orgID OrganizationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", r.PathValue("orgId"), &orgID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "orgId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "userId" -------------
+	var userID MockUserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "accountId" -------------
+	var accountID AccountID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "accountId", r.PathValue("accountId"), &accountID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "accountId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAccount(w, r, orgID, userID, accountID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetConsents operation middleware
 func (siw *ServerInterfaceWrapper) GetConsents(w http.ResponseWriter, r *http.Request) {
 
@@ -841,6 +896,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts", wrapper.GetAccounts)
 	m.HandleFunc("POST "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts", wrapper.CreateAccount)
 	m.HandleFunc("DELETE "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts/{accountId}", wrapper.DeleteAccount)
+	m.HandleFunc("PUT "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts/{accountId}", wrapper.UpdateAccount)
 	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/consents", wrapper.GetConsents)
 
 	return m
@@ -1061,6 +1117,26 @@ func (response DeleteAccount204Response) VisitDeleteAccountResponse(w http.Respo
 	return nil
 }
 
+type UpdateAccountRequestObject struct {
+	OrgID     OrganizationID `json:"orgId"`
+	UserID    MockUserID     `json:"userId"`
+	AccountID AccountID      `json:"accountId"`
+	Body      *UpdateAccountJSONRequestBody
+}
+
+type UpdateAccountResponseObject interface {
+	VisitUpdateAccountResponse(w http.ResponseWriter) error
+}
+
+type UpdateAccount201JSONResponse AccountResponse
+
+func (response UpdateAccount201JSONResponse) VisitUpdateAccountResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetConsentsRequestObject struct {
 	OrgID  OrganizationID `json:"orgId"`
 	UserID MockUserID     `json:"userId"`
@@ -1115,6 +1191,9 @@ type StrictServerInterface interface {
 	// Delete an account
 	// (DELETE /api/orgs/{orgId}/users/{userId}/accounts/{accountId})
 	DeleteAccount(ctx context.Context, request DeleteAccountRequestObject) (DeleteAccountResponseObject, error)
+	// Update an account
+	// (PUT /api/orgs/{orgId}/users/{userId}/accounts/{accountId})
+	UpdateAccount(ctx context.Context, request UpdateAccountRequestObject) (UpdateAccountResponseObject, error)
 	// Get consents of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/consents)
 	GetConsents(ctx context.Context, request GetConsentsRequestObject) (GetConsentsResponseObject, error)
@@ -1458,6 +1537,41 @@ func (sh *strictHandler) DeleteAccount(w http.ResponseWriter, r *http.Request, o
 	}
 }
 
+// UpdateAccount operation middleware
+func (sh *strictHandler) UpdateAccount(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, accountID AccountID) {
+	var request UpdateAccountRequestObject
+
+	request.OrgID = orgID
+	request.UserID = userID
+	request.AccountID = accountID
+
+	var body UpdateAccountJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAccount(ctx, request.(UpdateAccountRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAccount")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAccountResponseObject); ok {
+		if err := validResponse.VisitUpdateAccountResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetConsents operation middleware
 func (sh *strictHandler) GetConsents(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetConsentsParams) {
 	var request GetConsentsRequestObject
@@ -1489,35 +1603,36 @@ func (sh *strictHandler) GetConsents(w http.ResponseWriter, r *http.Request, org
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"gSoAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

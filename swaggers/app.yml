@@ -181,6 +181,27 @@ paths:
                 $ref: '#/components/schemas/AccountsResponse'
 
   /api/orgs/{orgId}/users/{userId}/accounts/{accountId}:
+    put:
+      summary: Update an account
+      operationId: updateAccount
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/mockUserId'
+        - $ref: '#/components/parameters/accountId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountRequest'
+      responses:
+        '201':
+          description: Account updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
     delete:
       summary: Delete an account
       operationId: deleteAccount

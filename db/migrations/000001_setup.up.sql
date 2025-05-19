@@ -80,12 +80,14 @@ CREATE UNIQUE INDEX idx_accounts_org_id_number ON accounts (org_id, number);
 CREATE TABLE consent_accounts (
     consent_id UUID NOT NULL REFERENCES consents(id) ON DELETE CASCADE,
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES mock_users(id),
     status TEXT NOT NULL,
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),
     PRIMARY KEY (consent_id, account_id)
 );
+CREATE INDEX idx_consent_accounts_org_id_user_id ON consent_accounts (org_id, user_id);
 
 CREATE TABLE account_transactions (
     id TEXT PRIMARY KEY,
@@ -106,6 +108,7 @@ SELECT
     'ACCOUNT' AS resource_type,
     consent_id,
     account_id AS resource_id,
+    user_id,
     status,
     org_id,
     created_at,

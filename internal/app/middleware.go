@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/api"
@@ -12,12 +13,19 @@ const (
 	headerXInteractionID = "X-Interaction-ID"
 )
 
+func authMiddleware(service Service) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return authMiddlewareHandler(next, service)
+	}
+}
+
 func authMiddlewareHandler(next http.Handler, service Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/directory/auth-url" {
+		if strings.HasPrefix(r.URL.Path, "/api/directory/") || r.URL.Path == "/api/logout" {
 			next.ServeHTTP(w, r)
 			return
 		}
+
 		ctx := r.Context()
 
 		cookie, err := r.Cookie(cookieSessionId)

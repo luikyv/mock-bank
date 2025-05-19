@@ -36,6 +36,7 @@ func (s Service) Authorize(ctx context.Context, accIDs []uuid.UUID, consentID uu
 			if err := s.createConsent(ctx, &ConsentAccount{
 				ConsentID: consentID,
 				AccountID: accID,
+				UserID:    acc.UserID,
 				Status:    status,
 				OrgID:     acc.OrgID,
 			}); err != nil {

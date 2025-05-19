@@ -80,7 +80,7 @@ func (s Server) ResourcesGetResources(ctx context.Context, req ResourcesGetResou
 	consentID := ctx.Value(opf.CtxKeyConsentID).(string)
 	orgID := ctx.Value(opf.CtxKeyOrgID).(string)
 	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
-	resources, err := s.service.Resources(ctx, consentID, orgID, pag)
+	resources, err := s.service.ConsentedResources(ctx, consentID, orgID, pag)
 	if err != nil {
 		return nil, err
 	}

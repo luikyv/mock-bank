@@ -50,8 +50,6 @@ func NewServer(
 
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
-	appMux := http.NewServeMux()
-
 	spec, err := GetSwagger()
 	if err != nil {
 		panic(err)
@@ -68,55 +66,6 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		},
 	})
 
-	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
-		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeResponseError(w, err)
-		},
-	})
-	wrapper := ServerInterfaceWrapper{
-		Handler:            strictHandler,
-		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, interactionIDMiddleware},
-		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
-		},
-	}
-
-	var handler http.Handler
-
-	appMux.HandleFunc("GET /api/directory/auth-url", wrapper.GetDirectoryAuthURL)
-	appMux.HandleFunc("GET /api/directory/callback", wrapper.HandleDirectoryCallback)
-	appMux.HandleFunc("GET /api/directory/jwks", func(w http.ResponseWriter, r *http.Request) {
-		api.WriteJSON(w, s.directoryService.publicJWKS(), http.StatusOK)
-	})
-	appMux.HandleFunc("POST /api/logout", wrapper.LogoutUser)
-
-	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.GetCurrentUser), s.service)
-	appMux.Handle("GET /api/me", handler)
-
-	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.GetMockUsers), s.service)
-	appMux.Handle("GET /api/orgs/{orgId}/users", handler)
-
-	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.CreateMockUser), s.service)
-	appMux.Handle("POST /api/orgs/{orgId}/users", handler)
-
-	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.DeleteMockUser), s.service)
-	appMux.Handle("DELETE /api/orgs/{orgId}/users/{userId}", handler)
-
-	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.UpdateMockUser), s.service)
-	appMux.Handle("PUT /api/orgs/{orgId}/users/{userId}", handler)
-
-	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.GetAccounts), s.service)
-	appMux.Handle("GET /api/orgs/{orgId}/users/{userId}/accounts", handler)
-
-	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.CreateAccount), s.service)
-	appMux.Handle("POST /api/orgs/{orgId}/users/{userId}/accounts", handler)
-
-	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.DeleteAccount), s.service)
-	appMux.Handle("DELETE /api/orgs/{orgId}/users/{userId}/accounts/{accountId}", handler)
-
-	handler = authMiddlewareHandler(http.HandlerFunc(wrapper.GetConsents), s.service)
-	appMux.Handle("GET /api/orgs/{orgId}/users/{userId}/consents", handler)
-
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{s.host},
 		AllowCredentials: true,
@@ -128,7 +77,27 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			http.MethodPut,
 		},
 	})
-	mux.Handle("/api/", c.Handler(appMux))
+
+	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			writeResponseError(w, err)
+		},
+	})
+
+	handler := HandlerWithOptions(strictHandler, StdHTTPServerOptions{
+		Middlewares: []MiddlewareFunc{
+			swaggerMiddleware,
+			interactionIDMiddleware,
+			authMiddleware(s.service),
+			func(next http.Handler) http.Handler {
+				return c.Handler(next)
+			},
+		},
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+		},
+	})
+	mux.Handle("/api/", handler)
 }
 
 func writeResponseError(w http.ResponseWriter, err error) {
@@ -364,7 +333,7 @@ func (s Server) CreateAccount(ctx context.Context, req CreateAccountRequestObjec
 		BlockedAmount:               req.Body.Data.BlockedAmount,
 		AutomaticallyInvestedAmount: req.Body.Data.AutomaticallyInvestedAmount,
 		OrgID:                       req.OrgID,
-		UserID:                      req.UserID,
+		UserID:                      uuid.MustParse(req.UserID),
 	}
 	if err := s.accountService.Save(ctx, acc); err != nil {
 		return nil, err
@@ -393,6 +362,40 @@ func (s Server) DeleteAccount(ctx context.Context, req DeleteAccountRequestObjec
 		return nil, err
 	}
 	return DeleteAccount204Response{}, nil
+}
+
+func (s Server) UpdateAccount(ctx context.Context, req UpdateAccountRequestObject) (UpdateAccountResponseObject, error) {
+	acc := &account.Account{
+		ID:                          uuid.MustParse(req.AccountID),
+		Number:                      req.Body.Data.Number,
+		Type:                        account.Type(req.Body.Data.Type),
+		SubType:                     account.SubType(req.Body.Data.Subtype),
+		AvailableAmount:             req.Body.Data.AvailableAmount,
+		BlockedAmount:               req.Body.Data.BlockedAmount,
+		AutomaticallyInvestedAmount: req.Body.Data.AutomaticallyInvestedAmount,
+		OrgID:                       req.OrgID,
+		UserID:                      uuid.MustParse(req.UserID),
+	}
+	if err := s.accountService.Save(ctx, acc); err != nil {
+		return nil, err
+	}
+
+	resp := AccountResponse{
+		Data: AccountData{
+			AccountID:                   acc.ID.String(),
+			AutomaticallyInvestedAmount: acc.AutomaticallyInvestedAmount,
+			AvailableAmount:             acc.AvailableAmount,
+			BlockedAmount:               acc.BlockedAmount,
+			BranchCode:                  account.DefaultBranch,
+			CheckDigit:                  account.DefaultCheckDigit,
+			CompeCode:                   account.DefaultCompeCode,
+			Number:                      acc.Number,
+			Subtype:                     string(acc.SubType),
+			Type:                        string(acc.Type),
+		},
+	}
+
+	return UpdateAccount201JSONResponse(resp), nil
 }
 
 func (s Server) GetAccounts(ctx context.Context, req GetAccountsRequestObject) (GetAccountsResponseObject, error) {

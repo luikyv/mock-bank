@@ -8,6 +8,9 @@ mock backend: https://matls-api.mockbank.local
 
 ## TODO
 
+- What's happening with created_at?
+- Accounts overdraft limits.
+- Account filters.
 - Transactions.
 - Improve error handling.
 - Add logs.

@@ -31,6 +31,7 @@ var (
 type ConsentAccount struct {
 	ConsentID uuid.UUID
 	AccountID uuid.UUID
+	UserID    uuid.UUID
 	Status    resource.Status
 
 	OrgID     string
@@ -46,7 +47,7 @@ func (ConsentAccount) TableName() string {
 
 type Account struct {
 	ID                          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	UserID                      string
+	UserID                      uuid.UUID
 	Number                      string
 	Type                        Type
 	SubType                     SubType `gorm:"column:subtype"`
