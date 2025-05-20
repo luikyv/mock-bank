@@ -15,25 +15,14 @@ type Page[T any] struct {
 }
 
 func New[T any](records []T, pagination Pagination, totalRecords int) Page[T] {
-	page := Page[T]{
+	return Page[T]{
+		Records:      records,
 		TotalRecords: totalRecords,
 		// Calculate the total number of pages using integer division.
 		// Adding (pagination.Size - 1) ensures correct rounding up for partial pages.
 		TotalPages: (totalRecords + pagination.Size - 1) / pagination.Size,
 		Pagination: pagination,
 	}
-
-	// Subtracting 1 from the page number to convert it to a zero-based index,
-	// as pages start at 1.
-	start := (page.Number - 1) * page.Size
-	if start >= totalRecords {
-		return page
-	}
-
-	end := min(start+page.Size, totalRecords)
-
-	page.Records = records[start:end]
-	return page
 }
 
 type Pagination struct {
@@ -71,10 +60,4 @@ func NewPagination(pageNumber *int32, pageSize *int32) Pagination {
 	}
 
 	return pagination
-}
-
-// Paginate slices a list of records into a specific page of data based on the
-// provided pagination parameters.
-func Paginate[T any](records []T, pagination Pagination) Page[T] {
-	return New(records, pagination, len(records))
 }
