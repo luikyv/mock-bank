@@ -1,11 +1,11 @@
-package api
+package apiutil
 
 import (
 	"net/url"
 	"strconv"
 
 	"github.com/luiky/mock-bank/internal/page"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 )
 
 const (
@@ -62,20 +62,20 @@ func NewPaginatedLinks[T any](self string, page page.Page[T]) *Links {
 }
 
 type Meta struct {
-	RequestDateTime timex.DateTime `json:"requestDateTime"`
-	TotalRecords    *int           `json:"totalRecords,omitempty"`
-	TotalPages      *int           `json:"totalPages,omitempty"`
+	RequestDateTime timeutil.DateTime `json:"requestDateTime"`
+	TotalRecords    *int              `json:"totalRecords,omitempty"`
+	TotalPages      *int              `json:"totalPages,omitempty"`
 }
 
 func NewMeta() *Meta {
 	return &Meta{
-		RequestDateTime: timex.DateTimeNow(),
+		RequestDateTime: timeutil.DateTimeNow(),
 	}
 }
 
 func NewPaginatedMeta[T any](p page.Page[T]) *Meta {
 	return &Meta{
-		RequestDateTime: timex.DateTimeNow(),
+		RequestDateTime: timeutil.DateTimeNow(),
 		TotalRecords:    &p.TotalRecords,
 		TotalPages:      &p.TotalPages,
 	}
@@ -84,7 +84,7 @@ func NewPaginatedMeta[T any](p page.Page[T]) *Meta {
 func NewSingleRecordMeta() *Meta {
 	one := 1
 	return &Meta{
-		RequestDateTime: timex.DateTimeNow(),
+		RequestDateTime: timeutil.DateTimeNow(),
 		TotalRecords:    &one,
 		TotalPages:      &one,
 	}

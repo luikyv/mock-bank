@@ -18,8 +18,8 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/apiutil"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/oapi-codegen/runtime"
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -102,7 +102,7 @@ type AccountBalancesData struct {
 	// - Quando não existente uma data vinculada especificamente ao bloco, se assume a data e hora de atualização do cadastro como um todo.
 	//
 	// De toda forma, é preciso continuar respeitando o prazo máximo de tempestividade da API de Contas.
-	UpdateDateTime timex.DateTime `json:"updateDateTime"`
+	UpdateDateTime timeutil.DateTime `json:"updateDateTime"`
 }
 
 // AccountBalancesDataAutomaticallyInvestedAmount Saldo disponível com aplicação automática - corresponde a soma do saldo disponível acrescido do valor obtido a partir da aplicação automática. Expresso em valor monetário com no mínimo 2 casas e no máximo 4 casas decimais.
@@ -339,40 +339,40 @@ type EnumTransactionTypes string
 type ResponseAccountBalances struct {
 	// Data Conjunto de informações das Contas de: depósito à vista, poupança e de pagamento pré-paga
 	Data  AccountBalancesData `json:"data"`
-	Links api.Links           `json:"links"`
-	Meta  api.Meta            `json:"meta"`
+	Links apiutil.Links           `json:"links"`
+	Meta  apiutil.Meta            `json:"meta"`
 }
 
 // ResponseAccountIdentification defines model for ResponseAccountIdentification.
 type ResponseAccountIdentification struct {
 	// Data Conjunto dos atributos que caracterizam as Contas de: depósito à vista, poupança e de pagamento pré-paga
 	Data  AccountIdentificationData `json:"data"`
-	Links api.Links                 `json:"links"`
-	Meta  api.Meta                  `json:"meta"`
+	Links apiutil.Links                 `json:"links"`
+	Meta  apiutil.Meta                  `json:"meta"`
 }
 
 // ResponseAccountList defines model for ResponseAccountList.
 type ResponseAccountList struct {
 	// Data Lista de contas depósito à vista, poupança e pagamento pré-pagas mantidas pelo cliente na instituição transmissora e para as quais ele tenha fornecido consentimento
 	Data  []AccountData `json:"data"`
-	Links api.Links     `json:"links"`
-	Meta  api.Meta      `json:"meta"`
+	Links apiutil.Links     `json:"links"`
+	Meta  apiutil.Meta      `json:"meta"`
 }
 
 // ResponseAccountOverdraftLimits defines model for ResponseAccountOverdraftLimits.
 type ResponseAccountOverdraftLimits struct {
 	// Data Conjunto de informações da Conta de: depósito à vista
 	Data  AccountOverdraftLimitsData `json:"data"`
-	Links api.Links                  `json:"links"`
-	Meta  api.Meta                   `json:"meta"`
+	Links apiutil.Links                  `json:"links"`
+	Meta  apiutil.Meta                   `json:"meta"`
 }
 
 // ResponseAccountTransactions defines model for ResponseAccountTransactions.
 type ResponseAccountTransactions struct {
 	// Data Lista dos lançamentos referentes às transações realizadas e de lançamentos futuros para as contas de: depósito à vista, poupança e de pagamento pré-paga
 	Data  []AccountTransactionsData `json:"data"`
-	Links api.Links                 `json:"links"`
-	Meta  api.Meta                  `json:"meta"`
+	Links apiutil.Links                 `json:"links"`
+	Meta  apiutil.Meta                  `json:"meta"`
 }
 
 // ResponseError defines model for ResponseError.
@@ -387,7 +387,7 @@ type ResponseError struct {
 		// Title Título legível por humanos deste erro específico
 		Title string `json:"title"`
 	} `json:"errors"`
-	Meta *api.Meta `json:"meta,omitempty"`
+	Meta *apiutil.Meta `json:"meta,omitempty"`
 }
 
 // ResponseErrorMetaSingle defines model for ResponseErrorMetaSingle.
@@ -402,7 +402,7 @@ type ResponseErrorMetaSingle struct {
 		// Title Título legível por humanos deste erro específico
 		Title string `json:"title"`
 	} `json:"errors"`
-	Meta *api.Meta `json:"meta,omitempty"`
+	Meta *apiutil.Meta `json:"meta,omitempty"`
 }
 
 // Authorization defines model for Authorization.
@@ -423,10 +423,10 @@ type AccountType = EnumAccountType
 type CreditDebitIndicator = EnumCreditDebitIndicator
 
 // FromBookingDate defines model for fromBookingDate.
-type FromBookingDate = timex.Date
+type FromBookingDate = timeutil.Date
 
 // FromBookingDateMaxLimited defines model for fromBookingDateMaxLimited.
-type FromBookingDateMaxLimited = timex.Date
+type FromBookingDateMaxLimited = timeutil.Date
 
 // Page defines model for page.
 type Page = int32
@@ -438,10 +438,10 @@ type PageSize = int32
 type PaginationKey = string
 
 // ToBookingDate defines model for toBookingDate.
-type ToBookingDate = timex.Date
+type ToBookingDate = timeutil.Date
 
 // ToBookingDateMaxLimited defines model for toBookingDateMaxLimited.
-type ToBookingDateMaxLimited = timex.Date
+type ToBookingDateMaxLimited = timeutil.Date
 
 // XCustomerUserAgent defines model for xCustomerUserAgent.
 type XCustomerUserAgent = string

@@ -9,13 +9,13 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/apiutil"
 	"github.com/luiky/mock-bank/internal/opf/account"
 	"github.com/luiky/mock-bank/internal/opf/consent"
 	"github.com/luiky/mock-bank/internal/opf/resource"
 	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luiky/mock-bank/internal/page"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"github.com/rs/cors"
 )
@@ -66,7 +66,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			},
 		},
 		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
+			apiutil.WriteError(w, apiutil.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
 		},
 	})
 
@@ -98,7 +98,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			},
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+			apiutil.WriteError(w, apiutil.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
 	})
 	mux.Handle("/api/", handler)
@@ -106,21 +106,21 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 func writeResponseError(w http.ResponseWriter, err error) {
 	if errors.Is(err, errSessionNotFound) {
-		api.WriteError(w, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, err.Error()))
+		apiutil.WriteError(w, apiutil.NewError("UNAUTHORIZED", http.StatusUnauthorized, err.Error()))
 		return
 	}
 
 	if errors.Is(err, user.ErrAlreadyExists) {
-		api.WriteError(w, api.NewError("USER_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
+		apiutil.WriteError(w, apiutil.NewError("USER_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
 		return
 	}
 
 	if errors.Is(err, account.ErrAlreadyExists) {
-		api.WriteError(w, api.NewError("ACCOUNT_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
+		apiutil.WriteError(w, apiutil.NewError("ACCOUNT_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
 		return
 	}
 
-	api.WriteError(w, err)
+	apiutil.WriteError(w, err)
 }
 
 func (s Server) GetDirectoryAuthURL(ctx context.Context, request GetDirectoryAuthURLRequestObject) (GetDirectoryAuthURLResponseObject, error) {
@@ -135,7 +135,7 @@ func (s Server) GetDirectoryAuthURL(ctx context.Context, request GetDirectoryAut
 			Name:     cookieNonce,
 			Value:    nonceHash,
 			Path:     "/api/directory/callback",
-			Expires:  timex.Now().Add(nonceValidity),
+			Expires:  timeutil.Now().Add(nonceValidity),
 			HttpOnly: true,
 			Secure:   true,
 			Domain:   strings.TrimPrefix(s.host, "https://"),
@@ -164,7 +164,7 @@ func (s Server) HandleDirectoryCallback(ctx context.Context, req HandleDirectory
 			Name:     cookieSessionId,
 			Value:    session.ID.String(),
 			Path:     "/api",
-			Expires:  timex.Now().Add(sessionValidity),
+			Expires:  timeutil.Now().Add(sessionValidity),
 			HttpOnly: true,
 			Secure:   true,
 			Domain:   strings.TrimPrefix(s.host, "https://"),
@@ -244,8 +244,8 @@ func (s Server) GetMockUsers(ctx context.Context, req GetMockUsersRequestObject)
 			Name     string `json:"name"`
 			Username string `json:"username"`
 		}{},
-		Meta:  api.NewPaginatedMeta(us),
-		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users", us),
+		Meta:  apiutil.NewPaginatedMeta(us),
+		Links: apiutil.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users", us),
 	}
 	for _, u := range us.Records {
 		resp.Data = append(resp.Data, struct {
@@ -411,8 +411,8 @@ func (s Server) GetAccounts(ctx context.Context, req GetAccountsRequestObject) (
 
 	resp := AccountsResponse{
 		Data:  []AccountData{},
-		Meta:  api.NewPaginatedMeta(accs),
-		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/accounts", accs),
+		Meta:  apiutil.NewPaginatedMeta(accs),
+		Links: apiutil.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/accounts", accs),
 	}
 	for _, acc := range accs.Records {
 		resp.Data = append(resp.Data, AccountData{
@@ -441,38 +441,38 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 
 	resp := ConsentsResponse{
 		Data: []struct {
-			ClientID             string          `json:"clientId"`
-			ConsentID            string          `json:"consentId"`
-			CreationDateTime     timex.DateTime  `json:"creationDateTime"`
-			ExpirationDateTime   *timex.DateTime `json:"expirationDateTime,omitempty"`
-			Permissions          []string        `json:"permissions"`
-			RejectedBy           *string         `json:"rejectedBy,omitempty"`
-			RejectionReason      *string         `json:"rejectionReason,omitempty"`
-			Status               string          `json:"status"`
-			StatusUpdateDateTime timex.DateTime  `json:"statusUpdateDateTime"`
-			UserID               string          `json:"userId"`
+			ClientID             string             `json:"clientId"`
+			ConsentID            string             `json:"consentId"`
+			CreationDateTime     timeutil.DateTime  `json:"creationDateTime"`
+			ExpirationDateTime   *timeutil.DateTime `json:"expirationDateTime,omitempty"`
+			Permissions          []string           `json:"permissions"`
+			RejectedBy           *string            `json:"rejectedBy,omitempty"`
+			RejectionReason      *string            `json:"rejectionReason,omitempty"`
+			Status               string             `json:"status"`
+			StatusUpdateDateTime timeutil.DateTime  `json:"statusUpdateDateTime"`
+			UserID               string             `json:"userId"`
 		}{},
-		Meta:  api.NewPaginatedMeta(cs),
-		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/consents", cs),
+		Meta:  apiutil.NewPaginatedMeta(cs),
+		Links: apiutil.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/consents", cs),
 	}
 	for _, c := range cs.Records {
 		data := struct {
-			ClientID             string          `json:"clientId"`
-			ConsentID            string          `json:"consentId"`
-			CreationDateTime     timex.DateTime  `json:"creationDateTime"`
-			ExpirationDateTime   *timex.DateTime `json:"expirationDateTime,omitempty"`
-			Permissions          []string        `json:"permissions"`
-			RejectedBy           *string         `json:"rejectedBy,omitempty"`
-			RejectionReason      *string         `json:"rejectionReason,omitempty"`
-			Status               string          `json:"status"`
-			StatusUpdateDateTime timex.DateTime  `json:"statusUpdateDateTime"`
-			UserID               string          `json:"userId"`
+			ClientID             string             `json:"clientId"`
+			ConsentID            string             `json:"consentId"`
+			CreationDateTime     timeutil.DateTime  `json:"creationDateTime"`
+			ExpirationDateTime   *timeutil.DateTime `json:"expirationDateTime,omitempty"`
+			Permissions          []string           `json:"permissions"`
+			RejectedBy           *string            `json:"rejectedBy,omitempty"`
+			RejectionReason      *string            `json:"rejectionReason,omitempty"`
+			Status               string             `json:"status"`
+			StatusUpdateDateTime timeutil.DateTime  `json:"statusUpdateDateTime"`
+			UserID               string             `json:"userId"`
 		}{
 			ClientID:             c.ClientID,
 			ConsentID:            c.URN(),
-			CreationDateTime:     timex.NewDateTime(c.CreatedAt),
+			CreationDateTime:     timeutil.NewDateTime(c.CreatedAt),
 			Status:               string(c.Status),
-			StatusUpdateDateTime: timex.NewDateTime(c.StatusUpdatedAt),
+			StatusUpdateDateTime: timeutil.NewDateTime(c.StatusUpdatedAt),
 			UserID:               c.UserID.String(),
 		}
 		perms := make([]string, len(c.Permissions))
@@ -489,7 +489,7 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 		}
 
 		if c.ExpiresAt != nil {
-			exp := timex.NewDateTime(*c.ExpiresAt)
+			exp := timeutil.NewDateTime(*c.ExpiresAt)
 			data.ExpirationDateTime = &exp
 		}
 		resp.Data = append(resp.Data, data)
@@ -507,29 +507,29 @@ func (s Server) GetResources(ctx context.Context, req GetResourcesRequestObject)
 
 	resp := ResourcesResponse{
 		Data: []struct {
-			ConsentID        string         `json:"consentId"`
-			CreationDateTime timex.DateTime `json:"creationDateTime"`
-			ResourceID       string         `json:"resourceId"`
-			Status           ResourceStatus `json:"status"`
-			Type             ResourceType   `json:"type"`
+			ConsentID        string            `json:"consentId"`
+			CreationDateTime timeutil.DateTime `json:"creationDateTime"`
+			ResourceID       string            `json:"resourceId"`
+			Status           ResourceStatus    `json:"status"`
+			Type             ResourceType      `json:"type"`
 		}{},
-		Meta:  *api.NewPaginatedMeta(rs),
-		Links: *api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/resources", rs),
+		Meta:  *apiutil.NewPaginatedMeta(rs),
+		Links: *apiutil.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/resources", rs),
 	}
 
 	for _, r := range rs.Records {
 		resp.Data = append(resp.Data, struct {
-			ConsentID        string         `json:"consentId"`
-			CreationDateTime timex.DateTime `json:"creationDateTime"`
-			ResourceID       string         `json:"resourceId"`
-			Status           ResourceStatus `json:"status"`
-			Type             ResourceType   `json:"type"`
+			ConsentID        string            `json:"consentId"`
+			CreationDateTime timeutil.DateTime `json:"creationDateTime"`
+			ResourceID       string            `json:"resourceId"`
+			Status           ResourceStatus    `json:"status"`
+			Type             ResourceType      `json:"type"`
 		}{
 			ConsentID:        r.ConsentID,
 			ResourceID:       r.ResourceID,
 			Status:           ResourceStatus(r.Status),
 			Type:             ResourceType(r.Type),
-			CreationDateTime: timex.NewDateTime(r.CreatedAt),
+			CreationDateTime: timeutil.NewDateTime(r.CreatedAt),
 		})
 	}
 

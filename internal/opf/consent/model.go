@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
 
@@ -50,7 +50,7 @@ func (c Consent) URN() string {
 // HasAuthExpired returns true if the status is [StatusAwaitingAuthorization] and
 // the max time awaiting authorization has elapsed.
 func (c Consent) HasAuthExpired() bool {
-	now := timex.Now()
+	now := timeutil.Now()
 	return c.IsAwaitingAuthorization() &&
 		now.After(c.CreatedAt.Add(time.Second*maxTimeAwaitingAuthorizationSecs))
 }
@@ -61,7 +61,7 @@ func (c Consent) IsExpired() bool {
 	if c.ExpiresAt == nil {
 		return false
 	}
-	now := timex.Now()
+	now := timeutil.Now()
 	return c.Status == StatusAuthorized && now.After(*c.ExpiresAt)
 }
 

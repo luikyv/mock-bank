@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 )
 
 func IDFromScopes(scopes string) (string, bool) {
@@ -72,7 +72,7 @@ func validateExtension(c *Consent, ext *Extension) error {
 		return nil
 	}
 
-	now := timex.Now()
+	now := timeutil.Now()
 	if ext.ExpiresAt.Before(now) || ext.ExpiresAt.After(now.AddDate(1, 0, 0)) {
 		return ErrInvalidExpiration
 	}

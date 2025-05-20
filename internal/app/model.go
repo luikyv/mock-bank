@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 )
 
 type ContextKey string
@@ -36,7 +36,7 @@ type Session struct {
 }
 
 func (s Session) IsExpired() bool {
-	return s.ExpiresAt.Before(timex.Now())
+	return s.ExpiresAt.Before(timeutil.Now())
 }
 
 type Organizations map[string]struct {

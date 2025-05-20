@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/apiutil"
 )
 
 const (
@@ -20,7 +20,7 @@ func FAPIIDHandler(next http.Handler, opts *Options) http.Handler {
 		// Verify if the interaction ID is valid, return a new value if not.
 		if _, err := uuid.Parse(interactionID); err != nil {
 			w.Header().Add(HeaderXFAPIInteractionID, uuid.NewString())
-			api.WriteError(w, api.NewError("INVALID_INTERACTION_ID", http.StatusBadRequest, "The fapi interaction id is missing or invalid").Pagination(opts.ErrorPagination))
+			apiutil.WriteError(w, apiutil.NewError("INVALID_INTERACTION_ID", http.StatusBadRequest, "The fapi interaction id is missing or invalid").Pagination(opts.ErrorPagination))
 			return
 		}
 

@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/apiutil"
 	"github.com/luiky/mock-bank/internal/opf"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
@@ -23,7 +23,7 @@ func AuthHandler(next http.Handler, op *provider.Provider, scopes ...goidc.Scope
 		tokenInfo, err := op.TokenInfoFromRequest(w, r)
 		if err != nil {
 			slog.DebugContext(r.Context(), "the token is not active")
-			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(true))
+			apiutil.WriteError(w, apiutil.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(true))
 			return
 		}
 
@@ -36,7 +36,7 @@ func AuthHandler(next http.Handler, op *provider.Provider, scopes ...goidc.Scope
 		tokenScopes := strings.Split(tokenInfo.Scopes, " ")
 		if !areScopesValid(scopes, tokenScopes) {
 			slog.DebugContext(r.Context(), "invalid scopes", slog.String("token_scopes", tokenInfo.Scopes))
-			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "token missing scopes").Pagination(true))
+			apiutil.WriteError(w, apiutil.NewError("UNAUTHORISED", http.StatusUnauthorized, "token missing scopes").Pagination(true))
 			return
 		}
 

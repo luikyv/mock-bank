@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/apiutil"
 )
 
 const (
@@ -30,13 +30,13 @@ func authMiddlewareHandler(next http.Handler, service Service) http.Handler {
 
 		cookie, err := r.Cookie(cookieSessionId)
 		if err != nil {
-			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "session not found"))
+			apiutil.WriteError(w, apiutil.NewError("UNAUTHORISED", http.StatusUnauthorized, "session not found"))
 			return
 		}
 
 		session, err := service.session(r.Context(), cookie.Value)
 		if err != nil {
-			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "session not found"))
+			apiutil.WriteError(w, apiutil.NewError("UNAUTHORISED", http.StatusUnauthorized, "session not found"))
 			return
 		}
 		ctx = context.WithValue(ctx, CtxKeySessionID, session.ID.String())
@@ -44,7 +44,7 @@ func authMiddlewareHandler(next http.Handler, service Service) http.Handler {
 		orgID := r.PathValue("orgId")
 		if orgID != "" {
 			if _, ok := session.Organizations[orgID]; !ok {
-				api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid org id"))
+				apiutil.WriteError(w, apiutil.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid org id"))
 				return
 			}
 			ctx = context.WithValue(ctx, CtxKeyOrgID, orgID)

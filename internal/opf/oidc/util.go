@@ -18,7 +18,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/luiky/mock-bank/internal/opf/consent"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 )
@@ -146,7 +146,7 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 			return goidc.WrapError(goidc.ErrorCodeInvalidClientMetadata, "invalid software statement signature", err)
 		}
 
-		if claims.IssuedAt == nil || timex.Now().After(claims.IssuedAt.Time().Add(5*time.Minute)) {
+		if claims.IssuedAt == nil || timeutil.Now().After(claims.IssuedAt.Time().Add(5*time.Minute)) {
 			return goidc.NewError(goidc.ErrorCodeInvalidClientMetadata, "invalid software statement iat claim")
 		}
 
@@ -215,7 +215,7 @@ func fetchSoftwareStatementJWKS(ssURL string, httpClient *http.Client) (goidc.JS
 	ssJWKSMu.Lock()
 	defer ssJWKSMu.Unlock()
 
-	if ssJWKSCache != nil && timex.Now().Before(ssJWKSLastFetchedAt.Add(ssJWKcacheTime)) {
+	if ssJWKSCache != nil && timeutil.Now().Before(ssJWKSLastFetchedAt.Add(ssJWKcacheTime)) {
 		return *ssJWKSCache, nil
 	}
 
@@ -235,6 +235,6 @@ func fetchSoftwareStatementJWKS(ssURL string, httpClient *http.Client) (goidc.JS
 	}
 
 	ssJWKSCache = &jwks
-	ssJWKSLastFetchedAt = timex.Now()
+	ssJWKSLastFetchedAt = timeutil.Now()
 	return jwks, nil
 }

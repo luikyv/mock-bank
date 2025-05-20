@@ -67,10 +67,7 @@ db-migration-file:
 	migrate create -ext sql -dir ./db/migrations -seq $$name
 
 db-seeds:
-	@docker-compose exec -T psql psql -U admin -d mockbank < ./db/seeds/setup.up.sql
-
-db-seeds-down:
-	@docker-compose exec -T psql psql -U admin -d mockbank < ./db/seeds/setup.down.sql
+	@docker-compose exec -T psql psql -U admin -d mockbank < ./mockdata/setup.sql
 
 # Clone and build the Open Finance Conformance Suite.
 setup-cs:

@@ -20,7 +20,7 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/joseutil"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
 
@@ -84,7 +84,7 @@ func (ds DirectoryService) requestURI(ctx context.Context, nonce string) (string
 		return "", err
 	}
 
-	now := timex.Timestamp()
+	now := timeutil.Timestamp()
 	claims := map[string]any{
 		"iss": ds.clientID,
 		"sub": ds.clientID,
@@ -184,7 +184,7 @@ func (ds DirectoryService) wellKnown() (directoryWellKnown, error) {
 	directoryWellKnownMu.Lock()
 	defer directoryWellKnownMu.Unlock()
 
-	if directoryWellKnownCache != nil && timex.Now().Before(directoryWellKnownLastFetchedAt.Add(cacheTime)) {
+	if directoryWellKnownCache != nil && timeutil.Now().Before(directoryWellKnownLastFetchedAt.Add(cacheTime)) {
 		return *directoryWellKnownCache, nil
 	}
 
@@ -205,7 +205,7 @@ func (ds DirectoryService) wellKnown() (directoryWellKnown, error) {
 	}
 
 	directoryWellKnownCache = &config
-	directoryWellKnownLastFetchedAt = timex.Now()
+	directoryWellKnownLastFetchedAt = timeutil.Now()
 	return config, nil
 }
 
@@ -214,7 +214,7 @@ func (ds DirectoryService) jwks() (goidc.JSONWebKeySet, error) {
 	directoryJWKSMu.Lock()
 	defer directoryJWKSMu.Unlock()
 
-	if directoryJWKSCache != nil && timex.Now().Before(directoryJWKSLastFetchedAt.Add(cacheTime)) {
+	if directoryJWKSCache != nil && timeutil.Now().Before(directoryJWKSLastFetchedAt.Add(cacheTime)) {
 		return *directoryJWKSCache, nil
 	}
 
@@ -239,7 +239,7 @@ func (ds DirectoryService) jwks() (goidc.JSONWebKeySet, error) {
 	}
 
 	directoryJWKSCache = &jwks
-	directoryJWKSLastFetchedAt = timex.Now()
+	directoryJWKSLastFetchedAt = timeutil.Now()
 	return jwks, nil
 }
 

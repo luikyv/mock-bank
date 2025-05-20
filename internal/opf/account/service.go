@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/luiky/mock-bank/internal/opf/resource"
 	"github.com/luiky/mock-bank/internal/page"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -68,7 +68,7 @@ func (s Service) UpdateConsent(ctx context.Context, consentID, accountID uuid.UU
 		Where("consent_id = ? AND account_id = ? AND org_id = ?", consentID, accountID, orgID).
 		Updates(map[string]any{
 			"status":     status,
-			"updated_at": timex.Now(),
+			"updated_at": timeutil.Now(),
 		})
 
 	if result.Error != nil {

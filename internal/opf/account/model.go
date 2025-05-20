@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/apiutil"
 	"github.com/luiky/mock-bank/internal/opf/resource"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"gorm.io/gorm"
 )
@@ -141,27 +141,27 @@ const (
 )
 
 type TransactionFilter struct {
-	from timex.Date
-	to   timex.Date
+	from timeutil.Date
+	to   timeutil.Date
 }
 
-func NewTransactionFilter(from, to *timex.Date, current bool) (TransactionFilter, error) {
-	now := timex.DateNow()
+func NewTransactionFilter(from, to *timeutil.Date, current bool) (TransactionFilter, error) {
+	now := timeutil.DateNow()
 	filter := TransactionFilter{
 		from: now,
-		to:   timex.NewDate(now.AddDate(0, 0, 1)),
+		to:   timeutil.NewDate(now.AddDate(0, 0, 1)),
 	}
 
 	if from != nil {
 		if to == nil {
-			return TransactionFilter{}, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, "toBookingDate is required if fromBookingDate is informed")
+			return TransactionFilter{}, apiutil.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, "toBookingDate is required if fromBookingDate is informed")
 		}
 		filter.from = *from
 	}
 
 	if to != nil {
 		if from == nil {
-			return TransactionFilter{}, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, "fromBookingDate is required if toBookingDate is informed")
+			return TransactionFilter{}, apiutil.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, "fromBookingDate is required if toBookingDate is informed")
 		}
 
 		filter.to = *to
@@ -170,11 +170,11 @@ func NewTransactionFilter(from, to *timex.Date, current bool) (TransactionFilter
 	if current {
 		nowMinus7Days := now.AddDate(0, 0, -7)
 		if filter.from.Before(nowMinus7Days) {
-			return TransactionFilter{}, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, "fromBookingDate too far in the past")
+			return TransactionFilter{}, apiutil.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, "fromBookingDate too far in the past")
 		}
 
 		if filter.to.Before(nowMinus7Days) {
-			return TransactionFilter{}, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, "toBookingDate too far in the past")
+			return TransactionFilter{}, apiutil.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, "toBookingDate too far in the past")
 		}
 	}
 

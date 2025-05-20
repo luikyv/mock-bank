@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -30,8 +30,8 @@ func (s Service) createSession(ctx context.Context, idToken, nonceHash string) (
 	session := &Session{
 		Username:      idTkn.Sub,
 		Organizations: Organizations{},
-		CreatedAt:     timex.Now(),
-		ExpiresAt:     timex.Now().Add(sessionValidity),
+		CreatedAt:     timeutil.Now(),
+		ExpiresAt:     timeutil.Now().Add(sessionValidity),
 	}
 	for orgID, org := range idTkn.Profile.OrgAccessDetails {
 		session.Organizations[orgID] = struct {

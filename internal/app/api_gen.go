@@ -18,8 +18,8 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/apiutil"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/oapi-codegen/runtime"
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -90,8 +90,8 @@ type AccountResponse struct {
 // AccountsResponse defines model for AccountsResponse.
 type AccountsResponse struct {
 	Data  []AccountData `json:"data"`
-	Links *api.Links    `json:"links,omitempty"`
-	Meta  *api.Meta     `json:"meta,omitempty"`
+	Links *apiutil.Links    `json:"links,omitempty"`
+	Meta  *apiutil.Meta     `json:"meta,omitempty"`
 }
 
 // AuthURLResponse defines model for AuthUrlResponse.
@@ -106,17 +106,17 @@ type ConsentsResponse struct {
 	Data []struct {
 		ClientID             string          `json:"clientId"`
 		ConsentID            string          `json:"consentId"`
-		CreationDateTime     timex.DateTime  `json:"creationDateTime"`
-		ExpirationDateTime   *timex.DateTime `json:"expirationDateTime,omitempty"`
+		CreationDateTime     timeutil.DateTime  `json:"creationDateTime"`
+		ExpirationDateTime   *timeutil.DateTime `json:"expirationDateTime,omitempty"`
 		Permissions          []string        `json:"permissions"`
 		RejectedBy           *string         `json:"rejectedBy,omitempty"`
 		RejectionReason      *string         `json:"rejectionReason,omitempty"`
 		Status               string          `json:"status"`
-		StatusUpdateDateTime timex.DateTime  `json:"statusUpdateDateTime"`
+		StatusUpdateDateTime timeutil.DateTime  `json:"statusUpdateDateTime"`
 		UserID               string          `json:"userId"`
 	} `json:"data"`
-	Links *api.Links `json:"links,omitempty"`
-	Meta  *api.Meta  `json:"meta,omitempty"`
+	Links *apiutil.Links `json:"links,omitempty"`
+	Meta  *apiutil.Meta  `json:"meta,omitempty"`
 }
 
 // MockUserRequest defines model for MockUserRequest.
@@ -148,8 +148,8 @@ type MockUsersResponse struct {
 		Name     string `json:"name"`
 		Username string `json:"username"`
 	} `json:"data"`
-	Links *api.Links `json:"links,omitempty"`
-	Meta  *api.Meta  `json:"meta,omitempty"`
+	Links *apiutil.Links `json:"links,omitempty"`
+	Meta  *apiutil.Meta  `json:"meta,omitempty"`
 }
 
 // ResourceStatus defines model for ResourceStatus.
@@ -162,13 +162,13 @@ type ResourceType string
 type ResourcesResponse struct {
 	Data []struct {
 		ConsentID        string         `json:"consentId"`
-		CreationDateTime timex.DateTime `json:"creationDateTime"`
+		CreationDateTime timeutil.DateTime `json:"creationDateTime"`
 		ResourceID       string         `json:"resourceId"`
 		Status           ResourceStatus `json:"status"`
 		Type             ResourceType   `json:"type"`
 	} `json:"data"`
-	Links api.Links `json:"links"`
-	Meta  api.Meta  `json:"meta"`
+	Links apiutil.Links `json:"links"`
+	Meta  apiutil.Meta  `json:"meta"`
 }
 
 // UserResponse defines model for UserResponse.

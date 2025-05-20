@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/apiutil"
 	"github.com/oapi-codegen/runtime"
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -65,7 +65,7 @@ type ResponseErrorWithAbleAdditionalProperties struct {
 		// Title Título legível por humanos deste erro específico
 		Title string `json:"title"`
 	} `json:"errors"`
-	Meta *api.Meta `json:"meta,omitempty"`
+	Meta *apiutil.Meta `json:"meta,omitempty"`
 }
 
 // ResponseResourceList defines model for ResponseResourceList.
@@ -102,8 +102,8 @@ type ResponseResourceList struct {
 		//   - Exchange - Câmbio
 		Type ResponseResourceListDataType `json:"type"`
 	} `json:"data"`
-	Links api.Links `json:"links"`
-	Meta  api.Meta  `json:"meta"`
+	Links apiutil.Links `json:"links"`
+	Meta  apiutil.Meta  `json:"meta"`
 }
 
 // ResponseResourceListDataStatus Tipo de status de recurso (vide Enum):

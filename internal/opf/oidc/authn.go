@@ -12,7 +12,7 @@ import (
 	"github.com/luiky/mock-bank/internal/opf/account"
 	"github.com/luiky/mock-bank/internal/opf/consent"
 	"github.com/luiky/mock-bank/internal/opf/user"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
 
@@ -261,7 +261,7 @@ func (a authenticator) finishFlow(r *http.Request, session *goidc.AuthnSession) 
 	session.SetUserID(session.StoredParameter(paramUserID).(string))
 	session.GrantScopes(session.Scopes)
 	session.SetIDTokenClaimACR(ACROpenBankingLOA2)
-	session.SetIDTokenClaimAuthTime(timex.Timestamp())
+	session.SetIDTokenClaimAuthTime(timeutil.Timestamp())
 
 	if session.Claims != nil {
 		if slices.Contains(session.Claims.IDTokenEssentials(), goidc.ClaimACR) {

@@ -8,12 +8,12 @@ import (
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/google/uuid"
 
-	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/apiutil"
 	"github.com/luiky/mock-bank/internal/opf"
 	"github.com/luiky/mock-bank/internal/opf/consent"
 	"github.com/luiky/mock-bank/internal/opf/middleware"
 	"github.com/luiky/mock-bank/internal/page"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/provider"
 	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 )
@@ -47,7 +47,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			},
 		},
 		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
+			apiutil.WriteError(w, apiutil.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
 		},
 	})
 
@@ -60,7 +60,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		Handler:            strictHandler,
 		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, middleware.FAPIID(nil)},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+			apiutil.WriteError(w, apiutil.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
 	}
 
@@ -113,23 +113,23 @@ func (s Server) ConsentsPostConsents(ctx context.Context, req ConsentsPostConsen
 	resp := ResponseConsent{
 		Data: struct {
 			ConsentID            string                           `json:"consentId"`
-			CreationDateTime     timex.DateTime                   `json:"creationDateTime"`
-			ExpirationDateTime   *timex.DateTime                  `json:"expirationDateTime,omitempty"`
+			CreationDateTime     timeutil.DateTime                `json:"creationDateTime"`
+			ExpirationDateTime   *timeutil.DateTime               `json:"expirationDateTime,omitempty"`
 			Permissions          []ResponseConsentDataPermissions `json:"permissions"`
 			Status               ResponseConsentDataStatus        `json:"status"`
-			StatusUpdateDateTime timex.DateTime                   `json:"statusUpdateDateTime"`
+			StatusUpdateDateTime timeutil.DateTime                `json:"statusUpdateDateTime"`
 		}{
 			ConsentID:            c.URN(),
 			Status:               ResponseConsentDataStatus(c.Status),
 			Permissions:          respPerms,
-			CreationDateTime:     timex.NewDateTime(c.CreatedAt),
-			StatusUpdateDateTime: timex.NewDateTime(c.StatusUpdatedAt),
+			CreationDateTime:     timeutil.NewDateTime(c.CreatedAt),
+			StatusUpdateDateTime: timeutil.NewDateTime(c.StatusUpdatedAt),
 		},
-		Links: api.NewLinks(s.baseURL + "/consents/" + c.URN()),
-		Meta:  api.NewMeta(),
+		Links: apiutil.NewLinks(s.baseURL + "/consents/" + c.URN()),
+		Meta:  apiutil.NewMeta(),
 	}
 	if c.ExpiresAt != nil {
-		exp := timex.NewDateTime(*c.ExpiresAt)
+		exp := timeutil.NewDateTime(*c.ExpiresAt)
 		resp.Data.ExpirationDateTime = &exp
 	}
 
@@ -150,8 +150,8 @@ func (s Server) ConsentsGetConsentsConsentID(ctx context.Context, req ConsentsGe
 	resp := ResponseConsentRead{
 		Data: struct {
 			ConsentID          string                               `json:"consentId"`
-			CreationDateTime   timex.DateTime                       `json:"creationDateTime"`
-			ExpirationDateTime *timex.DateTime                      `json:"expirationDateTime,omitempty"`
+			CreationDateTime   timeutil.DateTime                    `json:"creationDateTime"`
+			ExpirationDateTime *timeutil.DateTime                   `json:"expirationDateTime,omitempty"`
 			Permissions        []ResponseConsentReadDataPermissions `json:"permissions"`
 			Rejection          *struct {
 				Reason struct {
@@ -161,19 +161,19 @@ func (s Server) ConsentsGetConsentsConsentID(ctx context.Context, req ConsentsGe
 				RejectedBy EnumRejectedBy `json:"rejectedBy"`
 			} `json:"rejection,omitempty"`
 			Status               ResponseConsentReadDataStatus `json:"status"`
-			StatusUpdateDateTime timex.DateTime                `json:"statusUpdateDateTime"`
+			StatusUpdateDateTime timeutil.DateTime             `json:"statusUpdateDateTime"`
 		}{
 			ConsentID:            c.URN(),
-			CreationDateTime:     timex.NewDateTime(c.CreatedAt),
+			CreationDateTime:     timeutil.NewDateTime(c.CreatedAt),
 			Permissions:          respPerms,
 			Status:               ResponseConsentReadDataStatus(c.Status),
-			StatusUpdateDateTime: timex.NewDateTime(c.StatusUpdatedAt),
+			StatusUpdateDateTime: timeutil.NewDateTime(c.StatusUpdatedAt),
 		},
-		Links: api.NewLinks(s.baseURL + "/consents/" + c.URN()),
-		Meta:  api.NewMeta(),
+		Links: apiutil.NewLinks(s.baseURL + "/consents/" + c.URN()),
+		Meta:  apiutil.NewMeta(),
 	}
 	if c.ExpiresAt != nil {
-		exp := timex.NewDateTime(*c.ExpiresAt)
+		exp := timeutil.NewDateTime(*c.ExpiresAt)
 		resp.Data.ExpirationDateTime = &exp
 	}
 	if c.RejectedBy != "" {
@@ -220,21 +220,21 @@ func (s Server) ConsentsPostConsentsConsentIDExtends(ctx context.Context, req Co
 	resp := ResponseConsentExtensions{
 		Data: struct {
 			ConsentID            string                                     `json:"consentId"`
-			CreationDateTime     timex.DateTime                             `json:"creationDateTime"`
-			ExpirationDateTime   *timex.DateTime                            `json:"expirationDateTime,omitempty"`
+			CreationDateTime     timeutil.DateTime                          `json:"creationDateTime"`
+			ExpirationDateTime   *timeutil.DateTime                         `json:"expirationDateTime,omitempty"`
 			Permissions          []ResponseConsentExtensionsDataPermissions `json:"permissions"`
 			Status               ResponseConsentExtensionsDataStatus        `json:"status"`
-			StatusUpdateDateTime timex.DateTime                             `json:"statusUpdateDateTime"`
+			StatusUpdateDateTime timeutil.DateTime                          `json:"statusUpdateDateTime"`
 		}{
 			ConsentID:            c.URN(),
-			CreationDateTime:     timex.NewDateTime(c.CreatedAt),
+			CreationDateTime:     timeutil.NewDateTime(c.CreatedAt),
 			Permissions:          respPerms,
 			Status:               ResponseConsentExtensionsDataStatus(c.Status),
-			StatusUpdateDateTime: timex.NewDateTime(c.StatusUpdatedAt),
+			StatusUpdateDateTime: timeutil.NewDateTime(c.StatusUpdatedAt),
 		},
 	}
 	if c.ExpiresAt != nil {
-		exp := timex.NewDateTime(*c.ExpiresAt)
+		exp := timeutil.NewDateTime(*c.ExpiresAt)
 		resp.Data.ExpirationDateTime = &exp
 	}
 	return ConsentsPostConsentsConsentIDExtends201JSONResponse{N201ConsentsCreatedExtensionsJSONResponse(resp)}, nil
@@ -250,15 +250,15 @@ func (s Server) ConsentsGetConsentsConsentIDExtensions(ctx context.Context, req 
 	}
 
 	resp := ResponseConsentReadExtensions{
-		Links: api.NewPaginatedLinks(s.baseURL+"/consents/"+req.ConsentID+"/extensions", exts),
-		Meta:  api.NewPaginatedMeta(exts),
+		Links: apiutil.NewPaginatedLinks(s.baseURL+"/consents/"+req.ConsentID+"/extensions", exts),
+		Meta:  apiutil.NewPaginatedMeta(exts),
 	}
 	for _, ext := range exts.Records {
 		extResp := struct {
-			ExpirationDateTime         *timex.DateTime      `json:"expirationDateTime,omitempty"`
+			ExpirationDateTime         *timeutil.DateTime   `json:"expirationDateTime,omitempty"`
 			LoggedUser                 LoggedUserExtensions `json:"loggedUser"`
-			PreviousExpirationDateTime *timex.DateTime      `json:"previousExpirationDateTime,omitempty"`
-			RequestDateTime            timex.DateTime       `json:"requestDateTime"`
+			PreviousExpirationDateTime *timeutil.DateTime   `json:"previousExpirationDateTime,omitempty"`
+			RequestDateTime            timeutil.DateTime    `json:"requestDateTime"`
 			XCustomerUserAgent         *string              `json:"xCustomerUserAgent,omitempty"`
 			XFapiCustomerIPAddress     *string              `json:"xFapiCustomerIpAddress,omitempty"`
 		}{
@@ -268,16 +268,16 @@ func (s Server) ConsentsGetConsentsConsentIDExtensions(ctx context.Context, req 
 					Rel:            consent.DefaultUserDocumentRelation,
 				},
 			},
-			RequestDateTime:        timex.NewDateTime(ext.RequestedAt),
+			RequestDateTime:        timeutil.NewDateTime(ext.RequestedAt),
 			XCustomerUserAgent:     &ext.UserAgent,
 			XFapiCustomerIPAddress: &ext.UserIPAddress,
 		}
 		if ext.ExpiresAt != nil {
-			exp := timex.NewDateTime(*ext.ExpiresAt)
+			exp := timeutil.NewDateTime(*ext.ExpiresAt)
 			extResp.ExpirationDateTime = &exp
 		}
 		if ext.PreviousExpiresAt != nil {
-			exp := timex.NewDateTime(*ext.PreviousExpiresAt)
+			exp := timeutil.NewDateTime(*ext.PreviousExpiresAt)
 			extResp.PreviousExpirationDateTime = &exp
 		}
 
@@ -289,44 +289,44 @@ func (s Server) ConsentsGetConsentsConsentIDExtensions(ctx context.Context, req 
 
 func writeResponseError(w http.ResponseWriter, err error) {
 	if errors.Is(err, consent.ErrAccessNotAllowed) {
-		api.WriteError(w, api.NewError("FORBIDDEN", http.StatusForbidden, consent.ErrAccessNotAllowed.Error()))
+		apiutil.WriteError(w, apiutil.NewError("FORBIDDEN", http.StatusForbidden, consent.ErrAccessNotAllowed.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrExtensionNotAllowed) {
-		api.WriteError(w, api.NewError("FORBIDDEN", http.StatusForbidden, consent.ErrExtensionNotAllowed.Error()))
+		apiutil.WriteError(w, apiutil.NewError("FORBIDDEN", http.StatusForbidden, consent.ErrExtensionNotAllowed.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrInvalidPermissionGroup) {
-		api.WriteError(w, api.NewError("COMBINACAO_PERMISSOES_INCORRETA", http.StatusUnprocessableEntity, consent.ErrInvalidPermissionGroup.Error()))
+		apiutil.WriteError(w, apiutil.NewError("COMBINACAO_PERMISSOES_INCORRETA", http.StatusUnprocessableEntity, consent.ErrInvalidPermissionGroup.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrPersonalAndBusinessPermissionsTogether) {
-		api.WriteError(w, api.NewError("PERMISSAO_PF_PJ_EM_CONJUNTO", http.StatusUnprocessableEntity, consent.ErrPersonalAndBusinessPermissionsTogether.Error()))
+		apiutil.WriteError(w, apiutil.NewError("PERMISSAO_PF_PJ_EM_CONJUNTO", http.StatusUnprocessableEntity, consent.ErrPersonalAndBusinessPermissionsTogether.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrInvalidExpiration) {
-		api.WriteError(w, api.NewError("DATA_EXPIRACAO_INVALIDA", http.StatusUnprocessableEntity, consent.ErrInvalidExpiration.Error()))
+		apiutil.WriteError(w, apiutil.NewError("DATA_EXPIRACAO_INVALIDA", http.StatusUnprocessableEntity, consent.ErrInvalidExpiration.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrAlreadyRejected) {
-		api.WriteError(w, api.NewError("CONSENTIMENTO_EM_STATUS_REJEITADO", http.StatusUnprocessableEntity, consent.ErrAlreadyRejected.Error()))
+		apiutil.WriteError(w, apiutil.NewError("CONSENTIMENTO_EM_STATUS_REJEITADO", http.StatusUnprocessableEntity, consent.ErrAlreadyRejected.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrCannotExtendConsentNotAuthorized) {
-		api.WriteError(w, api.NewError("ESTADO_CONSENTIMENTO_INVALIDO", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentNotAuthorized.Error()))
+		apiutil.WriteError(w, apiutil.NewError("ESTADO_CONSENTIMENTO_INVALIDO", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentNotAuthorized.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrCannotExtendConsentForJointAccount) {
-		api.WriteError(w, api.NewError("DEPENDE_MULTIPLA_ALCADA", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentForJointAccount.Error()))
+		apiutil.WriteError(w, apiutil.NewError("DEPENDE_MULTIPLA_ALCADA", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentForJointAccount.Error()))
 		return
 	}
 
-	api.WriteError(w, api.NewError("INTERNAL_ERROR", http.StatusInternalServerError, "internal error"))
+	apiutil.WriteError(w, apiutil.NewError("INTERNAL_ERROR", http.StatusInternalServerError, "internal error"))
 }

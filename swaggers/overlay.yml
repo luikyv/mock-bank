@@ -7,7 +7,7 @@ actions:
 - target: $.components.schemas[*].properties.meta
   description: Set x-go-type and x-go-type-import for all fields named "meta"
   update:
-    x-go-type: api.Meta
+    x-go-type: apiutil.Meta
     x-go-type-import:
       path: github.com/luiky/mock-bank/internal/api
 - target: $.components.schemas[*].properties.meta.$ref
@@ -17,7 +17,7 @@ actions:
 - target: $.components.schemas[*].properties.links
   description: Set x-go-type and x-go-type-import for all fields named "links"
   update:
-    x-go-type: api.Links
+    x-go-type: apiutil.Links
     x-go-type-import:
       path: github.com/luiky/mock-bank/internal/api
 - target: $.components.schemas[*].properties.links.$ref
@@ -26,15 +26,15 @@ actions:
 
 - target: $..[*][?(@.format == "date")]
   update:
-    x-go-type: timex.Date
+    x-go-type: timeutil.Date
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/timex
+      path: github.com/luiky/mock-bank/internal/timeutil
 
 - target: $..[*][?(@.format == "date-time")]
   update:
-    x-go-type: timex.DateTime
+    x-go-type: timeutil.DateTime
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/timex
+      path: github.com/luiky/mock-bank/internal/timeutil
 
 - target: $.components.responses[*].headers.x-fapi-interaction-id
   description: Remove x-fapi-interaction-id header from all responses

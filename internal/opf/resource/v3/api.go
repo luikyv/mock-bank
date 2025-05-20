@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/getkin/kin-openapi/openapi3filter"
-	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/apiutil"
 	"github.com/luiky/mock-bank/internal/opf"
 	"github.com/luiky/mock-bank/internal/opf/consent"
 	"github.com/luiky/mock-bank/internal/opf/middleware"
@@ -49,7 +49,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			},
 		},
 		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
+			apiutil.WriteError(w, apiutil.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
 		},
 	})
 
@@ -62,7 +62,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		Handler:            strictHandler,
 		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, middleware.FAPIID(nil)},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+			apiutil.WriteError(w, apiutil.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
 	}
 
@@ -91,8 +91,8 @@ func (s Server) ResourcesGetResources(ctx context.Context, req ResourcesGetResou
 			Status     ResponseResourceListDataStatus `json:"status"`
 			Type       ResponseResourceListDataType   `json:"type"`
 		}{},
-		Links: *api.NewPaginatedLinks(s.baseURL+"/resources", resources),
-		Meta:  *api.NewPaginatedMeta(resources),
+		Links: *apiutil.NewPaginatedLinks(s.baseURL+"/resources", resources),
+		Meta:  *apiutil.NewPaginatedMeta(resources),
 	}
 	for _, r := range resources.Records {
 		resp.Data = append(resp.Data, struct {
@@ -110,5 +110,5 @@ func (s Server) ResourcesGetResources(ctx context.Context, req ResourcesGetResou
 }
 
 func writeResponseError(w http.ResponseWriter, err error) {
-	api.WriteError(w, err)
+	apiutil.WriteError(w, err)
 }

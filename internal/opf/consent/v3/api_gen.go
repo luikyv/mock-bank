@@ -18,8 +18,8 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/apiutil"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/oapi-codegen/runtime"
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -275,7 +275,7 @@ type N422ResponseErrorCreateConsent struct {
 		// - ERRO_NAO_MAPEADO: Utilizado quando não houver um code de erro definido. O texto deve deixar claro o motivo do erro ocorrido.
 		Title string `json:"title"`
 	} `json:"errors"`
-	Meta *api.Meta `json:"meta,omitempty"`
+	Meta *apiutil.Meta `json:"meta,omitempty"`
 }
 
 // N422ResponseErrorCreateConsentErrorsCode Códigos de erros previstos na durante o processo de extensão do consentimento:
@@ -331,7 +331,7 @@ type CreateConsent struct {
 		// [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada.
 		// Em casos de consentimento com prazo indeterminado o campo não deve ser enviado.
 		// Quando preenchido, o valor do campo não pode ultrapassar 12 meses.
-		ExpirationDateTime *timex.DateTime `json:"expirationDateTime,omitempty"`
+		ExpirationDateTime *timeutil.DateTime `json:"expirationDateTime,omitempty"`
 
 		// LoggedUser Usuário (pessoa natural) que encontra-se logado na instituição receptora e que iniciará o processo de consentimento para compartilhamento de dados.
 		//
@@ -358,7 +358,7 @@ type CreateConsentExtensions struct {
 		// [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada.
 		// Em casos de consentimento com prazo indeterminado o campo não deve ser enviado.
 		// Quando preenchido, o valor do campo não pode ultrapassar 12 meses.
-		ExpirationDateTime *timex.DateTime `json:"expirationDateTime,omitempty"`
+		ExpirationDateTime *timeutil.DateTime `json:"expirationDateTime,omitempty"`
 
 		// LoggedUser Usuário (pessoa natural) que encontra-se logado na instituição receptora e que iniciará o processo de consentimento para compartilhamento de dados.
 		// Deve ser armazenado como novo usuário logado responsável pela renovação do consentimento atual.
@@ -418,7 +418,7 @@ type ResponseConsent struct {
 		ConsentID string `json:"consentId"`
 
 		// CreationDateTime Data e hora em que o recurso foi criado. Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC(UTC time format).
-		CreationDateTime timex.DateTime `json:"creationDateTime"`
+		CreationDateTime timeutil.DateTime `json:"creationDateTime"`
 
 		// ExpirationDateTime Data e hora de expiração da permissão. Reflete a data limite de validade do consentimento.
 		// Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC (UTC time format).
@@ -426,7 +426,7 @@ type ResponseConsent struct {
 		// [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada.
 		// Em casos de consentimento com prazo indeterminado o campo não deve ser enviado.
 		// Quando preenchido, o valor do campo não pode ultrapassar 12 meses.
-		ExpirationDateTime *timex.DateTime `json:"expirationDateTime,omitempty"`
+		ExpirationDateTime *timeutil.DateTime `json:"expirationDateTime,omitempty"`
 
 		// Permissions Especifica os tipos de permissões de acesso às APIs no escopo do Open Finance Brasil - Dados cadastrais e transacionais, de acordo com os blocos de consentimento fornecidos pelo usuário e necessários ao acesso a cada endpoint das APIs. Esse array não deve ter duplicidade de itens.
 		Permissions []ResponseConsentDataPermissions `json:"permissions"`
@@ -435,10 +435,10 @@ type ResponseConsent struct {
 		Status ResponseConsentDataStatus `json:"status"`
 
 		// StatusUpdateDateTime Data e hora em que o recurso foi atualizado. Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC(UTC time format).
-		StatusUpdateDateTime timex.DateTime `json:"statusUpdateDateTime"`
+		StatusUpdateDateTime timeutil.DateTime `json:"statusUpdateDateTime"`
 	} `json:"data"`
-	Links *api.Links `json:"links,omitempty"`
-	Meta  *api.Meta  `json:"meta,omitempty"`
+	Links *apiutil.Links `json:"links,omitempty"`
+	Meta  *apiutil.Meta  `json:"meta,omitempty"`
 }
 
 // ResponseConsentDataPermissions defines model for ResponseConsent.Data.Permissions.
@@ -462,7 +462,7 @@ type ResponseConsentExtensions struct {
 		ConsentID string `json:"consentId"`
 
 		// CreationDateTime Data e hora em que o recurso foi criado. Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC(UTC time format).
-		CreationDateTime timex.DateTime `json:"creationDateTime"`
+		CreationDateTime timeutil.DateTime `json:"creationDateTime"`
 
 		// ExpirationDateTime Data e hora de expiração da permissão. Reflete a data limite de validade do consentimento.
 		// Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC (UTC time format).
@@ -470,7 +470,7 @@ type ResponseConsentExtensions struct {
 		// [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada.
 		// Em casos de consentimento com prazo indeterminado o campo não deve ser enviado.
 		// Quando preenchido, o valor do campo não pode ultrapassar 12 meses.
-		ExpirationDateTime *timex.DateTime `json:"expirationDateTime,omitempty"`
+		ExpirationDateTime *timeutil.DateTime `json:"expirationDateTime,omitempty"`
 
 		// Permissions Especifica os tipos de permissões de acesso às APIs no escopo do Open Finance Brasil - Dados cadastrais e transacionais, de acordo com os blocos de consentimento fornecidos pelo usuário e necessários ao acesso a cada endpoint das APIs. Esse array não deve ter duplicidade de itens.
 		Permissions []ResponseConsentExtensionsDataPermissions `json:"permissions"`
@@ -479,10 +479,10 @@ type ResponseConsentExtensions struct {
 		Status ResponseConsentExtensionsDataStatus `json:"status"`
 
 		// StatusUpdateDateTime Data e hora em que o recurso foi atualizado. Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC(UTC time format).
-		StatusUpdateDateTime timex.DateTime `json:"statusUpdateDateTime"`
+		StatusUpdateDateTime timeutil.DateTime `json:"statusUpdateDateTime"`
 	} `json:"data"`
-	Links *api.Links `json:"links,omitempty"`
-	Meta  *api.Meta  `json:"meta,omitempty"`
+	Links *apiutil.Links `json:"links,omitempty"`
+	Meta  *apiutil.Meta  `json:"meta,omitempty"`
 }
 
 // ResponseConsentExtensionsDataPermissions defines model for ResponseConsentExtensions.Data.Permissions.
@@ -506,12 +506,12 @@ type ResponseConsentRead struct {
 		ConsentID string `json:"consentId"`
 
 		// CreationDateTime Data e hora em que o recurso foi criado. Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC(UTC time format).
-		CreationDateTime timex.DateTime `json:"creationDateTime"`
+		CreationDateTime timeutil.DateTime `json:"creationDateTime"`
 
 		// ExpirationDateTime Data e hora de expiração da permissão. Reflete a data limite de validade do consentimento. Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC(UTC time format).
 		//
 		// [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada. Em casos de consentimento com prazo indeterminado o campo não deve ser preenchido.
-		ExpirationDateTime *timex.DateTime `json:"expirationDateTime,omitempty"`
+		ExpirationDateTime *timeutil.DateTime `json:"expirationDateTime,omitempty"`
 
 		// Permissions Especifica os tipos de permissões de acesso às APIs no escopo do Open Finance Brasil - Dados cadastrais e transacionais, de acordo com os blocos de consentimento fornecidos pelo usuário e necessários ao acesso a cada endpoint das APIs. Esse array não deve ter duplicidade de itens.
 		Permissions []ResponseConsentReadDataPermissions `json:"permissions"`
@@ -545,10 +545,10 @@ type ResponseConsentRead struct {
 		Status ResponseConsentReadDataStatus `json:"status"`
 
 		// StatusUpdateDateTime Data e hora em que o recurso foi atualizado. Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC(UTC time format).
-		StatusUpdateDateTime timex.DateTime `json:"statusUpdateDateTime"`
+		StatusUpdateDateTime timeutil.DateTime `json:"statusUpdateDateTime"`
 	} `json:"data"`
-	Links *api.Links `json:"links,omitempty"`
-	Meta  *api.Meta  `json:"meta,omitempty"`
+	Links *apiutil.Links `json:"links,omitempty"`
+	Meta  *apiutil.Meta  `json:"meta,omitempty"`
 }
 
 // ResponseConsentReadDataPermissions defines model for ResponseConsentRead.Data.Permissions.
@@ -575,7 +575,7 @@ type ResponseConsentReadExtensions struct {
 		// [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada.
 		//
 		// Em casos de consentimento com prazo indeterminada o campo não deve ser preenchido.
-		ExpirationDateTime *timex.DateTime `json:"expirationDateTime,omitempty"`
+		ExpirationDateTime *timeutil.DateTime `json:"expirationDateTime,omitempty"`
 
 		// LoggedUser Usuário (pessoa natural) que encontra-se logado na instituição receptora e que iniciará o processo de consentimento para compartilhamento de dados.
 		// Deve ser armazenado como novo usuário logado responsável pela renovação do consentimento atual.
@@ -584,10 +584,10 @@ type ResponseConsentReadExtensions struct {
 		// PreviousExpirationDateTime Data e hora de expiração anteriores a renovação. Reflete a data limite anterior de validade do consentimento. Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC (UTC time format).
 		//
 		// [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada. Em casos de consentimento com prazo indeterminado, ou renovações feitas com a v2.2.0 em que não exista persistência dessa informação, o campo não deve ser preenchido.
-		PreviousExpirationDateTime *timex.DateTime `json:"previousExpirationDateTime,omitempty"`
+		PreviousExpirationDateTime *timeutil.DateTime `json:"previousExpirationDateTime,omitempty"`
 
 		// RequestDateTime Data e hora em que o recurso foi criado. Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC(UTC time format).
-		RequestDateTime timex.DateTime `json:"requestDateTime"`
+		RequestDateTime timeutil.DateTime `json:"requestDateTime"`
 
 		// XCustomerUserAgent Indica o user-agent que o usuário utilizou quando solicitou a renovação sem redirecionamento.
 		//
@@ -599,8 +599,8 @@ type ResponseConsentReadExtensions struct {
 		// [Restrição] De preenchimento obrigatório a partir da v3.0.0. Opcional para renovações feitas com a v2.2.0 quando não existir persistência dessa informação.
 		XFapiCustomerIPAddress *string `json:"xFapiCustomerIpAddress,omitempty"`
 	} `json:"data"`
-	Links *api.Links `json:"links,omitempty"`
-	Meta  *api.Meta  `json:"meta,omitempty"`
+	Links *apiutil.Links `json:"links,omitempty"`
+	Meta  *apiutil.Meta  `json:"meta,omitempty"`
 }
 
 // ResponseError defines model for ResponseError.
@@ -615,7 +615,7 @@ type ResponseError struct {
 		// Title Título legível por humanos deste erro específico
 		Title string `json:"title"`
 	} `json:"errors"`
-	Meta *api.Meta `json:"meta,omitempty"`
+	Meta *apiutil.Meta `json:"meta,omitempty"`
 }
 
 // ResponseErrorUnprocessableEntity defines model for ResponseErrorUnprocessableEntity.
@@ -638,7 +638,7 @@ type ResponseErrorUnprocessableEntity struct {
 		// Title Título legível por humanos deste erro específico.
 		Title string `json:"title"`
 	} `json:"errors"`
-	Meta *api.Meta `json:"meta,omitempty"`
+	Meta *apiutil.Meta `json:"meta,omitempty"`
 }
 
 // ResponseErrorUnprocessableEntityErrorsCode - SEM_PERMISSOES_FUNCIONAIS_RESTANTES
@@ -664,7 +664,7 @@ type ResponseErrorUnprocessableEntityDelete struct {
 		// Title Título legível por humanos deste erro específico
 		Title string `json:"title"`
 	} `json:"errors"`
-	Meta *api.Meta `json:"meta,omitempty"`
+	Meta *apiutil.Meta `json:"meta,omitempty"`
 }
 
 // ResponseErrorUnprocessableEntityDeleteErrorsCode - CONSENTIMENTO_EM_STATUS_REJEITADO
@@ -752,7 +752,7 @@ type SiteIsOverloaded struct {
 	// Meta Meta informações referente a API requisitada.
 	Meta *struct {
 		// RequestDateTime Data e hora da consulta, conforme especificação RFC-3339, formato UTC.
-		RequestDateTime timex.Date `json:"requestDateTime"`
+		RequestDateTime timeutil.Date `json:"requestDateTime"`
 	} `json:"meta,omitempty"`
 }
 
@@ -1777,7 +1777,7 @@ type SiteIsOverloadedApplicationJSONCharsetUTF8Response struct {
 	// Meta Meta informações referente a API requisitada.
 	Meta *struct {
 		// RequestDateTime Data e hora da consulta, conforme especificação RFC-3339, formato UTC.
-		RequestDateTime timex.Date `json:"requestDateTime"`
+		RequestDateTime timeutil.Date `json:"requestDateTime"`
 	} `json:"meta,omitempty"`
 }
 

@@ -20,7 +20,7 @@ import (
 	"github.com/luiky/mock-bank/internal/opf/resource"
 	resourcev3 "github.com/luiky/mock-bank/internal/opf/resource/v3"
 	"github.com/luiky/mock-bank/internal/opf/user"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -90,7 +90,7 @@ func main() {
 
 func dbConnection() (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(dbConnectionString), &gorm.Config{
-		NowFunc: timex.Now,
+		NowFunc: timeutil.Now,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
@@ -114,7 +114,7 @@ func logger() *slog.Logger {
 			// Make sure time is logged in UTC.
 			ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
 				if attr.Key == slog.TimeKey {
-					utcTime := timex.Now()
+					utcTime := timeutil.Now()
 					return slog.Attr{Key: slog.TimeKey, Value: slog.TimeValue(utcTime)}
 				}
 				return attr

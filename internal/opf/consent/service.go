@@ -10,7 +10,7 @@ import (
 	"github.com/luiky/mock-bank/internal/opf"
 	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luiky/mock-bank/internal/page"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -33,7 +33,7 @@ func (s Service) Authorize(ctx context.Context, c *Consent) error {
 	}
 
 	c.Status = StatusAuthorized
-	c.StatusUpdatedAt = timex.Now()
+	c.StatusUpdatedAt = timeutil.Now()
 	return s.save(ctx, c)
 }
 
@@ -64,7 +64,7 @@ func (s Service) Reject(ctx context.Context, id, orgID string, by RejectedBy, re
 	}
 
 	c.Status = StatusRejected
-	c.StatusUpdatedAt = timex.Now()
+	c.StatusUpdatedAt = timeutil.Now()
 	c.RejectedBy = by
 	c.RejectionReason = reason
 	return s.save(ctx, c)
@@ -106,7 +106,7 @@ func (s Service) modify(ctx context.Context, consent *Consent) error {
 		consent.Status = StatusRejected
 		consent.RejectedBy = RejectedByUser
 		consent.RejectionReason = RejectionReasonConsentExpired
-		consent.StatusUpdatedAt = timex.Now()
+		consent.StatusUpdatedAt = timeutil.Now()
 		consentWasModified = true
 	}
 
@@ -115,7 +115,7 @@ func (s Service) modify(ctx context.Context, consent *Consent) error {
 		consent.Status = StatusRejected
 		consent.RejectedBy = RejectedByASPSP
 		consent.RejectionReason = RejectionReasonConsentMaxDateReached
-		consent.StatusUpdatedAt = timex.Now()
+		consent.StatusUpdatedAt = timeutil.Now()
 		consentWasModified = true
 	}
 
@@ -157,7 +157,7 @@ func validate(c *Consent) error {
 		return err
 	}
 
-	now := timex.Now()
+	now := timeutil.Now()
 	if c.ExpiresAt != nil && c.ExpiresAt.After(now.AddDate(1, 0, 0)) {
 		return ErrInvalidExpiration
 	}

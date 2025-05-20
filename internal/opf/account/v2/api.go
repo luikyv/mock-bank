@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3filter"
-	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/apiutil"
 	"github.com/luiky/mock-bank/internal/opf"
 	"github.com/luiky/mock-bank/internal/opf/account"
 	"github.com/luiky/mock-bank/internal/opf/consent"
 	"github.com/luiky/mock-bank/internal/opf/middleware"
 	"github.com/luiky/mock-bank/internal/page"
-	"github.com/luiky/mock-bank/internal/timex"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
@@ -52,7 +52,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			},
 		},
 		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
+			apiutil.WriteError(w, apiutil.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
 		},
 	})
 
@@ -65,7 +65,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		Handler:            strictHandler,
 		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, middleware.FAPIID(nil)},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+			apiutil.WriteError(w, apiutil.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
 	}
 
@@ -116,8 +116,8 @@ func (s Server) AccountsGetAccounts(ctx context.Context, req AccountsGetAccounts
 
 	resp := ResponseAccountList{
 		Data:  []AccountData{},
-		Meta:  *api.NewPaginatedMeta(accs),
-		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts", accs),
+		Meta:  *apiutil.NewPaginatedMeta(accs),
+		Links: *apiutil.NewPaginatedLinks(s.baseURL+"/accounts", accs),
 	}
 	defaultBranch := account.DefaultBranch
 	for _, acc := range accs.Records {
@@ -156,8 +156,8 @@ func (s Server) AccountsGetAccountsAccountID(ctx context.Context, req AccountsGe
 			Subtype:    EnumAccountSubType(acc.SubType),
 			Type:       EnumAccountType(acc.Type),
 		},
-		Meta:  *api.NewSingleRecordMeta(),
-		Links: *api.NewLinks(s.baseURL + "/accounts/" + req.AccountID),
+		Meta:  *apiutil.NewSingleRecordMeta(),
+		Links: *apiutil.NewLinks(s.baseURL + "/accounts/" + req.AccountID),
 	}
 	return AccountsGetAccountsAccountID200JSONResponse{OKResponseAccountIdentificationJSONResponse(resp)}, nil
 }
@@ -185,10 +185,10 @@ func (s Server) AccountsGetAccountsAccountIDBalances(ctx context.Context, req Ac
 				Amount:   acc.BlockedAmount,
 				Currency: opf.DefaultCurrency,
 			},
-			UpdateDateTime: timex.NewDateTime(acc.UpdatedAt),
+			UpdateDateTime: timeutil.NewDateTime(acc.UpdatedAt),
 		},
-		Meta:  *api.NewSingleRecordMeta(),
-		Links: *api.NewLinks(s.baseURL + "/accounts/" + req.AccountID + "/balances"),
+		Meta:  *apiutil.NewSingleRecordMeta(),
+		Links: *apiutil.NewLinks(s.baseURL + "/accounts/" + req.AccountID + "/balances"),
 	}
 	return AccountsGetAccountsAccountIDBalances200JSONResponse{OKResponseAccountBalancesJSONResponse(resp)}, nil
 }
@@ -203,8 +203,8 @@ func (s Server) AccountsGetAccountsAccountIDOverdraftLimits(ctx context.Context,
 	}
 
 	resp := ResponseAccountOverdraftLimits{
-		Meta:  *api.NewSingleRecordMeta(),
-		Links: *api.NewLinks(s.baseURL + "/accounts/" + req.AccountID + "/overdraft-limits"),
+		Meta:  *apiutil.NewSingleRecordMeta(),
+		Links: *apiutil.NewLinks(s.baseURL + "/accounts/" + req.AccountID + "/overdraft-limits"),
 	}
 	if acc.OverdraftLimitContracted != "" {
 		resp.Data.OverdraftContractedLimit = &AccountOverdraftLimitsDataOverdraftContractedLimit{
@@ -244,8 +244,8 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 
 	resp := ResponseAccountTransactions{
 		Data:  []AccountTransactionsData{},
-		Meta:  *api.NewMeta(),
-		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts/"+req.AccountID+"/transactions", txs),
+		Meta:  *apiutil.NewMeta(),
+		Links: *apiutil.NewPaginatedLinks(s.baseURL+"/accounts/"+req.AccountID+"/transactions", txs),
 	}
 	for _, tx := range txs.Records {
 		resp.Data = append(resp.Data, AccountTransactionsData{
@@ -261,7 +261,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 				Amount:   tx.Amount,
 				Currency: opf.DefaultCurrency,
 			},
-			TransactionDateTime: tx.CreatedAt.Format(timex.DateTimeMillisFormat),
+			TransactionDateTime: tx.CreatedAt.Format(timeutil.DateTimeMillisFormat),
 			TransactionID:       tx.ID,
 			TransactionName:     tx.Name,
 			Type:                EnumTransactionTypes(tx.Type),
@@ -286,8 +286,8 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 
 	resp := ResponseAccountTransactions{
 		Data:  []AccountTransactionsData{},
-		Meta:  *api.NewMeta(),
-		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts/"+req.AccountID+"/transactions-current", txs),
+		Meta:  *apiutil.NewMeta(),
+		Links: *apiutil.NewPaginatedLinks(s.baseURL+"/accounts/"+req.AccountID+"/transactions-current", txs),
 	}
 	for _, tx := range txs.Records {
 		resp.Data = append(resp.Data, AccountTransactionsData{
@@ -303,7 +303,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 				Amount:   tx.Amount,
 				Currency: opf.DefaultCurrency,
 			},
-			TransactionDateTime: tx.CreatedAt.Format(timex.DateTimeMillisFormat),
+			TransactionDateTime: tx.CreatedAt.Format(timeutil.DateTimeMillisFormat),
 			TransactionID:       tx.ID,
 			TransactionName:     tx.Name,
 			Type:                EnumTransactionTypes(tx.Type),
@@ -315,14 +315,14 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 
 func writeResponseError(w http.ResponseWriter, err error, pagination bool) {
 	if errors.Is(err, account.ErrNotAllowed) {
-		api.WriteError(w, api.NewError("FORBIDDEN", http.StatusForbidden, account.ErrNotAllowed.Error()).Pagination(pagination))
+		apiutil.WriteError(w, apiutil.NewError("FORBIDDEN", http.StatusForbidden, account.ErrNotAllowed.Error()).Pagination(pagination))
 		return
 	}
 
 	if errors.Is(err, account.ErrJointAccountPendingAuthorization) {
-		api.WriteError(w, api.NewError("STATUS_RESOURCE_PENDING_AUTHORISATION", http.StatusForbidden, account.ErrJointAccountPendingAuthorization.Error()).Pagination(pagination))
+		apiutil.WriteError(w, apiutil.NewError("STATUS_RESOURCE_PENDING_AUTHORISATION", http.StatusForbidden, account.ErrJointAccountPendingAuthorization.Error()).Pagination(pagination))
 		return
 	}
 
-	api.WriteError(w, err)
+	apiutil.WriteError(w, err)
 }
