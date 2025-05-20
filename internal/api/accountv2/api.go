@@ -10,6 +10,7 @@ import (
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/consent"
+	"github.com/luiky/mock-bank/internal/oidc"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
@@ -71,32 +72,32 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccounts)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsRead)
-	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = oidc.AuthMiddleware(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountID)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsRead)
-	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = oidc.AuthMiddleware(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDBalances)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsBalanceRead)
-	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = oidc.AuthMiddleware(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/balances", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDOverdraftLimits)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsOverdraftLimitsRead)
-	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = oidc.AuthMiddleware(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/overdraft-limits", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDTransactions)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsTransactionsRead)
-	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = oidc.AuthMiddleware(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/transactions", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDTransactionsCurrent)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsTransactionsRead)
-	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = oidc.AuthMiddleware(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/transactions-current", handler)
 
 	mux.Handle("/open-banking/accounts/v2/", http.StripPrefix("/open-banking/accounts/v2", accountMux))

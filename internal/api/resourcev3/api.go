@@ -7,6 +7,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/consent"
+	"github.com/luiky/mock-bank/internal/oidc"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/resource"
 	"github.com/luikyv/go-oidc/pkg/goidc"
@@ -68,7 +69,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	handler = http.HandlerFunc(wrapper.ResourcesGetResources)
 	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionResourcesRead)
-	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = oidc.AuthMiddleware(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	resourceMux.Handle("GET /resources", handler)
 
 	mux.Handle("/open-banking/resources/v3/", http.StripPrefix("/open-banking/resources/v3", resourceMux))

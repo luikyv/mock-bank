@@ -22,6 +22,13 @@ import (
 	"github.com/rs/cors"
 )
 
+const (
+	cookieSessionId = "sessionId"
+	cookieNonce     = "nonce"
+	sessionValidity = 24 * time.Hour
+	nonceValidity   = 15 * time.Minute
+)
+
 var _ StrictServerInterface = Server{}
 
 type Server struct {
@@ -81,6 +88,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			http.MethodPost,
 			http.MethodDelete,
 			http.MethodPut,
+			http.MethodPatch,
 		},
 	})
 
@@ -93,7 +101,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler := HandlerWithOptions(strictHandler, StdHTTPServerOptions{
 		Middlewares: []MiddlewareFunc{
 			swaggerMiddleware,
-			interactionIDMiddleware,
+			api.FAPIID(nil),
 			authSessionMiddleware(s.sessionService),
 			func(next http.Handler) http.Handler {
 				return c.Handler(next)

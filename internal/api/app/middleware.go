@@ -5,13 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/session"
-)
-
-const (
-	headerXInteractionID = "X-Interaction-ID"
 )
 
 func authSessionMiddleware(service session.Service) func(http.Handler) http.Handler {
@@ -54,24 +49,4 @@ func authSessionMiddlewareHandler(next http.Handler, service session.Service) ht
 		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	})
-}
-
-func interactionIDHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		interactionID := r.Header.Get(headerXInteractionID)
-		if _, err := uuid.Parse(interactionID); err != nil {
-			interactionID = uuid.NewString()
-		}
-
-		// Return the same interaction ID in the response.
-		w.Header().Set(headerXInteractionID, interactionID)
-
-		ctx := context.WithValue(r.Context(), api.CtxKeyInteractionID, interactionID)
-		r = r.WithContext(ctx)
-		next.ServeHTTP(w, r)
-	})
-}
-
-func interactionIDMiddleware(next http.Handler) http.Handler {
-	return interactionIDHandler(next)
 }

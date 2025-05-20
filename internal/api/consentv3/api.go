@@ -10,6 +10,7 @@ import (
 
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/consent"
+	"github.com/luiky/mock-bank/internal/oidc"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/provider"
@@ -65,23 +66,23 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	var handler http.Handler
 
 	handler = http.HandlerFunc(wrapper.ConsentsPostConsents)
-	handler = api.AuthHandler(handler, s.op, consent.Scope)
+	handler = oidc.AuthMiddleware(handler, s.op, consent.Scope)
 	consentMux.Handle("POST /consents", handler)
 
 	handler = http.HandlerFunc(wrapper.ConsentsDeleteConsentsConsentID)
-	handler = api.AuthHandler(handler, s.op, consent.Scope)
+	handler = oidc.AuthMiddleware(handler, s.op, consent.Scope)
 	consentMux.Handle("DELETE /consents/{consentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.ConsentsGetConsentsConsentID)
-	handler = api.AuthHandler(handler, s.op, consent.Scope)
+	handler = oidc.AuthMiddleware(handler, s.op, consent.Scope)
 	consentMux.Handle("GET /consents/{consentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.ConsentsPostConsentsConsentIDExtends)
-	handler = api.AuthHandler(handler, s.op, consent.Scope)
+	handler = oidc.AuthMiddleware(handler, s.op, consent.Scope)
 	consentMux.Handle("POST /consents/{consentId}/extends", handler)
 
 	handler = http.HandlerFunc(wrapper.ConsentsGetConsentsConsentIDExtensions)
-	handler = api.AuthHandler(handler, s.op, consent.Scope)
+	handler = oidc.AuthMiddleware(handler, s.op, consent.Scope)
 	consentMux.Handle("GET /consents/{consentId}/extensions", handler)
 
 	mux.Handle("/open-banking/consents/v3/", http.StripPrefix("/open-banking/consents/v3", consentMux))
