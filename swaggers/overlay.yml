@@ -7,7 +7,7 @@ actions:
 - target: $.components.schemas[*].properties.meta
   description: Set x-go-type and x-go-type-import for all fields named "meta"
   update:
-    x-go-type: apiutil.Meta
+    x-go-type: api.Meta
     x-go-type-import:
       path: github.com/luiky/mock-bank/internal/api
 - target: $.components.schemas[*].properties.meta.$ref
@@ -17,7 +17,7 @@ actions:
 - target: $.components.schemas[*].properties.links
   description: Set x-go-type and x-go-type-import for all fields named "links"
   update:
-    x-go-type: apiutil.Links
+    x-go-type: api.Links
     x-go-type-import:
       path: github.com/luiky/mock-bank/internal/api
 - target: $.components.schemas[*].properties.links.$ref

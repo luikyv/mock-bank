@@ -8,6 +8,7 @@ mock backend: https://matls-api.mockbank.local
 
 ## TODO
 
+- Allow setting the currency.
 - What's happening with created_at?
 - Accounts overdraft limits.
 - Account filters.
