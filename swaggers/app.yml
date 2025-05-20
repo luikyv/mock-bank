@@ -234,6 +234,70 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConsentsResponse'
 
+  /api/orgs/{orgId}/users/{userId}/resources:
+    get:
+      summary: Get shared resources of a user
+      operationId: getResources
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/mockUserId'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: User resources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcesResponse'
+
+  /api/orgs/{orgId}/users/{userId}/resources/{resourceId}/consents/{consentId}:
+    patch:
+      summary: Update status of a shared resource
+      operationId: patchResourceStatus
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/mockUserId'
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: consentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/ResourceType"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data: 
+                  type: object
+                  required:
+                    - status
+                  properties:
+                    status:
+                      $ref: '#/components/schemas/ResourceStatus'
+      responses:
+        '204':
+          description: Status updated successfully
+
 components:
   schemas:
     UserResponse:
@@ -261,7 +325,6 @@ components:
                     type: string
                   name:
                     type: string
-
     MockUsersResponse:
       type: object
       required:
@@ -467,6 +530,62 @@ components:
           $ref: '#/components/schemas/Meta'
         links:
           $ref: '#/components/schemas/Links'
+    ResourcesResponse:
+      type: object
+      required:
+        - data
+        - links
+        - meta
+      properties:
+        data:
+          type: array
+          minItems: 0
+          items:
+            type: object
+            required:
+              - resourceId
+              - consentId
+              - type
+              - status
+              - creationDateTime
+            properties:
+              resourceId:
+                type: string
+              consentId:
+                type: string
+              type:
+                $ref: "#/components/schemas/ResourceType"
+              status:
+                $ref: "#/components/schemas/ResourceStatus"
+              creationDateTime:
+                type: string
+                format: date-time
+        links:
+          $ref: '#/components/schemas/Links'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    ResourceStatus:
+      type: string
+      enum:
+        - AVAILABLE
+        - UNAVAILABLE
+        - TEMPORARILY_UNAVAILABLE
+        - PENDING_AUTHORISATION
+    ResourceType:
+      type: string
+      enum:
+        - ACCOUNT
+        - CREDIT_CARD_ACCOUNT
+        - LOAN
+        - FINANCING
+        - UNARRANGED_ACCOUNT_OVERDRAFT
+        - INVOICE_FINANCING
+        - BANK_FIXED_INCOME
+        - CREDIT_FIXED_INCOME
+        - VARIABLE_INCOME
+        - TREASURE_TITLE
+        - FUND
+        - EXCHANGE
     AuthUrlResponse:
       type: object
       required:
@@ -552,12 +671,14 @@ components:
       required: true
       schema:
         type: string
+        format: uuid
     accountId:
       name: accountId
       in: path
       required: true
       schema:
         type: string
+        format: uuid
     page:
       name: page
       in: query

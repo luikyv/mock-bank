@@ -21,7 +21,7 @@ func authMiddleware(service Service) func(http.Handler) http.Handler {
 
 func authMiddlewareHandler(next http.Handler, service Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/directory/") || r.URL.Path == "/api/logout" {
+		if strings.HasPrefix(r.URL.Path, "/api/directory/") {
 			next.ServeHTTP(w, r)
 			return
 		}

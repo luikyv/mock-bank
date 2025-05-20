@@ -58,7 +58,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeResponseError(w, err, strings.Contains(r.URL.Path, "/transactions-current"))
+			writeResponseError(w, err, !strings.Contains(r.URL.Path, "/transactions-current"))
 		},
 	})
 	wrapper := ServerInterfaceWrapper{

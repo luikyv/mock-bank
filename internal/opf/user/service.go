@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/page"
 	"gorm.io/gorm"
 )
@@ -75,6 +76,6 @@ func (s Service) Users(ctx context.Context, orgID string, pag page.Pagination) (
 	return page.New(users, pag, int(total)), nil
 }
 
-func (s Service) Delete(ctx context.Context, id, orgID string) error {
+func (s Service) Delete(ctx context.Context, id uuid.UUID, orgID string) error {
 	return s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).Delete(&User{}).Error
 }

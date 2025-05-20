@@ -22,10 +22,35 @@ import (
 	"github.com/luiky/mock-bank/internal/timex"
 	"github.com/oapi-codegen/runtime"
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
 	SessionCookieScopes = "SessionCookie.Scopes"
+)
+
+// Defines values for ResourceStatus.
+const (
+	AVAILABLE              ResourceStatus = "AVAILABLE"
+	PENDINGAUTHORISATION   ResourceStatus = "PENDING_AUTHORISATION"
+	TEMPORARILYUNAVAILABLE ResourceStatus = "TEMPORARILY_UNAVAILABLE"
+	UNAVAILABLE            ResourceStatus = "UNAVAILABLE"
+)
+
+// Defines values for ResourceType.
+const (
+	ACCOUNT                    ResourceType = "ACCOUNT"
+	BANKFIXEDINCOME            ResourceType = "BANK_FIXED_INCOME"
+	CREDITCARDACCOUNT          ResourceType = "CREDIT_CARD_ACCOUNT"
+	CREDITFIXEDINCOME          ResourceType = "CREDIT_FIXED_INCOME"
+	EXCHANGE                   ResourceType = "EXCHANGE"
+	FINANCING                  ResourceType = "FINANCING"
+	FUND                       ResourceType = "FUND"
+	INVOICEFINANCING           ResourceType = "INVOICE_FINANCING"
+	LOAN                       ResourceType = "LOAN"
+	TREASURETITLE              ResourceType = "TREASURE_TITLE"
+	UNARRANGEDACCOUNTOVERDRAFT ResourceType = "UNARRANGED_ACCOUNT_OVERDRAFT"
+	VARIABLEINCOME             ResourceType = "VARIABLE_INCOME"
 )
 
 // AccountData defines model for AccountData.
@@ -127,6 +152,25 @@ type MockUsersResponse struct {
 	Meta  *api.Meta  `json:"meta,omitempty"`
 }
 
+// ResourceStatus defines model for ResourceStatus.
+type ResourceStatus string
+
+// ResourceType defines model for ResourceType.
+type ResourceType string
+
+// ResourcesResponse defines model for ResourcesResponse.
+type ResourcesResponse struct {
+	Data []struct {
+		ConsentID        string         `json:"consentId"`
+		CreationDateTime timex.DateTime `json:"creationDateTime"`
+		ResourceID       string         `json:"resourceId"`
+		Status           ResourceStatus `json:"status"`
+		Type             ResourceType   `json:"type"`
+	} `json:"data"`
+	Links api.Links `json:"links"`
+	Meta  api.Meta  `json:"meta"`
+}
+
 // UserResponse defines model for UserResponse.
 type UserResponse struct {
 	Data struct {
@@ -139,10 +183,10 @@ type UserResponse struct {
 }
 
 // AccountID defines model for accountId.
-type AccountID = string
+type AccountID = openapi_types.UUID
 
 // MockUserID defines model for mockUserId.
-type MockUserID = string
+type MockUserID = openapi_types.UUID
 
 // OrganizationID defines model for organizationId.
 type OrganizationID = string
@@ -186,6 +230,27 @@ type GetConsentsParams struct {
 	PageSize *PageSize `form:"page-size,omitempty" json:"page-size,omitempty"`
 }
 
+// GetResourcesParams defines parameters for GetResources.
+type GetResourcesParams struct {
+	// Page Número da página que está sendo requisitada (o valor da primeira página é 1).
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Quantidade total de registros por páginas.
+	PageSize *PageSize `form:"page-size,omitempty" json:"page-size,omitempty"`
+}
+
+// PatchResourceStatusJSONBody defines parameters for PatchResourceStatus.
+type PatchResourceStatusJSONBody struct {
+	Data struct {
+		Status ResourceStatus `json:"status"`
+	} `json:"data"`
+}
+
+// PatchResourceStatusParams defines parameters for PatchResourceStatus.
+type PatchResourceStatusParams struct {
+	Type ResourceType `form:"type" json:"type"`
+}
+
 // CreateMockUserJSONRequestBody defines body for CreateMockUser for application/json ContentType.
 type CreateMockUserJSONRequestBody = MockUserRequest
 
@@ -197,6 +262,9 @@ type CreateAccountJSONRequestBody = AccountRequest
 
 // UpdateAccountJSONRequestBody defines body for UpdateAccount for application/json ContentType.
 type UpdateAccountJSONRequestBody = AccountRequest
+
+// PatchResourceStatusJSONRequestBody defines body for PatchResourceStatus for application/json ContentType.
+type PatchResourceStatusJSONRequestBody PatchResourceStatusJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -239,6 +307,12 @@ type ServerInterface interface {
 	// Get consents of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/consents)
 	GetConsents(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetConsentsParams)
+	// Get shared resources of a user
+	// (GET /api/orgs/{orgId}/users/{userId}/resources)
+	GetResources(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetResourcesParams)
+	// Update status of a shared resource
+	// (PATCH /api/orgs/{orgId}/users/{userId}/resources/{resourceId}/consents/{consentId})
+	PatchResourceStatus(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, resourceID string, consentID openapi_types.UUID, params PatchResourceStatusParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -771,6 +845,141 @@ func (siw *ServerInterfaceWrapper) GetConsents(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// GetResources operation middleware
+func (siw *ServerInterfaceWrapper) GetResources(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "orgId" -------------
+	var orgID OrganizationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", r.PathValue("orgId"), &orgID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "orgId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "userId" -------------
+	var userID MockUserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetResourcesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", r.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "page-size" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page-size", r.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page-size", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetResources(w, r, orgID, userID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchResourceStatus operation middleware
+func (siw *ServerInterfaceWrapper) PatchResourceStatus(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "orgId" -------------
+	var orgID OrganizationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", r.PathValue("orgId"), &orgID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "orgId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "userId" -------------
+	var userID MockUserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "resourceId" -------------
+	var resourceID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "resourceId", r.PathValue("resourceId"), &resourceID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "consentId" -------------
+	var consentID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "consentId", r.PathValue("consentId"), &consentID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "consentId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PatchResourceStatusParams
+
+	// ------------- Required query parameter "type" -------------
+
+	if paramValue := r.URL.Query().Get("type"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "type"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "type", r.URL.Query(), &params.Type)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "type", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchResourceStatus(w, r, orgID, userID, resourceID, consentID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -898,6 +1107,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("DELETE "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts/{accountId}", wrapper.DeleteAccount)
 	m.HandleFunc("PUT "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts/{accountId}", wrapper.UpdateAccount)
 	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/consents", wrapper.GetConsents)
+	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/resources", wrapper.GetResources)
+	m.HandleFunc("PATCH "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/resources/{resourceId}/consents/{consentId}", wrapper.PatchResourceStatus)
 
 	return m
 }
@@ -1156,6 +1367,46 @@ func (response GetConsents200JSONResponse) VisitGetConsentsResponse(w http.Respo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetResourcesRequestObject struct {
+	OrgID  OrganizationID `json:"orgId"`
+	UserID MockUserID     `json:"userId"`
+	Params GetResourcesParams
+}
+
+type GetResourcesResponseObject interface {
+	VisitGetResourcesResponse(w http.ResponseWriter) error
+}
+
+type GetResources200JSONResponse ResourcesResponse
+
+func (response GetResources200JSONResponse) VisitGetResourcesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchResourceStatusRequestObject struct {
+	OrgID      OrganizationID     `json:"orgId"`
+	UserID     MockUserID         `json:"userId"`
+	ResourceID string             `json:"resourceId"`
+	ConsentID  openapi_types.UUID `json:"consentId"`
+	Params     PatchResourceStatusParams
+	Body       *PatchResourceStatusJSONRequestBody
+}
+
+type PatchResourceStatusResponseObject interface {
+	VisitPatchResourceStatusResponse(w http.ResponseWriter) error
+}
+
+type PatchResourceStatus204Response struct {
+}
+
+func (response PatchResourceStatus204Response) VisitPatchResourceStatusResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Get the authentication URL for the directory service
@@ -1197,6 +1448,12 @@ type StrictServerInterface interface {
 	// Get consents of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/consents)
 	GetConsents(ctx context.Context, request GetConsentsRequestObject) (GetConsentsResponseObject, error)
+	// Get shared resources of a user
+	// (GET /api/orgs/{orgId}/users/{userId}/resources)
+	GetResources(ctx context.Context, request GetResourcesRequestObject) (GetResourcesResponseObject, error)
+	// Update status of a shared resource
+	// (PATCH /api/orgs/{orgId}/users/{userId}/resources/{resourceId}/consents/{consentId})
+	PatchResourceStatus(ctx context.Context, request PatchResourceStatusRequestObject) (PatchResourceStatusResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -1600,39 +1857,110 @@ func (sh *strictHandler) GetConsents(w http.ResponseWriter, r *http.Request, org
 	}
 }
 
+// GetResources operation middleware
+func (sh *strictHandler) GetResources(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetResourcesParams) {
+	var request GetResourcesRequestObject
+
+	request.OrgID = orgID
+	request.UserID = userID
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetResources(ctx, request.(GetResourcesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetResources")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetResourcesResponseObject); ok {
+		if err := validResponse.VisitGetResourcesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PatchResourceStatus operation middleware
+func (sh *strictHandler) PatchResourceStatus(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, resourceID string, consentID openapi_types.UUID, params PatchResourceStatusParams) {
+	var request PatchResourceStatusRequestObject
+
+	request.OrgID = orgID
+	request.UserID = userID
+	request.ResourceID = resourceID
+	request.ConsentID = consentID
+	request.Params = params
+
+	var body PatchResourceStatusJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchResourceStatus(ctx, request.(PatchResourceStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchResourceStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchResourceStatusResponseObject); ok {
+		if err := validResponse.VisitPatchResourceStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"gSoAAA==",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

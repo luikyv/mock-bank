@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/luiky/mock-bank/internal/opf/resource"
 	"github.com/luiky/mock-bank/internal/page"
+	"github.com/luiky/mock-bank/internal/timex"
 	"gorm.io/gorm"
 )
 
@@ -61,6 +62,26 @@ func (s Service) Save(ctx context.Context, acc *Account) error {
 	return nil
 }
 
+func (s Service) UpdateConsent(ctx context.Context, consentID, accountID uuid.UUID, orgID string, status resource.Status) error {
+	result := s.db.WithContext(ctx).
+		Model(&ConsentAccount{}).
+		Where("consent_id = ? AND account_id = ? AND org_id = ?", consentID, accountID, orgID).
+		Updates(map[string]any{
+			"status":     status,
+			"updated_at": timex.Now(),
+		})
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to update consent account: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no matching consent account found for consent_id=%s account_id=%s", consentID, accountID)
+	}
+
+	return nil
+}
+
 func (s Service) createConsent(ctx context.Context, consentAcc *ConsentAccount) error {
 	return s.db.WithContext(ctx).Create(consentAcc).Error
 }
@@ -69,12 +90,16 @@ func (s Service) ConsentedAccount(ctx context.Context, accountID, consentID, org
 	consentAcc := &ConsentAccount{}
 	if err := s.db.WithContext(ctx).
 		Preload("Account").
-		Where(`account_id = ? AND consent_id = ? AND org_id = ? AND status = ?`, accountID, consentID, orgID, resource.StatusAvailable).
+		Where(`account_id = ? AND consent_id = ? AND org_id = ?`, accountID, consentID, orgID).
 		First(consentAcc).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotAllowed
 		}
 		return nil, err
+	}
+
+	if consentAcc.Status != resource.StatusAvailable {
+		return nil, ErrJointAccountPendingAuthorization
 	}
 
 	return consentAcc.Account, nil
@@ -90,7 +115,7 @@ func (s Service) AllAccounts(ctx context.Context, userID, orgID string) ([]Accou
 	return accounts, nil
 }
 
-func (s Service) Accounts(ctx context.Context, userID, orgID string, pag page.Pagination) (page.Page[*Account], error) {
+func (s Service) Accounts(ctx context.Context, userID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Account], error) {
 	query := s.db.WithContext(ctx).Where("user_id = ? AND org_id = ?", userID, orgID)
 
 	var accounts []*Account
@@ -137,7 +162,7 @@ func (s Service) ConsentedAccounts(ctx context.Context, consentID, orgID string,
 	return page.New(accs, pag, int(total)), nil
 }
 
-func (s Service) Delete(ctx context.Context, id, orgID string) error {
+func (s Service) Delete(ctx context.Context, id uuid.UUID, orgID string) error {
 	return s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).Delete(&Account{}).Error
 }
 

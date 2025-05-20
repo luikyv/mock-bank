@@ -61,8 +61,6 @@ type Account struct {
 	OrgID     string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-
-	Transactions []*Transaction `gorm:"foreignKey:account_id"`
 }
 
 type Type string

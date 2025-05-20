@@ -41,7 +41,7 @@ var (
 	authMTLSHost       = strings.Replace(host, "https://", "https://matls-auth.", 1)
 	directoryIssuer    = getEnv("DIRECTORY_ISSUER", "https://directory.local")
 	directoryClientID  = getEnv("DIRECTORY_CLIENT_ID", "mockbank")
-	ssJWKSURL          = getEnv("SS_JWKS_URL", "https://keystore.local")
+	ssJWKSURL          = getEnv("SS_JWKS_URL", "https://keystore.local/openbanking.jwks")
 	ssIssuer           = getEnv("SS_ISSUER", "Open Banking Open Banking Brasil sandbox SSA issuer")
 	port               = getEnv("PORT", "80")
 	dbConnectionString = getEnv("DB_CONNECTION_STRING", "postgres://admin:pass@localhost:5432/mockbank?sslmode=disable")
@@ -78,7 +78,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	op.RegisterRoutes(mux)
-	app.NewServer(appHost, appService, directoryService, userService, consentService, accountService).RegisterRoutes(mux)
+	app.NewServer(appHost, appService, directoryService, userService, consentService, resouceService, accountService).RegisterRoutes(mux)
 	consentv3.NewServer(apiMTLSHost, consentService, op).RegisterRoutes(mux)
 	resourcev3.NewServer(apiMTLSHost, resouceService, consentService, op).RegisterRoutes(mux)
 	accountv2.NewServer(apiMTLSHost, accountService, consentService, op).RegisterRoutes(mux)

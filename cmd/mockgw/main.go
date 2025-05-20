@@ -145,8 +145,8 @@ func main() {
 		http.ServeFile(w, r, "/mocks/client.jwks")
 	})
 
-	mux.HandleFunc("GET keystore.local/", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request keystore jwks")
+	mux.HandleFunc("GET keystore.local/openbanking.jwks", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("request keystore open banking jwks")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		var jwks jose.JSONWebKeySet

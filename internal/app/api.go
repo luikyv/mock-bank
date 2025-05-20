@@ -12,6 +12,7 @@ import (
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/opf/account"
 	"github.com/luiky/mock-bank/internal/opf/consent"
+	"github.com/luiky/mock-bank/internal/opf/resource"
 	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timex"
@@ -27,6 +28,7 @@ type Server struct {
 	directoryService DirectoryService
 	userService      user.Service
 	consentService   consent.Service
+	resourceService  resource.Service
 	accountService   account.Service
 }
 
@@ -36,6 +38,7 @@ func NewServer(
 	directoryService DirectoryService,
 	userService user.Service,
 	consentService consent.Service,
+	resourceService resource.Service,
 	accountService account.Service,
 ) Server {
 	return Server{
@@ -44,6 +47,7 @@ func NewServer(
 		directoryService: directoryService,
 		userService:      userService,
 		consentService:   consentService,
+		resourceService:  resourceService,
 		accountService:   accountService,
 	}
 }
@@ -289,7 +293,7 @@ func (s Server) CreateMockUser(ctx context.Context, req CreateMockUserRequestObj
 
 func (s Server) UpdateMockUser(ctx context.Context, req UpdateMockUserRequestObject) (UpdateMockUserResponseObject, error) {
 	u := &user.User{
-		ID:       uuid.MustParse(req.UserID),
+		ID:       req.UserID,
 		Username: req.Body.Data.Username,
 		Name:     req.Body.Data.Name,
 		CPF:      req.Body.Data.Cpf,
@@ -333,7 +337,7 @@ func (s Server) CreateAccount(ctx context.Context, req CreateAccountRequestObjec
 		BlockedAmount:               req.Body.Data.BlockedAmount,
 		AutomaticallyInvestedAmount: req.Body.Data.AutomaticallyInvestedAmount,
 		OrgID:                       req.OrgID,
-		UserID:                      uuid.MustParse(req.UserID),
+		UserID:                      req.UserID,
 	}
 	if err := s.accountService.Save(ctx, acc); err != nil {
 		return nil, err
@@ -366,7 +370,7 @@ func (s Server) DeleteAccount(ctx context.Context, req DeleteAccountRequestObjec
 
 func (s Server) UpdateAccount(ctx context.Context, req UpdateAccountRequestObject) (UpdateAccountResponseObject, error) {
 	acc := &account.Account{
-		ID:                          uuid.MustParse(req.AccountID),
+		ID:                          req.AccountID,
 		Number:                      req.Body.Data.Number,
 		Type:                        account.Type(req.Body.Data.Type),
 		SubType:                     account.SubType(req.Body.Data.Subtype),
@@ -374,7 +378,7 @@ func (s Server) UpdateAccount(ctx context.Context, req UpdateAccountRequestObjec
 		BlockedAmount:               req.Body.Data.BlockedAmount,
 		AutomaticallyInvestedAmount: req.Body.Data.AutomaticallyInvestedAmount,
 		OrgID:                       req.OrgID,
-		UserID:                      uuid.MustParse(req.UserID),
+		UserID:                      req.UserID,
 	}
 	if err := s.accountService.Save(ctx, acc); err != nil {
 		return nil, err
@@ -408,7 +412,7 @@ func (s Server) GetAccounts(ctx context.Context, req GetAccountsRequestObject) (
 	resp := AccountsResponse{
 		Data:  []AccountData{},
 		Meta:  api.NewPaginatedMeta(accs),
-		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID+"/accounts", accs),
+		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/accounts", accs),
 	}
 	for _, acc := range accs.Records {
 		resp.Data = append(resp.Data, AccountData{
@@ -449,7 +453,7 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 			UserID               string          `json:"userId"`
 		}{},
 		Meta:  api.NewPaginatedMeta(cs),
-		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID+"/consents", cs),
+		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/consents", cs),
 	}
 	for _, c := range cs.Records {
 		data := struct {
@@ -491,4 +495,56 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 		resp.Data = append(resp.Data, data)
 	}
 	return GetConsents200JSONResponse(resp), nil
+}
+
+func (s Server) GetResources(ctx context.Context, req GetResourcesRequestObject) (GetResourcesResponseObject, error) {
+	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
+
+	rs, err := s.resourceService.Resources(ctx, req.UserID, req.OrgID, pag)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := ResourcesResponse{
+		Data: []struct {
+			ConsentID        string         `json:"consentId"`
+			CreationDateTime timex.DateTime `json:"creationDateTime"`
+			ResourceID       string         `json:"resourceId"`
+			Status           ResourceStatus `json:"status"`
+			Type             ResourceType   `json:"type"`
+		}{},
+		Meta:  *api.NewPaginatedMeta(rs),
+		Links: *api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/resources", rs),
+	}
+
+	for _, r := range rs.Records {
+		resp.Data = append(resp.Data, struct {
+			ConsentID        string         `json:"consentId"`
+			CreationDateTime timex.DateTime `json:"creationDateTime"`
+			ResourceID       string         `json:"resourceId"`
+			Status           ResourceStatus `json:"status"`
+			Type             ResourceType   `json:"type"`
+		}{
+			ConsentID:        r.ConsentID,
+			ResourceID:       r.ResourceID,
+			Status:           ResourceStatus(r.Status),
+			Type:             ResourceType(r.Type),
+			CreationDateTime: timex.NewDateTime(r.CreatedAt),
+		})
+	}
+
+	return GetResources200JSONResponse(resp), nil
+}
+
+func (s Server) PatchResourceStatus(ctx context.Context, req PatchResourceStatusRequestObject) (PatchResourceStatusResponseObject, error) {
+	switch resource.Type(req.Params.Type) {
+	case resource.TypeAccount:
+		if err := s.accountService.UpdateConsent(ctx, req.ConsentID, uuid.MustParse(req.ResourceID), req.OrgID, resource.Status(req.Body.Data.Status)); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("invalid resource type")
+	}
+
+	return PatchResourceStatus204Response{}, nil
 }

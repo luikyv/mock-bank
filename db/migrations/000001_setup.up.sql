@@ -106,11 +106,13 @@ CREATE INDEX idx_account_transactions_org_id_account_id ON account_transactions 
 CREATE OR REPLACE VIEW consent_resources AS
 SELECT
     'ACCOUNT' AS resource_type,
-    consent_id,
-    account_id AS resource_id,
-    user_id,
-    status,
-    org_id,
-    created_at,
-    updated_at
-FROM consent_accounts;
+    ca.consent_id,
+    ca.account_id AS resource_id,
+    ca.user_id,
+    ca.status,
+    ca.org_id,
+    ca.created_at,
+    ca.updated_at
+FROM consent_accounts ca
+JOIN consents c ON ca.consent_id = c.id
+WHERE c.status = 'AUTHORISED';

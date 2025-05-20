@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/page"
 	"gorm.io/gorm"
 )
@@ -38,7 +39,7 @@ func (s Service) ConsentedResources(ctx context.Context, consentID, orgID string
 	return page.New(rs, pag, int(total)), nil
 }
 
-func (s Service) Resources(ctx context.Context, userID, orgID string, pag page.Pagination) (page.Page[*Resource], error) {
+func (s Service) Resources(ctx context.Context, userID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Resource], error) {
 	query := s.db.WithContext(ctx).Where("user_id = ? AND org_id = ?", userID, orgID)
 
 	var rs []*Resource

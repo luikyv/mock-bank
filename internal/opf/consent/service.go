@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/opf"
 	"github.com/luiky/mock-bank/internal/opf/user"
 	"github.com/luiky/mock-bank/internal/page"
@@ -182,7 +183,7 @@ func (s Service) consent(ctx context.Context, id, orgID string) (*Consent, error
 	return c, err
 }
 
-func (s Service) Consents(ctx context.Context, userID, orgID string, pag page.Pagination) (page.Page[*Consent], error) {
+func (s Service) Consents(ctx context.Context, userID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Consent], error) {
 	query := s.db.WithContext(ctx).Model(&Consent{}).Where("user_id = ? AND org_id = ?", userID, orgID)
 
 	var consents []*Consent
