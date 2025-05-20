@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luiky/mock-bank/internal/user"
@@ -42,10 +43,9 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 		return nil, err
 	}
 
-	// TODO: Find a better way.
-	// if ctx.Value(opf.CtxKeyClientID) != nil && ctx.Value(opf.CtxKeyClientID) != c.ClientID {
-	// 	return nil, ErrAccessNotAllowed
-	// }
+	if ctx.Value(api.CtxKeyClientID) != nil && ctx.Value(api.CtxKeyClientID) != c.ClientID {
+		return nil, ErrAccessNotAllowed
+	}
 
 	if err := s.modify(ctx, c); err != nil {
 		return nil, err

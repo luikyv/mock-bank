@@ -40,7 +40,7 @@ func authSessionMiddlewareHandler(next http.Handler, service session.Service) ht
 			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "session not found"))
 			return
 		}
-		ctx = context.WithValue(ctx, CtxKeySessionID, session.ID.String())
+		ctx = context.WithValue(ctx, api.CtxKeySessionID, session.ID.String())
 
 		orgID := r.PathValue("orgId")
 		if orgID != "" {
@@ -48,7 +48,7 @@ func authSessionMiddlewareHandler(next http.Handler, service session.Service) ht
 				api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid org id"))
 				return
 			}
-			ctx = context.WithValue(ctx, CtxKeyOrgID, orgID)
+			ctx = context.WithValue(ctx, api.CtxKeyOrgID, orgID)
 		}
 
 		r = r.WithContext(ctx)
@@ -66,7 +66,7 @@ func interactionIDHandler(next http.Handler) http.Handler {
 		// Return the same interaction ID in the response.
 		w.Header().Set(headerXInteractionID, interactionID)
 
-		ctx := context.WithValue(r.Context(), CtxKeyInteractionID, interactionID)
+		ctx := context.WithValue(r.Context(), api.CtxKeyInteractionID, interactionID)
 		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	})

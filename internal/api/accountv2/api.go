@@ -70,32 +70,32 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	var handler http.Handler
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccounts)
-	handler = api.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsRead)
+	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsRead)
 	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountID)
-	handler = api.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsRead)
+	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsRead)
 	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDBalances)
-	handler = api.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsBalanceRead)
+	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsBalanceRead)
 	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/balances", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDOverdraftLimits)
-	handler = api.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsOverdraftLimitsRead)
+	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsOverdraftLimitsRead)
 	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/overdraft-limits", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDTransactions)
-	handler = api.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsTransactionsRead)
+	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsTransactionsRead)
 	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/transactions", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDTransactionsCurrent)
-	handler = api.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsTransactionsRead)
+	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionAccountsTransactionsRead)
 	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/transactions-current", handler)
 

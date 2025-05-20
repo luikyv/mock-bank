@@ -178,7 +178,7 @@ func (s Server) HandleDirectoryCallback(ctx context.Context, req HandleDirectory
 }
 
 func (s Server) LogoutUser(ctx context.Context, req LogoutUserRequestObject) (LogoutUserResponseObject, error) {
-	sessionID := ctx.Value(CtxKeySessionID).(string)
+	sessionID := ctx.Value(api.CtxKeySessionID).(string)
 	_ = s.sessionService.DeleteSession(ctx, sessionID)
 
 	headers := LogoutUser303ResponseHeaders{
@@ -198,7 +198,7 @@ func (s Server) LogoutUser(ctx context.Context, req LogoutUserRequestObject) (Lo
 }
 
 func (s Server) GetCurrentUser(ctx context.Context, req GetCurrentUserRequestObject) (GetCurrentUserResponseObject, error) {
-	sessionID := ctx.Value(CtxKeySessionID).(string)
+	sessionID := ctx.Value(api.CtxKeySessionID).(string)
 	session, err := s.sessionService.Session(ctx, sessionID)
 	if err != nil {
 		return nil, err

@@ -167,15 +167,7 @@ func (h *logCtxHandler) Handle(ctx context.Context, r slog.Record) error {
 		r.AddAttrs(slog.String("org_id", orgID))
 	}
 
-	if orgID, ok := ctx.Value(app.CtxKeyOrgID).(string); ok {
-		r.AddAttrs(slog.String("org_id", orgID))
-	}
-
-	if interactionID, ok := ctx.Value(app.CtxKeyInteractionID).(string); ok {
-		r.AddAttrs(slog.String("interaction_id", interactionID))
-	}
-
-	if sessionID, ok := ctx.Value(app.CtxKeySessionID).(string); ok {
+	if sessionID, ok := ctx.Value(api.CtxKeySessionID).(string); ok {
 		r.AddAttrs(slog.String("session_id", sessionID))
 	}
 

@@ -67,7 +67,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	var handler http.Handler
 
 	handler = http.HandlerFunc(wrapper.ResourcesGetResources)
-	handler = api.PermissionMiddleware(handler, s.consentService, consent.PermissionResourcesRead)
+	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionResourcesRead)
 	handler = api.AuthHandler(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	resourceMux.Handle("GET /resources", handler)
 
