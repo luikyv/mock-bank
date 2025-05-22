@@ -58,6 +58,7 @@ CREATE TABLE mock_users (
     username TEXT NOT NULL,
     name TEXT NOT NULL,
     cpf TEXT NOT NULL,
+    description TEXT,
 
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),

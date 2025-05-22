@@ -9,7 +9,6 @@ mock backend: https://matls-api.mockbank.local
 ## TODO
 
 - Allow setting the currency.
-- SQL init.
 - Mock user description.
 - Set up new orgs.
 - What's happening with created_at?
@@ -18,6 +17,5 @@ mock backend: https://matls-api.mockbank.local
 - Transactions.
 - Improve error handling.
 - Add logs.
-- KMS.
 - https://github.com/unrolled/secure.
 - https://openfinancebrasil.atlassian.net/wiki/spaces/OF/pages/246120449/EN+Open+Finance+Brasil+Financial-grade+API+Dynamic+Client+Registration+2.0+RC1+Implementers+Draft+3

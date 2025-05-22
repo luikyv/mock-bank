@@ -13,10 +13,10 @@ setup:
 setup-dev:
 	@go mod download
 	@pre-commit install
-	@make keys
-	@make setup-cs
 	@make tools
+	@make keys
 	@chmod +x testdata/setup-localstack.sh
+	@make setup-cs
 
 tools:
 	@go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest

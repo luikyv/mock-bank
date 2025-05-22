@@ -9,11 +9,6 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 )
 
-func NewSigner() crypto.Signer {
-	key, _ := rsa.GenerateKey(rand.Reader, 2048)
-	return key
-}
-
 func Sign(claims any, signer crypto.Signer) (string, error) {
 	key := jose.SigningKey{
 		Algorithm: jose.PS256,

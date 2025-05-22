@@ -348,6 +348,8 @@ components:
                 type: string
               cpf:
                 type: string
+              description:
+                type: string
         meta:
           $ref: '#/components/schemas/Meta'
         links:
@@ -372,6 +374,8 @@ components:
               type: string
             cpf:
               type: string
+            description:
+              type: string
     MockUserResponse:
       type: object
       required:
@@ -394,6 +398,8 @@ components:
             name:
               type: string
             cpf:
+              type: string
+            description:
               type: string
     AccountRequest:
       type: object

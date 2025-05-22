@@ -249,26 +249,32 @@ func (s Server) GetMockUsers(ctx context.Context, req GetMockUsersRequestObject)
 
 	resp := MockUsersResponse{
 		Data: []struct {
-			Cpf      string `json:"cpf"`
-			ID       string `json:"id"`
-			Name     string `json:"name"`
-			Username string `json:"username"`
+			Cpf         string  `json:"cpf"`
+			Description *string `json:"description,omitempty"`
+			ID          string  `json:"id"`
+			Name        string  `json:"name"`
+			Username    string  `json:"username"`
 		}{},
 		Meta:  api.NewPaginatedMeta(us),
-		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users", us),
+		Links: api.NewPaginatedLinks(s.host+"/api/orgs/"+req.OrgID+"/users", us),
 	}
 	for _, u := range us.Records {
-		resp.Data = append(resp.Data, struct {
-			Cpf      string `json:"cpf"`
-			ID       string `json:"id"`
-			Name     string `json:"name"`
-			Username string `json:"username"`
+		data := struct {
+			Cpf         string  `json:"cpf"`
+			Description *string `json:"description,omitempty"`
+			ID          string  `json:"id"`
+			Name        string  `json:"name"`
+			Username    string  `json:"username"`
 		}{
 			ID:       u.ID.String(),
 			Username: u.Username,
 			Cpf:      u.CPF,
 			Name:     u.Name,
-		})
+		}
+		if u.Description != "" {
+			data.Description = &u.Description
+		}
+		resp.Data = append(resp.Data, data)
 	}
 	return GetMockUsers200JSONResponse(resp), nil
 }
@@ -280,23 +286,31 @@ func (s Server) CreateMockUser(ctx context.Context, req CreateMockUserRequestObj
 		CPF:      req.Body.Data.Cpf,
 		OrgID:    req.OrgID,
 	}
+	if req.Body.Data.Description != nil {
+		u.Description = *req.Body.Data.Description
+	}
+
 	if err := s.userService.Save(ctx, u); err != nil {
 		return nil, err
 	}
 
 	resp := MockUserResponse{
 		Data: struct {
-			Cpf      string  `json:"cpf"`
-			ID       string  `json:"id"`
-			Name     string  `json:"name"`
-			Password *string `json:"password,omitempty"`
-			Username string  `json:"username"`
+			Cpf         string  `json:"cpf"`
+			Description *string `json:"description,omitempty"`
+			ID          string  `json:"id"`
+			Name        string  `json:"name"`
+			Password    *string `json:"password,omitempty"`
+			Username    string  `json:"username"`
 		}{
 			Cpf:      u.CPF,
 			ID:       u.ID.String(),
 			Name:     u.Name,
 			Username: u.Name,
 		},
+	}
+	if u.Description != "" {
+		resp.Data.Description = &u.Description
 	}
 	return CreateMockUser201JSONResponse(resp), nil
 }
@@ -309,23 +323,30 @@ func (s Server) UpdateMockUser(ctx context.Context, req UpdateMockUserRequestObj
 		CPF:      req.Body.Data.Cpf,
 		OrgID:    req.OrgID,
 	}
+	if req.Body.Data.Description != nil {
+		u.Description = *req.Body.Data.Description
+	}
 	if err := s.userService.Save(ctx, u); err != nil {
 		return nil, err
 	}
 
 	resp := MockUserResponse{
 		Data: struct {
-			Cpf      string  `json:"cpf"`
-			ID       string  `json:"id"`
-			Name     string  `json:"name"`
-			Password *string `json:"password,omitempty"`
-			Username string  `json:"username"`
+			Cpf         string  `json:"cpf"`
+			Description *string `json:"description,omitempty"`
+			ID          string  `json:"id"`
+			Name        string  `json:"name"`
+			Password    *string `json:"password,omitempty"`
+			Username    string  `json:"username"`
 		}{
 			Cpf:      u.CPF,
 			ID:       u.ID.String(),
 			Name:     u.Name,
 			Username: u.Name,
 		},
+	}
+	if u.Description != "" {
+		resp.Data.Description = &u.Description
 	}
 	return UpdateMockUser200JSONResponse(resp), nil
 }
@@ -463,7 +484,7 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 			UserID               string             `json:"userId"`
 		}{},
 		Meta:  api.NewPaginatedMeta(cs),
-		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/consents", cs),
+		Links: api.NewPaginatedLinks(s.host+"/api/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/consents", cs),
 	}
 	for _, c := range cs.Records {
 		data := struct {
@@ -524,7 +545,7 @@ func (s Server) GetResources(ctx context.Context, req GetResourcesRequestObject)
 			Type             ResourceType      `json:"type"`
 		}{},
 		Meta:  *api.NewPaginatedMeta(rs),
-		Links: *api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/resources", rs),
+		Links: *api.NewPaginatedLinks(s.host+"/api/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/resources", rs),
 	}
 
 	for _, r := range rs.Records {

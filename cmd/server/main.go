@@ -86,7 +86,8 @@ var Scopes = []goidc.Scope{
 func main() {
 	ctx := context.Background()
 
-	// Logging.
+	// Defaults.
+	http.DefaultClient = httpClient()
 	slog.SetDefault(logger())
 
 	// Database.
@@ -145,7 +146,7 @@ func dbConnection() (*gorm.DB, error) {
 	return db, nil
 }
 
-// getEnv retrieves an environment variable or returns a fallback value if not found
+// getEnv retrieves an environment variable or returns a fallback value if not found.
 func getEnv[T ~string](key, fallback T) T {
 	if value, exists := os.LookupEnv(string(key)); exists {
 		return T(value)
@@ -283,20 +284,12 @@ func openidProvider(
 			SSIssuer:   SoftwareStatementIssuer,
 			HTTPClient: httpClient(),
 		}), nil),
-		provider.WithHTTPClientFunc(httpClientFunc()),
 	}
 	if err := op.WithOptions(opts...); err != nil {
 		return nil, err
 	}
 
 	return op, nil
-}
-
-// TODO: Move this to oidc.
-func httpClientFunc() goidc.HTTPClientFunc {
-	return func(ctx context.Context) *http.Client {
-		return httpClient()
-	}
 }
 
 func kmsClient() *kms.Client {

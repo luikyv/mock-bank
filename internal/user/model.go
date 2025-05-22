@@ -7,10 +7,11 @@ import (
 )
 
 type User struct {
-	ID       uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Username string
-	Name     string
-	CPF      string
+	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Username    string
+	Name        string
+	CPF         string
+	Description string
 
 	OrgID     string
 	CreatedAt time.Time
