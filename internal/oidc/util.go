@@ -21,6 +21,7 @@ import (
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
+	"gorm.io/datatypes"
 )
 
 const (
@@ -237,4 +238,24 @@ func fetchSoftwareStatementJWKS(ssURL string, httpClient *http.Client) (goidc.JS
 	ssJWKSCache = &jwks
 	ssJWKSLastFetchedAt = timeutil.Now()
 	return jwks, nil
+}
+
+func parseTimestamp(timestamp int) time.Time {
+	return time.Unix(int64(timestamp), 0).UTC()
+}
+
+func marshalJSON(v any) datatypes.JSON {
+	bytes, err := json.Marshal(v)
+	if err != nil {
+		panic("failed to marshal json: " + err.Error())
+	}
+	return datatypes.JSON(bytes)
+}
+
+func unmarshalJSON(data datatypes.JSON, v any) error {
+	if len(data) == 0 {
+		return errors.New("data is empty")
+	}
+
+	return json.Unmarshal(data, v)
 }

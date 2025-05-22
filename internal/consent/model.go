@@ -1,13 +1,11 @@
 package consent
 
 import (
-	"database/sql/driver"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
@@ -28,7 +26,7 @@ var (
 type Consent struct {
 	ID              uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Status          Status
-	Permissions     Permissions
+	Permissions     []Permission `gorm:"serializer:json"`
 	StatusUpdatedAt time.Time
 	ExpiresAt       *time.Time
 	UserID          uuid.UUID
@@ -133,26 +131,6 @@ const (
 )
 
 type Permissions []Permission
-
-func (p Permissions) Value() (driver.Value, error) {
-	strs := make([]string, len(p))
-	for i, perm := range p {
-		strs[i] = string(perm)
-	}
-	return pq.StringArray(strs).Value()
-}
-
-func (p *Permissions) Scan(src any) error {
-	var strs pq.StringArray
-	if err := strs.Scan(src); err != nil {
-		return err
-	}
-	*p = make(Permissions, len(strs))
-	for i, s := range strs {
-		(*p)[i] = Permission(s)
-	}
-	return nil
-}
 
 func (p Permissions) HasAccountPermissions() bool {
 	return slices.ContainsFunc(p, func(permission Permission) bool {

@@ -7,6 +7,9 @@ services:
       - DB_CONNECTION_STRING=postgres://admin:pass@psql:5432/mockbank?sslmode=disable
     volumes:
       - ./keys/:/app/keys/
+    depends_on:
+      - psql
+      - localstack
 
   psql:
     image: postgres
@@ -28,12 +31,12 @@ services:
       - ./keys/server.key:/mocks/server.key
       - ./keys/client_one_pub.jwks:/mocks/client.jwks
       - ./keys/client_ca.crt:/mocks/client_ca.crt
-      - ./mockdata/participants.json:/mocks/participants.json
-      - ./mockdata/directory_jwks.json:/mocks/directory_jwks.json
-      - ./mockdata/directory_well_known.json:/mocks/directory_well_known.json
-      - ./mockdata/id_token.json:/mocks/id_token.json
-      - ./mockdata/software_statement.json:/mocks/software_statement.json
-      - ./mockdata/software_statement_jwks.json:/mocks/software_statement_jwks.json
+      - ./testdata/participants.json:/mocks/participants.json
+      - ./testdata/directory_jwks.json:/mocks/directory_jwks.json
+      - ./testdata/directory_well_known.json:/mocks/directory_well_known.json
+      - ./testdata/id_token.json:/mocks/id_token.json
+      - ./testdata/software_statement.json:/mocks/software_statement.json
+      - ./testdata/software_statement_jwks.json:/mocks/software_statement_jwks.json
     ports:
       - 443:443
     networks:
@@ -47,6 +50,23 @@ services:
           - matls-api.mockbank.local
           - directory.local
           - keystore.local
+
+  localstack:
+    profiles:
+      - debug
+      - main
+    image: localstack/localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=kms
+      - AWS_ACCESS_KEY_ID="test"
+      - AWS_SECRET_ACCESS_KEY="test"
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./testdata/setup-localstack.sh:/etc/localstack/init/ready.d/setup.sh
 
   cs-httpd:
     profiles:

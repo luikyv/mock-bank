@@ -2,54 +2,60 @@ package oidc
 
 import (
 	"context"
+	"fmt"
+	"time"
 
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 type ClientManager struct {
-	coll *mongo.Collection
+	db *gorm.DB
 }
 
-func NewClientManager(database *mongo.Database) ClientManager {
-	return ClientManager{
-		coll: database.Collection("clients"),
-	}
+func NewClientManager(db *gorm.DB) ClientManager {
+	return ClientManager{db: db}
 }
 
-func (manager ClientManager) Save(ctx context.Context, client *goidc.Client) error {
-	shouldUpsert := true
-	filter := bson.D{bson.E{Key: "_id", Value: client.ID}}
-	if _, err := manager.coll.ReplaceOne(ctx, filter, client, &options.ReplaceOptions{Upsert: &shouldUpsert}); err != nil {
-		return err
+func (cm ClientManager) Save(ctx context.Context, oidcClient *goidc.Client) error {
+	client := &Client{
+		ID:        oidcClient.ID,
+		Data:      marshalJSON(oidcClient),
+		UpdatedAt: timeutil.Now(),
+		OrgID:     oidcClient.CustomAttribute("org_id").(string),
 	}
-
-	return nil
+	return cm.db.WithContext(ctx).Save(client).Error
 }
 
-func (manager ClientManager) Client(ctx context.Context, id string) (*goidc.Client, error) {
-	filter := bson.D{bson.E{Key: "_id", Value: id}}
-
-	result := manager.coll.FindOne(ctx, filter)
-	if result.Err() != nil {
-		return nil, result.Err()
-	}
-
-	var client goidc.Client
-	if err := result.Decode(&client); err != nil {
+func (cm ClientManager) Client(ctx context.Context, id string) (*goidc.Client, error) {
+	var client Client
+	if err := cm.db.WithContext(ctx).First(&client, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 
-	return &client, nil
+	var oidcClient goidc.Client
+	if err := unmarshalJSON(client.Data, &oidcClient); err != nil {
+		return nil, fmt.Errorf("could not load the client: %w", err)
+	}
+	return &oidcClient, nil
 }
 
-func (manager ClientManager) Delete(ctx context.Context, id string) error {
-	filter := bson.D{bson.E{Key: "_id", Value: id}}
-	if _, err := manager.coll.DeleteOne(ctx, filter); err != nil {
-		return err
-	}
+func (cm ClientManager) Delete(ctx context.Context, id string) error {
+	return cm.db.WithContext(ctx).Where("id = ?", id).Delete(&Client{}).Error
+}
 
-	return nil
+type Client struct {
+	ID   string `gorm:"primaryKey"`
+	Data datatypes.JSON
+
+	OrgID     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (Client) TableName() string {
+	return "oauth_clients"
 }

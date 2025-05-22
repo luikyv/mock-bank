@@ -29,7 +29,7 @@ func FAPIIDHandler(next http.Handler, opts *Options) http.Handler {
 	})
 }
 
-func FAPIID(opts *Options) func(http.Handler) http.Handler {
+func FAPIIDMiddleware(opts *Options) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return FAPIIDHandler(next, opts)
 	}

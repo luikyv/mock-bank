@@ -4,18 +4,20 @@ import (
 	"context"
 	"crypto"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"log"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
+	smithyendpoints "github.com/aws/smithy-go/endpoints"
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/api/accountv2"
@@ -43,19 +45,22 @@ const (
 )
 
 var (
-	env                = getEnv("ENV", LocalEnvironment)
-	orgID              = getEnv("ORG_ID", "00000000-0000-0000-0000-000000000000")
-	host               = getEnv("HOST", "https://mockbank.local")
-	appHost            = strings.Replace(host, "https://", "https://app.", 1)
-	apiMTLSHost        = strings.Replace(host, "https://", "https://matls-api.", 1)
-	authHost           = strings.Replace(host, "https://", "https://auth.", 1)
-	authMTLSHost       = strings.Replace(host, "https://", "https://matls-auth.", 1)
-	directoryIssuer    = getEnv("DIRECTORY_ISSUER", "https://directory.local")
-	directoryClientID  = getEnv("DIRECTORY_CLIENT_ID", "mockbank")
-	ssJWKSURL          = getEnv("SS_JWKS_URL", "https://keystore.local/openbanking.jwks")
-	ssIssuer           = getEnv("SS_ISSUER", "Open Banking Open Banking Brasil sandbox SSA issuer")
-	port               = getEnv("PORT", "80")
-	dbConnectionString = getEnv("DB_CONNECTION_STRING", "postgres://admin:pass@localhost:5432/mockbank?sslmode=disable")
+	Env                            = getEnv("ENV", LocalEnvironment)
+	Host                           = getEnv("HOST", "https://mockbank.local")
+	APPHost                        = strings.Replace(Host, "https://", "https://app.", 1)
+	APIMTLSHost                    = strings.Replace(Host, "https://", "https://matls-api.", 1)
+	AuthHost                       = strings.Replace(Host, "https://", "https://auth.", 1)
+	AuthMTLSHost                   = strings.Replace(Host, "https://", "https://matls-auth.", 1)
+	DirectoryIssuer                = getEnv("DIRECTORY_ISSUER", "https://directory.local")
+	DirectoryClientID              = getEnv("DIRECTORY_CLIENT_ID", "mockbank")
+	SoftwareStatementJWKSURL       = getEnv("SS_JWKS_URL", "https://keystore.local/openbanking.jwks")
+	SoftwareStatementIssuer        = getEnv("SS_ISSUER", "Open Banking Open Banking Brasil sandbox SSA issuer")
+	Port                           = getEnv("PORT", "80")
+	DBConnectionString             = getEnv("DB_CONNECTION_STRING", "postgres://admin:pass@localhost:5432/mockbank?sslmode=disable")
+	AWSEndpoint                    = getEnv("AWS_ENDPOINT", "http://localhost:4566")
+	AWSRegion                      = getEnv("AWS_REGION", "us-east-1")
+	OPKMSSigningKeyID              = getEnv("OP_KMS_SIGNING_KEY", "alias/mockbank/op-signing-key")
+	DirectoryClientKMSSigningKeyID = getEnv("DIRECTORY_CLIENT_KMS_SIGNING_KEY", "alias/mockbank/directory-client-signing-key")
 )
 
 var Scopes = []goidc.Scope{
@@ -79,21 +84,31 @@ var Scopes = []goidc.Scope{
 }
 
 func main() {
+	ctx := context.Background()
+
 	// Logging.
 	slog.SetDefault(logger())
 
 	// Database.
 	db, err := dbConnection()
 	if err != nil {
-		log.Fatalf("failed to connect mongo database: %v", err)
+		log.Fatalf("failed connecting to database: %v", err)
 	}
 
 	// Keys.
-	opSigner := joseutil.NewSigner()
-	directorySigner := joseutil.NewSigner()
+	kmsClient := kmsClient()
+	opSigner, err := joseutil.NewKMSSigner(ctx, OPKMSSigningKeyID, kmsClient)
+	if err != nil {
+		log.Fatalf("could not load kms signer for op: %v\n", err)
+	}
+
+	directoryClientSigner, err := joseutil.NewKMSSigner(ctx, DirectoryClientKMSSigningKeyID, kmsClient)
+	if err != nil {
+		log.Fatalf("could not load kms signer for directory: %v\n", err)
+	}
 
 	// Services.
-	directoryService := directory.NewService(directoryIssuer, directoryClientID, appHost+"/api/directory/callback", directorySigner, httpClient())
+	directoryService := directory.NewService(DirectoryIssuer, DirectoryClientID, APPHost+"/api/directory/callback", directoryClientSigner, httpClient())
 	sessionService := session.NewService(db, directoryService)
 	userService := user.NewService(db)
 	consentService := consent.NewService(db, userService)
@@ -109,18 +124,18 @@ func main() {
 	mux := http.NewServeMux()
 
 	op.RegisterRoutes(mux)
-	app.NewServer(appHost, sessionService, directoryService, userService, consentService, resouceService, accountService).RegisterRoutes(mux)
-	consentv3.NewServer(apiMTLSHost, consentService, op).RegisterRoutes(mux)
-	resourcev3.NewServer(apiMTLSHost, resouceService, consentService, op).RegisterRoutes(mux)
-	accountv2.NewServer(apiMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
+	app.NewServer(APPHost, sessionService, directoryService, userService, consentService, resouceService, accountService).RegisterRoutes(mux)
+	consentv3.NewServer(APIMTLSHost, consentService, op).RegisterRoutes(mux)
+	resourcev3.NewServer(APIMTLSHost, resouceService, consentService, op).RegisterRoutes(mux)
+	accountv2.NewServer(APIMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
 
-	if err := http.ListenAndServe(":"+port, mux); err != http.ErrServerClosed {
+	if err := http.ListenAndServe(":"+Port, mux); err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }
 
 func dbConnection() (*gorm.DB, error) {
-	db, err := gorm.Open(postgres.Open(dbConnectionString), &gorm.Config{
+	db, err := gorm.Open(postgres.Open(DBConnectionString), &gorm.Config{
 		NowFunc: timeutil.Now,
 	})
 	if err != nil {
@@ -176,7 +191,7 @@ func (h *logCtxHandler) Handle(ctx context.Context, r slog.Record) error {
 
 func httpClient() *http.Client {
 	tlsConfig := &tls.Config{}
-	if env == LocalEnvironment {
+	if Env == LocalEnvironment {
 		tlsConfig.InsecureSkipVerify = true
 	}
 	return &http.Client{
@@ -187,7 +202,7 @@ func httpClient() *http.Client {
 }
 
 func openidProvider(
-	_ *gorm.DB,
+	db *gorm.DB,
 	signer crypto.Signer,
 	userService user.Service,
 	consentService consent.Service,
@@ -210,7 +225,7 @@ func openidProvider(
 		log.Fatal(err)
 	}
 
-	op, err := provider.New(goidc.ProfileFAPI1, authHost, func(_ context.Context) (goidc.JSONWebKeySet, error) {
+	op, err := provider.New(goidc.ProfileFAPI1, AuthHost, func(_ context.Context) (goidc.JSONWebKeySet, error) {
 		return goidc.JSONWebKeySet{
 			Keys: []goidc.JSONWebKey{{
 				KeyID:     "signer",
@@ -225,10 +240,9 @@ func openidProvider(
 	}
 
 	opts := []provider.ProviderOption{
-		// TODO.
-		// provider.WithClientStorage(oidc.NewClientManager(db)),
-		// provider.WithAuthnSessionStorage(oidc.NewAuthnSessionManager(db)),
-		// provider.WithGrantSessionStorage(oidc.NewGrantSessionManager(db)),
+		provider.WithClientStorage(oidc.NewClientManager(db)),
+		provider.WithAuthnSessionStorage(oidc.NewAuthnSessionManager(db)),
+		provider.WithGrantSessionStorage(oidc.NewGrantSessionManager(db)),
 		provider.WithSignerFunc(func(ctx context.Context, alg goidc.SignatureAlgorithm) (kid string, s crypto.Signer, err error) {
 			return "signer", signer, nil
 		}),
@@ -240,7 +254,7 @@ func openidProvider(
 		provider.WithClientCredentialsGrant(),
 		provider.WithTokenAuthnMethods(goidc.ClientAuthnPrivateKeyJWT),
 		provider.WithPrivateKeyJWTSignatureAlgs(goidc.PS256),
-		provider.WithMTLS(authMTLSHost, oidc.ClientCert),
+		provider.WithMTLS(AuthMTLSHost, oidc.ClientCert),
 		provider.WithTLSCertTokenBindingRequired(),
 		provider.WithPAR(60),
 		provider.WithJAR(goidc.PS256),
@@ -255,22 +269,21 @@ func openidProvider(
 		provider.WithIDTokenSignatureAlgs(goidc.PS256),
 		provider.WithIDTokenEncryption(goidc.RSA_OAEP),
 		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(op, consentService)),
-		provider.WithPolicy(oidc.Policy(authHost, tmpl, userService,
-			consentService, accountService)),
+		provider.WithPolicy(oidc.Policy(
+			AuthHost,
+			tmpl,
+			userService,
+			consentService,
+			accountService,
+		)),
 		provider.WithNotifyErrorFunc(oidc.LogError),
 		provider.WithDCR(oidc.DCRFunc(oidc.DCRConfig{
 			Scopes:     Scopes,
-			SSURL:      ssJWKSURL,
-			SSIssuer:   ssIssuer,
+			SSURL:      SoftwareStatementJWKSURL,
+			SSIssuer:   SoftwareStatementIssuer,
 			HTTPClient: httpClient(),
 		}), nil),
 		provider.WithHTTPClientFunc(httpClientFunc()),
-	}
-	if env == LocalEnvironment {
-		// TODO: Seed the db instead.
-		keysDir := filepath.Join(sourceDir, "../../keys")
-		opts = append(opts, provider.WithStaticClient(client("client_one", keysDir)),
-			provider.WithStaticClient(client("client_two", keysDir)))
 	}
 	if err := op.WithOptions(opts...); err != nil {
 		return nil, err
@@ -279,66 +292,31 @@ func openidProvider(
 	return op, nil
 }
 
-func client(clientID string, keysDir string) *goidc.Client {
-	var scopes []string
-	for _, scope := range Scopes {
-		scopes = append(scopes, scope.ID)
-	}
-
-	privateJWKS := privateJWKS(filepath.Join(keysDir, clientID+".jwks"))
-	publicJWKS := privateJWKS.Public()
-	return &goidc.Client{
-		ID: clientID,
-		ClientMeta: goidc.ClientMeta{
-			TokenAuthnMethod: goidc.ClientAuthnPrivateKeyJWT,
-			ScopeIDs:         strings.Join(scopes, " "),
-			RedirectURIs: []string{
-				"https://localhost.emobix.co.uk:8443/test/a/mockbank/callback",
-			},
-			GrantTypes: []goidc.GrantType{
-				goidc.GrantAuthorizationCode,
-				goidc.GrantRefreshToken,
-				goidc.GrantClientCredentials,
-				goidc.GrantImplicit,
-			},
-			ResponseTypes: []goidc.ResponseType{
-				goidc.ResponseTypeCode,
-				goidc.ResponseTypeCodeAndIDToken,
-			},
-			PublicJWKS:           &publicJWKS,
-			IDTokenKeyEncAlg:     goidc.RSA_OAEP,
-			IDTokenContentEncAlg: goidc.A128CBC_HS256,
-			CustomAttributes: map[string]any{
-				oidc.ClientAttrOrgID: orgID,
-			},
-		},
-	}
-}
-
-func privateJWKS(filePath string) goidc.JSONWebKeySet {
-	absPath, _ := filepath.Abs(filePath)
-	jwksFile, err := os.Open(absPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer jwksFile.Close()
-
-	jwksBytes, err := io.ReadAll(jwksFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var jwks goidc.JSONWebKeySet
-	if err := json.Unmarshal(jwksBytes, &jwks); err != nil {
-		log.Fatal(err)
-	}
-
-	return jwks
-}
-
 // TODO: Move this to oidc.
 func httpClientFunc() goidc.HTTPClientFunc {
 	return func(ctx context.Context) *http.Client {
 		return httpClient()
 	}
+}
+
+func kmsClient() *kms.Client {
+	kmsOpts := kms.Options{}
+	if Env == LocalEnvironment {
+		kmsOpts.Region = AWSRegion
+		kmsOpts.Credentials = credentials.NewStaticCredentialsProvider("test", "test", "")
+		kmsOpts.EndpointResolverV2 = localstackResolver{endpoint: AWSEndpoint}
+	}
+
+	return kms.New(kmsOpts)
+}
+
+type localstackResolver struct {
+	endpoint string
+}
+
+func (r localstackResolver) ResolveEndpoint(ctx context.Context, params kms.EndpointParameters) (smithyendpoints.Endpoint, error) {
+	uri, _ := url.Parse(r.endpoint)
+	return smithyendpoints.Endpoint{
+		URI: *uri,
+	}, nil
 }

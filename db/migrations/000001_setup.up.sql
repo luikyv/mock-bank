@@ -6,15 +6,59 @@ CREATE TABLE sessions (
     username TEXT NOT NULL,
     organizations JSONB NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
+
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE oauth_clients (
+    id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+
+    org_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+CREATE INDEX idx_oauth_clients_org_id ON oauth_clients (org_id);
+
+CREATE TABLE oauth_sessions (
+    id TEXT PRIMARY KEY,
+    callback_id TEXT,
+    auth_code TEXT,
+    pushed_auth_req_id TEXT,
+    expires_at TIMESTAMPTZ NOT NULL,
+    data JSONB NOT NULL,
+
+    org_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+CREATE INDEX idx_oauth_sessions_callback_id ON oauth_sessions (callback_id);
+CREATE INDEX idx_oauth_sessions_auth_code ON oauth_sessions (auth_code);
+CREATE INDEX idx_oauth_sessions_pushed_auth_req_id ON oauth_sessions (pushed_auth_req_id);
+
+CREATE TABLE oauth_grants (
+    id TEXT PRIMARY KEY,
+    token_id TEXT NOT NULL,
+    refresh_token_id TEXT,
+    auth_code TEXT,
+    expires_at TIMESTAMPTZ NOT NULL,
+    data JSONB,
+
+    org_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+CREATE INDEX idx_oauth_grants_token_id ON oauth_grants (token_id);
+CREATE INDEX idx_oauth_grants_refresh_token_id ON oauth_grants (refresh_token_id);
+CREATE INDEX idx_oauth_grants_auth_code ON oauth_grants (auth_code);
 
 CREATE TABLE mock_users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username TEXT NOT NULL,
     name TEXT NOT NULL,
     cpf TEXT NOT NULL,
+
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
@@ -26,15 +70,16 @@ CREATE UNIQUE INDEX idx_mock_users_org_id_username ON mock_users (org_id, userna
 CREATE TABLE consents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     status TEXT NOT NULL,
-    permissions TEXT[] NOT NULL,
+    permissions JSONB NOT NULL,
     status_updated_at TIMESTAMPTZ DEFAULT now(),
     expires_at TIMESTAMPTZ,
     user_id UUID REFERENCES mock_users(id),
     user_cpf TEXT NOT NULL,
     business_cnpj TEXT,
-    client_id TEXT NOT NULL,
+    client_id TEXT NOT NULL REFERENCES oauth_clients(id),
     rejected_by TEXT,
     rejection_reason TEXT,
+
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
@@ -52,6 +97,7 @@ CREATE TABLE consent_extensions (
     requested_at TIMESTAMPTZ NOT NULL,
     user_ip_address TEXT NOT NULL,
     user_agent TEXT NOT NULL,
+
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
@@ -70,6 +116,7 @@ CREATE TABLE accounts (
     overdraft_limit_contracted TEXT,
     overdraft_limit_used TEXT,
     overdraft_limit_unarranged TEXT,
+
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
@@ -82,9 +129,11 @@ CREATE TABLE consent_accounts (
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES mock_users(id),
     status TEXT NOT NULL,
+
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),
+
     PRIMARY KEY (consent_id, account_id)
 );
 CREATE INDEX idx_consent_accounts_org_id_user_id ON consent_accounts (org_id, user_id);
@@ -97,6 +146,7 @@ CREATE TABLE account_transactions (
     name TEXT NOT NULL,
     type TEXT NOT NULL,
     amount TEXT NOT NULL,
+    
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()

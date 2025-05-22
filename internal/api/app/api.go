@@ -101,7 +101,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler := HandlerWithOptions(strictHandler, StdHTTPServerOptions{
 		Middlewares: []MiddlewareFunc{
 			swaggerMiddleware,
-			api.FAPIID(nil),
+			fapiIDMiddleware,
 			authSessionMiddleware(s.sessionService),
 			func(next http.Handler) http.Handler {
 				return c.Handler(next)
@@ -422,7 +422,7 @@ func (s Server) GetAccounts(ctx context.Context, req GetAccountsRequestObject) (
 	resp := AccountsResponse{
 		Data:  []AccountData{},
 		Meta:  api.NewPaginatedMeta(accs),
-		Links: api.NewPaginatedLinks(s.host+"/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/accounts", accs),
+		Links: api.NewPaginatedLinks(s.host+"/api/orgs/"+req.OrgID+"/users/"+req.UserID.String()+"/accounts", accs),
 	}
 	for _, acc := range accs.Records {
 		resp.Data = append(resp.Data, AccountData{

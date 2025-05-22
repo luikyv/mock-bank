@@ -16,9 +16,11 @@ setup-dev:
 	@make keys
 	@make setup-cs
 	@make tools
+	@chmod +x testdata/setup-localstack.sh
 
 tools:
-	@go install tools
+	@go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+	@go install github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 # Runs the main MockBank components.
 run:
@@ -44,7 +46,7 @@ keys:
 	@go run cmd/keymaker/main.go --org_id=$(ORG_ID) --software_id=$(SOFTWARE_ID)
 
 models:
-	@oapi-codegen -config ./swaggers/config.yml -package app -o ./internal/app/api_gen.go ./swaggers/app.yml
+	@oapi-codegen -config ./swaggers/config.yml -package app -o ./internal/api/app/api_gen.go ./swaggers/app.yml
 	@oapi-codegen -config ./swaggers/config.yml -package consentv3 -o ./internal/api/consentv3/api_gen.go ./swaggers/consents_v3.yml
 	@oapi-codegen -config ./swaggers/config.yml -package accountv2 -o ./internal/api/accountv2/api_gen.go ./swaggers/accounts_v2.yml
 	@oapi-codegen -config ./swaggers/config.yml -package resourcev3 -o ./internal/api/resourcev3/api_gen.go ./swaggers/resources_v3.yml
@@ -57,17 +59,21 @@ build-mockgw:
 	@docker-compose build mockgw
 
 db-migrations:
-	@migrate -path ./db/migrations -database $(DSN) up
+	@migrate -path ./db/migrations -database "$(DSN)" up
 
 db-migrations-down:
-	@migrate -path ./db/migrations -database $(DSN) down
+	@migrate -path ./db/migrations -database "$(DSN)" down 1
 
 db-migration-file:
 	@read -p "Enter migration name (e.g. add_users_table): " name; \
 	migrate create -ext sql -dir ./db/migrations -seq $$name
 
 db-seeds:
-	@docker-compose exec -T psql psql -U admin -d mockbank < ./mockdata/setup.sql
+	@docker-compose exec -T psql psql -U admin -d mockbank < ./testdata/setup.sql
+
+db-reset:
+	@migrate -path ./db/migrations -database "$(DSN)" drop -f
+	@migrate -path ./db/migrations -database "$(DSN)" up
 
 # Clone and build the Open Finance Conformance Suite.
 setup-cs:

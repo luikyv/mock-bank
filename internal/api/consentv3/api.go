@@ -57,7 +57,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	})
 	wrapper := ServerInterfaceWrapper{
 		Handler:            strictHandler,
-		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, api.FAPIID(nil)},
+		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, api.FAPIIDMiddleware(nil)},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},

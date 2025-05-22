@@ -2,75 +2,80 @@ package oidc
 
 import (
 	"context"
+	"fmt"
+	"time"
 
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
-// TODO: Make sure this is working as expected.
-
 type GrantSessionManager struct {
-	coll *mongo.Collection
+	db *gorm.DB
 }
 
-func NewGrantSessionManager(database *mongo.Database) GrantSessionManager {
-	return GrantSessionManager{
-		coll: database.Collection("grant_sessions"),
+func NewGrantSessionManager(db *gorm.DB) GrantSessionManager {
+	return GrantSessionManager{db: db}
+}
+
+func (m GrantSessionManager) Save(ctx context.Context, gs *goidc.GrantSession) error {
+	grant := &Grant{
+		ID:             gs.ID,
+		TokenID:        gs.TokenID,
+		RefreshTokenID: gs.RefreshTokenID,
+		AuthCode:       gs.AuthCode,
+		ExpiresAt:      parseTimestamp(gs.ExpiresAtTimestamp),
+		Data:           marshalJSON(gs),
+		UpdatedAt:      timeutil.Now(),
+		OrgID:          gs.AdditionalTokenClaims["org_id"].(string),
 	}
+	return m.db.WithContext(ctx).Save(grant).Error
 }
 
-func (manager GrantSessionManager) Save(ctx context.Context, grantSession *goidc.GrantSession) error {
-	shouldReplace := true
-	filter := bson.D{bson.E{Key: "_id", Value: grantSession.ID}}
-	if _, err := manager.coll.ReplaceOne(
-		ctx,
-		filter,
-		grantSession,
-		&options.ReplaceOptions{Upsert: &shouldReplace},
-	); err != nil {
-		return err
-	}
-
-	return nil
+func (m GrantSessionManager) SessionByTokenID(ctx context.Context, id string) (*goidc.GrantSession, error) {
+	return m.grant(ctx, m.db.Where("token_id = ?", id))
 }
 
-func (manager GrantSessionManager) SessionByTokenID(ctx context.Context, id string) (*goidc.GrantSession, error) {
-	return manager.getWithFilter(ctx, bson.D{bson.E{Key: "token_id", Value: id}})
+func (m GrantSessionManager) SessionByRefreshTokenID(ctx context.Context, id string) (*goidc.GrantSession, error) {
+	return m.grant(ctx, m.db.Where("refresh_token_id = ?", id))
 }
 
-func (manager GrantSessionManager) SessionByRefreshTokenID(ctx context.Context, token string) (*goidc.GrantSession, error) {
-	return manager.getWithFilter(
-		ctx,
-		bson.D{bson.E{Key: "refresh_token", Value: token}},
-	)
+func (m GrantSessionManager) Delete(ctx context.Context, id string) error {
+	return m.db.WithContext(ctx).Where("id = ?", id).Delete(&Client{}).Error
 }
 
-func (manager GrantSessionManager) Delete(ctx context.Context, id string) error {
-	filter := bson.D{bson.E{Key: "_id", Value: id}}
-	if _, err := manager.coll.DeleteOne(ctx, filter); err != nil {
-		return err
-	}
-
-	return nil
+func (m GrantSessionManager) DeleteByAuthCode(ctx context.Context, code string) error {
+	return m.db.WithContext(ctx).Where("auth_code = ?", code).Delete(&Client{}).Error
 }
 
-func (m GrantSessionManager) DeleteByAuthCode(context.Context, string) error {
-	return nil
-}
+func (m GrantSessionManager) grant(ctx context.Context, tx *gorm.DB) (*goidc.GrantSession, error) {
 
-func (manager GrantSessionManager) getWithFilter(ctx context.Context, filter any) (*goidc.GrantSession, error) {
-
-	result := manager.coll.FindOne(ctx, filter)
-	if result.Err() != nil {
-		return nil, result.Err()
-	}
-
-	var grantSession goidc.GrantSession
-	if err := result.Decode(&grantSession); err != nil {
+	var grant Grant
+	if err := tx.WithContext(ctx).First(&grant).Error; err != nil {
 		return nil, err
 	}
 
-	return &grantSession, nil
+	var oidcGrant goidc.GrantSession
+	if err := unmarshalJSON(grant.Data, &oidcGrant); err != nil {
+		return nil, fmt.Errorf("could not load the grant session: %w", err)
+	}
+	return &oidcGrant, nil
+}
+
+type Grant struct {
+	ID             string `gorm:"primaryKey"`
+	TokenID        string
+	RefreshTokenID string
+	AuthCode       string
+	ExpiresAt      time.Time
+	Data           datatypes.JSON
+
+	OrgID     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (Grant) TableName() string {
+	return "oauth_grants"
 }

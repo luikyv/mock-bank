@@ -3,74 +3,88 @@ package oidc
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 type AuthnSessionManager struct {
-	coll *mongo.Collection
+	db *gorm.DB
 }
 
-func NewAuthnSessionManager(database *mongo.Database) AuthnSessionManager {
-	return AuthnSessionManager{
-		coll: database.Collection("auth_sessions"),
-	}
+func NewAuthnSessionManager(db *gorm.DB) AuthnSessionManager {
+	return AuthnSessionManager{db: db}
 }
 
-func (manager AuthnSessionManager) Save(ctx context.Context, session *goidc.AuthnSession) error {
-	shouldUpsert := true
-	filter := bson.D{bson.E{Key: "_id", Value: session.ID}}
-	if _, err := manager.coll.ReplaceOne(
-		ctx,
-		filter,
-		session,
-		&options.ReplaceOptions{Upsert: &shouldUpsert},
-	); err != nil {
-		return err
+func (m AuthnSessionManager) Save(ctx context.Context, as *goidc.AuthnSession) error {
+	session := &Session{
+		ID:              as.ID,
+		CallbackID:      as.CallbackID,
+		AuthCode:        as.AuthCode,
+		PushedAuthReqID: as.PushedAuthReqID,
+		ExpiresAt:       parseTimestamp(as.ExpiresAtTimestamp),
+		Data:            marshalJSON(as),
+		UpdatedAt:       timeutil.Now(),
+	}
+	// TODO: Find a way to get the org id during par.
+	if orgID := as.StoredParameter("org_id"); orgID != nil {
+		session.OrgID = orgID.(string)
 	}
 
-	return nil
+	return m.db.WithContext(ctx).Save(session).Error
 }
 
 func (m AuthnSessionManager) SessionByCallbackID(ctx context.Context, callbackID string) (*goidc.AuthnSession, error) {
-	return m.getWithFilter(ctx, bson.D{bson.E{Key: "callback_id", Value: callbackID}})
+	return m.session(ctx, m.db.Where("callback_id = ?", callbackID))
 }
 
-func (m AuthnSessionManager) SessionByAuthCode(ctx context.Context, authorizationCode string) (*goidc.AuthnSession, error) {
-	return m.getWithFilter(ctx, bson.D{bson.E{Key: "auth_code", Value: authorizationCode}})
+func (m AuthnSessionManager) SessionByAuthCode(ctx context.Context, code string) (*goidc.AuthnSession, error) {
+	return m.session(ctx, m.db.Where("auth_code = ?", code))
 }
 
 func (m AuthnSessionManager) SessionByPushedAuthReqID(ctx context.Context, id string) (*goidc.AuthnSession, error) {
-	return m.getWithFilter(ctx, bson.D{bson.E{Key: "pushed_auth_req_id", Value: id}})
+	return m.session(ctx, m.db.Where("pushed_auth_req_id = ?", id))
 }
 
 func (m AuthnSessionManager) SessionByCIBAAuthID(ctx context.Context, id string) (*goidc.AuthnSession, error) {
 	return nil, errors.ErrUnsupported
 }
 
-func (manager AuthnSessionManager) Delete(ctx context.Context, id string) error {
-	filter := bson.D{bson.E{Key: "_id", Value: id}}
-	if _, err := manager.coll.DeleteOne(ctx, filter); err != nil {
-		return err
-	}
-
-	return nil
+func (m AuthnSessionManager) Delete(ctx context.Context, id string) error {
+	return m.db.WithContext(ctx).Where("id = ?", id).Delete(&Client{}).Error
 }
 
-func (m AuthnSessionManager) getWithFilter(ctx context.Context, filter any) (*goidc.AuthnSession, error) {
+func (m AuthnSessionManager) session(ctx context.Context, tx *gorm.DB) (*goidc.AuthnSession, error) {
 
-	result := m.coll.FindOne(ctx, filter)
-	if result.Err() != nil {
-		return nil, result.Err()
-	}
-
-	var authnSession goidc.AuthnSession
-	if err := result.Decode(&authnSession); err != nil {
+	var as Session
+	if err := tx.WithContext(ctx).First(&as).Error; err != nil {
 		return nil, err
 	}
 
-	return &authnSession, nil
+	var oidcSession goidc.AuthnSession
+	if err := unmarshalJSON(as.Data, &oidcSession); err != nil {
+		return nil, fmt.Errorf("could not load the authn session: %w", err)
+	}
+	return &oidcSession, nil
+}
+
+type Session struct {
+	ID              string `gorm:"primaryKey"`
+	CallbackID      string
+	AuthCode        string
+	PushedAuthReqID string
+	ExpiresAt       time.Time
+	Data            datatypes.JSON
+
+	OrgID     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (Session) TableName() string {
+	return "oauth_sessions"
 }
