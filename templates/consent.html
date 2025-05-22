@@ -4,7 +4,7 @@
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
       <title>Consent – MockBank</title>
-      <style>
+      <style nonce="{{ .Nonce }}">
          * { box-sizing: border-box; }
          body { margin: 0; font-family: sans-serif; background: #f9fafb; display: flex; align-items: center; justify-content: center; height: 100vh; color: #111827; }
          .container { background: #fff; padding: 2rem; border-radius: .75rem; box-shadow: 0 10px 25px rgba(0,0,0,.08); max-width: 540px; width: 100%; }
@@ -27,83 +27,105 @@
          .cancel-button:hover { background: #d1d5db; }
       </style>
    </head>
-   <body>
-      <div class="container">
-         <h1>MockBank</h1>
-         <h2>Data Sharing Consent</h2>
-         <p class="description">
-            You are about to share your information with a trusted third party.
-            Please review and confirm your choices.
-         </p>
-         {{ if .BusinessCNPJ }}
-         <div class="info-block">
-            <strong>Company (CNPJ):</strong> {{ .BusinessCNPJ }}
-         </div>
-         {{ end }}
-         <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
-            {{ if .Accounts }}
-            <div class="section">
-               <div class="section-header" onclick="toggleAccountList()">
-                  <h3>Accounts</h3>
-                  <label class="checkbox" onclick="event.stopPropagation()">
-                  <input
-                     type="checkbox"
-                     id="accountsToggle"
-                     checked
-                     onclick="event.stopPropagation(); toggleAllAccounts()"
-                     />
-                  Enable All
-                  </label>
-               </div>
-               <ul id="accountsList" class="accounts-list">
-                  {{ range .Accounts }}
-                  <li>
-                     <label class="checkbox">
-                     <input
-                        type="checkbox"
-                        name="accounts"
-                        value="{{ .ID }}"
-                        checked
-                        class="account-checkbox"
-                        onchange="updateAccountsToggle()"
-                        />
-                     Branch: 0001, Number: {{ .Number }}
-                     </label>
-                  </li>
-                  {{ end }}
-               </ul>
-            </div>
-            {{ end }}
-            <input type="hidden" name="consent" value="true" />
-            <button type="submit" class="consent-button">Consent and Continue</button>
-         </form>
-         <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
-            <input type="hidden" name="consent" value="false" />
-            <button type="submit" class="cancel-button">Deny</button>
-         </form>
+
+<body>
+  <div class="container">
+    <h1>MockBank</h1>
+    <h2>Data Sharing Consent</h2>
+    <p class="description">
+      You are about to share your information with a trusted third party.
+      Please review and confirm your choices.
+    </p>
+
+    {{ if .BusinessCNPJ }}
+    <div class="info-block">
+      <strong>Company (CNPJ):</strong> {{ .BusinessCNPJ }}
+    </div>
+    {{ end }}
+
+    <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
+      {{ if .Accounts }}
+      <div class="section">
+        <div class="section-header" id="accountSectionToggle"> <!-- replaced onclick -->
+          <h3>Accounts</h3>
+          <label class="checkbox">
+            <input
+              type="checkbox"
+              id="accountsToggle"
+              checked
+            />
+            Enable All
+          </label>
+        </div>
+        <ul id="accountsList" class="accounts-list">
+          {{ range .Accounts }}
+          <li>
+            <label class="checkbox">
+              <input
+                type="checkbox"
+                name="accounts"
+                value="{{ .ID }}"
+                checked
+                class="account-checkbox"
+              />
+              Branch: 0001, Number: {{ .Number }}
+            </label>
+          </li>
+          {{ end }}
+        </ul>
       </div>
-      <script>
-         function toggleAccountList() {
-           document.getElementById('accountsList').classList.toggle('show');
-         }
-         
-         function toggleAllAccounts() {
-           const master = document.getElementById('accountsToggle');
-           const boxes = document.querySelectorAll('.account-checkbox');
-           boxes.forEach(cb => cb.checked = master.checked);
-           master.indeterminate = false;
-         }
-         
-         function updateAccountsToggle() {
-           const master = document.getElementById('accountsToggle');
-           const boxes = Array.from(document.querySelectorAll('.account-checkbox'));
-           const all = boxes.every(cb => cb.checked);
-           const none = boxes.every(cb => !cb.checked);
-           master.checked = all;
-           master.indeterminate = !all && !none;
-         }
-         
-         document.addEventListener('DOMContentLoaded', updateAccountsToggle);
-      </script>
-   </body>
+      {{ end }}
+      <input type="hidden" name="consent" value="true" />
+      <button type="submit" class="consent-button">Consent and Continue</button>
+    </form>
+
+    <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
+      <input type="hidden" name="consent" value="false" />
+      <button type="submit" class="cancel-button">Deny</button>
+    </form>
+  </div>
+
+  <script nonce="{{ .Nonce }}">
+    function toggleAccountList() {
+      document.getElementById('accountsList').classList.toggle('show');
+    }
+
+    function toggleAllAccounts() {
+      const master = document.getElementById('accountsToggle');
+      const boxes = document.querySelectorAll('.account-checkbox');
+      boxes.forEach(cb => cb.checked = master.checked);
+      master.indeterminate = false;
+    }
+
+    function updateAccountsToggle() {
+      const master = document.getElementById('accountsToggle');
+      const boxes = Array.from(document.querySelectorAll('.account-checkbox'));
+      const all = boxes.every(cb => cb.checked);
+      const none = boxes.every(cb => !cb.checked);
+      master.checked = all;
+      master.indeterminate = !all && !none;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateAccountsToggle();
+
+      document.getElementById('accountSectionToggle')
+        ?.addEventListener('click', toggleAccountList);
+
+      document.getElementById('accountsToggle')
+        ?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleAllAccounts();
+        });
+      document.querySelectorAll('.account-checkbox').forEach(cb =>
+  cb.addEventListener('change', updateAccountsToggle)
+);
+
+      // prevent label click from toggling list
+      document.querySelector('.section-header label.checkbox')
+        ?.addEventListener('click', (e) => e.stopPropagation());
+    });
+  </script>
+</body>
+
 </html>

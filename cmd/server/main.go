@@ -23,6 +23,7 @@ import (
 	"github.com/luiky/mock-bank/internal/api/accountv2"
 	"github.com/luiky/mock-bank/internal/api/app"
 	"github.com/luiky/mock-bank/internal/api/consentv3"
+	oidcapi "github.com/luiky/mock-bank/internal/api/oidc"
 	"github.com/luiky/mock-bank/internal/api/resourcev3"
 	"github.com/luiky/mock-bank/internal/consent"
 	"github.com/luiky/mock-bank/internal/directory"
@@ -124,7 +125,7 @@ func main() {
 	// Servers.
 	mux := http.NewServeMux()
 
-	op.RegisterRoutes(mux)
+	oidcapi.NewServer(AuthHost, op).RegisterRoutes(mux)
 	app.NewServer(APPHost, sessionService, directoryService, userService, consentService, resouceService, accountService).RegisterRoutes(mux)
 	consentv3.NewServer(APIMTLSHost, consentService, op).RegisterRoutes(mux)
 	resourcev3.NewServer(APIMTLSHost, resouceService, consentService, op).RegisterRoutes(mux)

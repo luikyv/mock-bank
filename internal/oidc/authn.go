@@ -14,6 +14,7 @@ import (
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luiky/mock-bank/internal/user"
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/unrolled/secure"
 )
 
 func Policy(
@@ -158,7 +159,7 @@ func (a authenticator) login(w http.ResponseWriter, r *http.Request, as *goidc.A
 	isLogin := r.PostFormValue(loginFormParam)
 	if isLogin == "" {
 		slog.InfoContext(r.Context(), "rendering login page")
-		return a.executeTemplate(w, "login.html", authnPage{
+		return a.executeTemplate(w, r, "login.html", authnPage{
 			CallbackID: as.CallbackID,
 		})
 	}
@@ -171,7 +172,7 @@ func (a authenticator) login(w http.ResponseWriter, r *http.Request, as *goidc.A
 	username := r.PostFormValue(usernameFormParam)
 	user, err := a.userService.UserByUsername(r.Context(), username, orgID)
 	if err != nil {
-		return a.executeTemplate(w, "login.html", authnPage{
+		return a.executeTemplate(w, r, "login.html", authnPage{
 			CallbackID: as.CallbackID,
 			Error:      "invalid username",
 		})
@@ -179,7 +180,7 @@ func (a authenticator) login(w http.ResponseWriter, r *http.Request, as *goidc.A
 
 	password := r.PostFormValue(passwordFormParam)
 	if user.CPF != as.StoredParameter(paramConsentCPF) || password != correctPassword {
-		return a.executeTemplate(w, "login.html", authnPage{
+		return a.executeTemplate(w, r, "login.html", authnPage{
 			CallbackID: as.CallbackID,
 			Error:      "invalid credentials",
 		})
@@ -245,7 +246,7 @@ func (a authenticator) renderConsentPage(w http.ResponseWriter, r *http.Request,
 		slog.InfoContext(r.Context(), "rendering consent page with accounts", "accounts", accs)
 		if err != nil {
 			page.Error = "Could not load the user accounts"
-			return a.executeTemplate(w, "consent.html", page)
+			return a.executeTemplate(w, r, "consent.html", page)
 		}
 		page.Accounts = accs
 	}
@@ -253,7 +254,7 @@ func (a authenticator) renderConsentPage(w http.ResponseWriter, r *http.Request,
 	if cnpj := as.StoredParameter(paramConsentCNPJ); cnpj != nil {
 		page.BusinessCNPJ = cnpj.(string)
 	}
-	return a.executeTemplate(w, "consent.html", page)
+	return a.executeTemplate(w, r, "consent.html", page)
 }
 
 func (a authenticator) finishFlow(r *http.Request, session *goidc.AuthnSession) (goidc.AuthnStatus, error) {
@@ -278,19 +279,23 @@ func (a authenticator) finishFlow(r *http.Request, session *goidc.AuthnSession) 
 
 func (a authenticator) executeTemplate(
 	w http.ResponseWriter,
+	r *http.Request,
 	templateName string,
 	params authnPage,
 ) (
 	goidc.AuthnStatus,
 	error,
 ) {
+	nonce := secure.CSPNonce(r.Context())
 	type page struct {
 		BaseURL string
+		Nonce   string
 		authnPage
 	}
 	w.WriteHeader(http.StatusOK)
 	_ = a.tmpl.ExecuteTemplate(w, templateName, page{
 		BaseURL:   a.baseURL,
+		Nonce:     nonce,
 		authnPage: params,
 	})
 	return goidc.StatusInProgress, nil

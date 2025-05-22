@@ -20,6 +20,7 @@ import (
 	"github.com/luiky/mock-bank/internal/user"
 	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"github.com/rs/cors"
+	"github.com/unrolled/secure"
 )
 
 const (
@@ -79,6 +80,16 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		},
 	})
 
+	secureMiddleware := secure.New(secure.Options{
+		STSSeconds:            31536000,
+		STSIncludeSubdomains:  true,
+		STSPreload:            true,
+		FrameDeny:             true,
+		ContentTypeNosniff:    true,
+		BrowserXssFilter:      true,
+		ContentSecurityPolicy: "default-src 'self'; script-src 'self'",
+	})
+
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{s.host},
 		AllowCredentials: true,
@@ -105,6 +116,9 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			authSessionMiddleware(s.sessionService),
 			func(next http.Handler) http.Handler {
 				return c.Handler(next)
+			},
+			func(next http.Handler) http.Handler {
+				return secureMiddleware.Handler(next)
 			},
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {

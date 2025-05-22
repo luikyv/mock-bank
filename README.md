@@ -9,7 +9,6 @@ mock backend: https://matls-api.mockbank.local
 ## TODO
 
 - Allow setting the currency.
-- Mock user description.
 - Set up new orgs.
 - What's happening with created_at?
 - Accounts overdraft limits.
