@@ -7,9 +7,12 @@ toolchain go1.24.2
 require github.com/google/uuid v1.6.0
 
 require (
+	github.com/aws/aws-lambda-go v1.48.0
+	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.67
 	github.com/aws/aws-sdk-go-v2/service/kms v1.38.3
-	github.com/aws/smithy-go v1.22.3
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.35.4
+	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
 	github.com/getkin/kin-openapi v0.132.0
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
@@ -46,21 +49,16 @@ require (
 )
 
 require (
-	github.com/aws/aws-lambda-go v1.48.0 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.36.3 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.34 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.34 // indirect
-	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.35.4 // indirect
-	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2 // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/aws/smithy-go v1.22.3 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
 )
 
 require (
-	github.com/go-jose/go-jose/v4 v4.0.4
-	github.com/luikyv/go-oidc v0.8.0
+	github.com/go-jose/go-jose/v4 v4.0.5
+	github.com/luikyv/go-oidc v0.9.0
 	golang.org/x/crypto v0.38.0 // indirect
 )
