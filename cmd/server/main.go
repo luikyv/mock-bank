@@ -5,19 +5,18 @@ import (
 	"crypto"
 	"crypto/tls"
 	"fmt"
-	"html/template"
 	"log"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
-	smithyendpoints "github.com/aws/smithy-go/endpoints"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/api/accountv2"
@@ -57,11 +56,10 @@ var (
 	SoftwareStatementJWKSURL       = getEnv("SS_JWKS_URL", "https://keystore.local/openbanking.jwks")
 	SoftwareStatementIssuer        = getEnv("SS_ISSUER", "Open Banking Open Banking Brasil sandbox SSA issuer")
 	Port                           = getEnv("PORT", "80")
-	DBConnectionString             = getEnv("DB_CONNECTION_STRING", "postgres://admin:pass@localhost:5432/mockbank?sslmode=disable")
-	AWSEndpoint                    = getEnv("AWS_ENDPOINT", "http://localhost:4566")
-	AWSRegion                      = getEnv("AWS_REGION", "us-east-1")
-	OPKMSSigningKeyID              = getEnv("OP_KMS_SIGNING_KEY", "alias/mockbank/op-signing-key")
-	DirectoryClientKMSSigningKeyID = getEnv("DIRECTORY_CLIENT_KMS_SIGNING_KEY", "alias/mockbank/directory-client-signing-key")
+	DBSecretName                   = getEnv("DB_SECRET_NAME", "mockbank/db-credentials")
+	OPKMSSigningKeyID              = getEnv("OP_KMS_SIGNING_KEY", "alias/mockbank-op-signing-key")
+	DirectoryClientKMSSigningKeyID = getEnv("DIRECTORY_CLIENT_KMS_SIGNING_KEY", "alias/mockbank-directory-client-signing-key")
+	AWSEndpoint                    = getEnv("AWS_ENDPOINT_URL", "http://localhost:4566")
 )
 
 var Scopes = []goidc.Scope{
@@ -87,18 +85,19 @@ var Scopes = []goidc.Scope{
 func main() {
 	ctx := context.Background()
 
-	// Defaults.
 	http.DefaultClient = httpClient()
 	slog.SetDefault(logger())
+	awsConfig := awsConfig()
 
 	// Database.
-	db, err := dbConnection()
+	secretsClient := secretsmanager.NewFromConfig(*awsConfig)
+	db, err := dbConnection(ctx, secretsClient)
 	if err != nil {
 		log.Fatalf("failed connecting to database: %v", err)
 	}
 
 	// Keys.
-	kmsClient := kmsClient()
+	kmsClient := kms.NewFromConfig(*awsConfig)
 	opSigner, err := joseutil.NewKMSSigner(ctx, OPKMSSigningKeyID, kmsClient)
 	if err != nil {
 		log.Fatalf("could not load kms signer for op: %v\n", err)
@@ -131,13 +130,25 @@ func main() {
 	resourcev3.NewServer(APIMTLSHost, resouceService, consentService, op).RegisterRoutes(mux)
 	accountv2.NewServer(APIMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
 
-	if err := http.ListenAndServe(":"+Port, mux); err != http.ErrServerClosed {
+	if os.Getenv("_LAMBDA_SERVER_PORT") != "" {
+		lambdaAdapter := httpadapter.New(mux)
+		lambda.Start(lambdaAdapter.ProxyWithContext)
+		return
+	}
+	if err := http.ListenAndServe(":"+Port, mux); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }
 
-func dbConnection() (*gorm.DB, error) {
-	db, err := gorm.Open(postgres.Open(DBConnectionString), &gorm.Config{
+func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, error) {
+	resp, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+		SecretId: &DBSecretName,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := gorm.Open(postgres.Open(*resp.SecretString), &gorm.Config{
 		NowFunc: timeutil.Now,
 	})
 	if err != nil {
@@ -213,20 +224,6 @@ func openidProvider(
 	*provider.Provider,
 	error,
 ) {
-
-	// Get the file path of the source file.
-	_, filename, _, _ := runtime.Caller(0)
-	sourceDir := filepath.Dir(filename)
-
-	templatesDirPath := filepath.Join(sourceDir, "../../templates")
-
-	loginTemplate := filepath.Join(templatesDirPath, "/login.html")
-	consentTemplate := filepath.Join(templatesDirPath, "/consent.html")
-	tmpl, err := template.ParseFiles(loginTemplate, consentTemplate)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	op, err := provider.New(goidc.ProfileFAPI1, AuthHost, func(_ context.Context) (goidc.JSONWebKeySet, error) {
 		return goidc.JSONWebKeySet{
 			Keys: []goidc.JSONWebKey{{
@@ -273,7 +270,6 @@ func openidProvider(
 		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(op, consentService)),
 		provider.WithPolicy(oidc.Policy(
 			AuthHost,
-			tmpl,
 			userService,
 			consentService,
 			accountService,
@@ -293,24 +289,11 @@ func openidProvider(
 	return op, nil
 }
 
-func kmsClient() *kms.Client {
-	kmsOpts := kms.Options{}
+func awsConfig() *aws.Config {
+	cfg := aws.NewConfig()
 	if Env == LocalEnvironment {
-		kmsOpts.Region = AWSRegion
-		kmsOpts.Credentials = credentials.NewStaticCredentialsProvider("test", "test", "")
-		kmsOpts.EndpointResolverV2 = localstackResolver{endpoint: AWSEndpoint}
+		cfg.BaseEndpoint = &AWSEndpoint
+		cfg.Credentials = credentials.NewStaticCredentialsProvider("test", "test", "")
 	}
-
-	return kms.New(kmsOpts)
-}
-
-type localstackResolver struct {
-	endpoint string
-}
-
-func (r localstackResolver) ResolveEndpoint(ctx context.Context, params kms.EndpointParameters) (smithyendpoints.Endpoint, error) {
-	uri, _ := url.Parse(r.endpoint)
-	return smithyendpoints.Endpoint{
-		URI: *uri,
-	}, nil
+	return cfg
 }

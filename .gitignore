@@ -28,3 +28,4 @@ go.work.sum
 conformance-suite/
 cs_config.json
 keys/
+lambda.zip

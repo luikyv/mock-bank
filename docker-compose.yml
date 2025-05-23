@@ -1,15 +1,28 @@
 services:
-  mockbank:
+  localstack:
     profiles:
+      - debug
       - main
-    build: .
+    image: localstack/localstack
+    ports:
+      - "4566:4566"
     environment:
-      - DB_CONNECTION_STRING=postgres://admin:pass@psql:5432/mockbank?sslmode=disable
+      - SERVICES=iam,lambda,apigateway,kms,secretsmanager
+      - AWS_ACCESS_KEY_ID="test"
+      - AWS_SECRET_ACCESS_KEY="test"
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:
-      - ./keys/:/app/keys/
-    depends_on:
-      - psql
-      - localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+      - shared:/shared
+      - ./testdata/setup-localstack.sh:/etc/localstack/init/ready.d/setup.sh
+      - ./lambda.zip:/tmp/lambda.zip
+    healthcheck:
+      test: ["CMD", "test", "-f", "/shared/mockbank_url.txt"]
+      interval: 2s
+      timeout: 1s
+      retries: 30
+      start_period: 2s
 
   psql:
     image: postgres
@@ -27,6 +40,7 @@ services:
     build:
       context: ./cmd/mockgw
     volumes:
+      - shared:/shared
       - ./keys/server.crt:/mocks/server.crt
       - ./keys/server.key:/mocks/server.key
       - ./keys/client_one_pub.jwks:/mocks/client.jwks
@@ -50,23 +64,9 @@ services:
           - matls-api.mockbank.local
           - directory.local
           - keystore.local
-
-  localstack:
-    profiles:
-      - debug
-      - main
-    image: localstack/localstack
-    ports:
-      - "4566:4566"
-    environment:
-      - SERVICES=kms
-      - AWS_ACCESS_KEY_ID="test"
-      - AWS_SECRET_ACCESS_KEY="test"
-      - DEBUG=1
-      - DOCKER_HOST=unix:///var/run/docker.sock
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./testdata/setup-localstack.sh:/etc/localstack/init/ready.d/setup.sh
+    depends_on:
+      localstack:
+        condition: service_healthy
 
   cs-httpd:
     profiles:
@@ -137,4 +137,6 @@ services:
 
 volumes:
   maven-cache:
+    driver: local
+  shared:
     driver: local

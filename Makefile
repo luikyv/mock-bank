@@ -4,13 +4,10 @@ DSN="postgres://admin:pass@localhost:5432/mockbank?sslmode=disable"
 ORG_ID="00000000-0000-0000-0000-000000000000"
 SOFTWARE_ID="11111111-1111-1111-1111-111111111111"
 
-setup:
-	@make keys
-
 # Set up the development environment by downloading dependencies installing
 # pre-commit hooks, generating keys, and setting up the Open Finance
 # Conformance Suite.
-setup-dev:
+setup:
 	@go mod download
 	@pre-commit install
 	@make tools
@@ -20,21 +17,36 @@ setup-dev:
 
 tools:
 	@go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
-	@go install github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+	@go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+lambda-zip:
+	@GOOS=linux GOARCH=amd64 go build -o main ./cmd/server/main.go
+	@zip -r lambda.zip main templates/
+	@rm main
 
 # Runs the main MockBank components.
 run:
+	@make lambda-zip
+	@docker volume rm mock-bank_shared
 	@docker-compose --profile main up
+
+# Start MockBank along with the Open Finance Conformance Suite.
+run-with-cs:
+	@make lambda-zip
+	@docker volume rm mock-bank_shared
+	@docker-compose --profile main --profile conformance up
 
 # Runs only the MockBank dependencies necessary for debugging. With this
 # command the MockBank server can run and be debugged in the local host.
 debug:
+	@docker volume rm mock-bank_shared
 	@docker-compose --profile debug up
 
 # Runs the local debug environment with both MockBank and the Conformance
 # Suite. With this command the MockBank server can run and be debugged in the
 # local host with the Conformance Suite.
 debug-with-cs:
+	@docker volume rm mock-bank_shared
 	@docker-compose --profile debug --profile conformance up
 
 # Run the Conformance Suite.
@@ -86,10 +98,6 @@ setup-cs:
 build-cs:
 	@docker compose run cs-builder
 
-# Start MockBank along with the Open Finance Conformance Suite.
-run-with-cs:
-	@docker-compose --profile main --profile conformance up
-
 # Create a Conformance Suite configuration file using the client keys in /keys.
 cs-config:
 	@jq -n \
@@ -122,6 +130,7 @@ cs-config:
 	      }, \
 		  "resource": { \
 	        "brazilOrganizationId": "00000000-0000-0000-0000-000000000000", \
+			"brazilCpf": "12345678901" \
 	      }, \
 		  "directory": { \
 		  	"keystore": "https://keystore.local", \

@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"embed"
 	"errors"
 	"html/template"
 	"log/slog"
@@ -17,13 +18,19 @@ import (
 	"github.com/unrolled/secure"
 )
 
+//go:embed *.html
+var templates embed.FS
+
 func Policy(
 	baseURL string,
-	tmpl *template.Template,
 	userService user.Service,
 	consentService consent.Service,
 	accountService account.Service,
 ) goidc.AuthnPolicy {
+	tmpl, err := template.ParseFS(templates, "login.html", "consent.html")
+	if err != nil {
+		panic(err)
+	}
 	authenticator := authenticator{
 		tmpl:           tmpl,
 		baseURL:        baseURL,

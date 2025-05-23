@@ -25,6 +25,13 @@ import (
 func main() {
 	nonce := ""
 
+	mockbankHostBytes, err := os.ReadFile("/shared/mockbank_url.txt")
+	if err != nil {
+		log.Fatalf("failed to read mockbank url: %v", err)
+	}
+	mockbankHost := strings.TrimSpace(string(mockbankHostBytes))
+	log.Printf("mockbank host: %v\n", mockbankHost)
+
 	directoryJWKSBytes, err := os.ReadFile("/mocks/directory_jwks.json")
 	if err != nil {
 		log.Fatal("failed to read directory jwks:", err)
@@ -160,7 +167,7 @@ func main() {
 	fallbackURL, _ := url.Parse("http://host.docker.internal")
 	fallbackProxy := httputil.NewSingleHostReverseProxy(fallbackURL)
 	// Reverse proxy for mockbank.
-	mockbankURL, _ := url.Parse("http://mockbank")
+	mockbankURL, _ := url.Parse(mockbankHost)
 	reverseProxy := httputil.NewSingleHostReverseProxy(mockbankURL)
 	mbHandler := mockbankHandler(reverseProxy, fallbackProxy)
 	mux.HandleFunc("auth.mockbank.local/", mbHandler)
