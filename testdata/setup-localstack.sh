@@ -1,5 +1,7 @@
 #!/bin/bash
 
+rm -f /shared/mockbank_url.txt
+
 # Exit immediately if any command fails.
 set -e
 
@@ -19,7 +21,7 @@ awslocal kms create-alias --alias-name "alias/mockbank-directory-client-signing-
 
 awslocal secretsmanager create-secret \
   --name mockbank/db-credentials \
-  --secret-string 'postgres://admin:pass@psql:5432/mockbank?sslmode=disable'
+  --secret-string 'postgres://admin:pass@psql.local:5432/mockbank?sslmode=disable'
 
 awslocal iam create-role \
   --role-name mockbank-lambda-role \

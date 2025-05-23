@@ -6,11 +6,9 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -164,12 +162,12 @@ func main() {
 	})
 
 	// Reverse proxy fallback.
-	fallbackURL, _ := url.Parse("http://host.docker.internal")
-	fallbackProxy := httputil.NewSingleHostReverseProxy(fallbackURL)
+	mockbankLocalhostURL, _ := url.Parse("http://host.docker.internal")
+	mockbankLocalhostReverseProxy := httputil.NewSingleHostReverseProxy(mockbankLocalhostURL)
 	// Reverse proxy for mockbank.
 	mockbankURL, _ := url.Parse(mockbankHost)
-	reverseProxy := httputil.NewSingleHostReverseProxy(mockbankURL)
-	mbHandler := mockbankHandler(reverseProxy, fallbackProxy)
+	mockbankReverseProxy := httputil.NewSingleHostReverseProxy(mockbankURL)
+	mbHandler := mockbankHandler(mockbankLocalhostReverseProxy, mockbankReverseProxy)
 	mux.HandleFunc("auth.mockbank.local/", mbHandler)
 	mux.HandleFunc("matls-auth.mockbank.local/", mbHandler)
 	mux.HandleFunc("matls-api.mockbank.local/", mbHandler)
@@ -265,12 +263,12 @@ func mockbankHandler(reverseProxy, fallbackProxy *httputil.ReverseProxy) http.Ha
 
 		reverseProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 			log.Println("Proxy error:", err)
-			var dnsErr *net.DNSError
-			if errors.As(err, &dnsErr) {
-				log.Println("DNS resolution failed, serving fallback")
-				fallbackProxy.ServeHTTP(w, rCopy)
+			if strings.Contains(err.Error(), "connection refused") {
+				log.Println("Connection refused, serving fallback")
+				fallbackProxy.ServeHTTP(w, r)
 				return
 			}
+
 			http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		}
 

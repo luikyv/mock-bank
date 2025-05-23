@@ -1,8 +1,5 @@
 services:
   localstack:
-    profiles:
-      - debug
-      - main
     image: localstack/localstack
     ports:
       - "4566:4566"
@@ -15,8 +12,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - shared:/shared
-      - ./testdata/setup-localstack.sh:/etc/localstack/init/ready.d/setup.sh
-      - ./lambda.zip:/tmp/lambda.zip
+      - ./testdata/setup-localstack.sh:/etc/localstack/init/ready.d/setup.sh:ro
+      - ./lambda.zip:/tmp/lambda.zip:ro
     healthcheck:
       test: ["CMD", "test", "-f", "/shared/mockbank_url.txt"]
       interval: 2s
@@ -32,25 +29,26 @@ services:
       POSTGRES_DB: mockbank
     ports:
       - "5432:5432"
+    networks:
+      default:
+        aliases:
+          - psql.local
 
   mockgw:
-    profiles:
-      - debug
-      - main
     build:
       context: ./cmd/mockgw
     volumes:
       - shared:/shared
-      - ./keys/server.crt:/mocks/server.crt
-      - ./keys/server.key:/mocks/server.key
-      - ./keys/client_one_pub.jwks:/mocks/client.jwks
-      - ./keys/client_ca.crt:/mocks/client_ca.crt
-      - ./testdata/participants.json:/mocks/participants.json
-      - ./testdata/directory_jwks.json:/mocks/directory_jwks.json
-      - ./testdata/directory_well_known.json:/mocks/directory_well_known.json
-      - ./testdata/id_token.json:/mocks/id_token.json
-      - ./testdata/software_statement.json:/mocks/software_statement.json
-      - ./testdata/software_statement_jwks.json:/mocks/software_statement_jwks.json
+      - ./keys/server.crt:/mocks/server.crt:ro
+      - ./keys/server.key:/mocks/server.key:ro
+      - ./keys/client_one_pub.jwks:/mocks/client.jwks:ro
+      - ./keys/client_ca.crt:/mocks/client_ca.crt:ro
+      - ./testdata/participants.json:/mocks/participants.json:ro
+      - ./testdata/directory_jwks.json:/mocks/directory_jwks.json:ro
+      - ./testdata/directory_well_known.json:/mocks/directory_well_known.json:ro
+      - ./testdata/id_token.json:/mocks/id_token.json:ro
+      - ./testdata/software_statement.json:/mocks/software_statement.json:ro
+      - ./testdata/software_statement_jwks.json:/mocks/software_statement_jwks.json:ro
     ports:
       - 443:443
     networks:
@@ -117,6 +115,8 @@ services:
         max-file: "5"
 
   cs-mongodb:
+    profiles:
+      - conformance
     image: mongo:latest
     ports:
       - 27017:27017

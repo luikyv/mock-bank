@@ -44,6 +44,10 @@ const (
 	LocalEnvironment Environment = "LOCAL"
 )
 
+func (e Environment) IsLocal() bool {
+	return e == LocalEnvironment
+}
+
 var (
 	Env                            = getEnv("ENV", LocalEnvironment)
 	Host                           = getEnv("HOST", "https://mockbank.local")
@@ -204,7 +208,7 @@ func (h *logCtxHandler) Handle(ctx context.Context, r slog.Record) error {
 
 func httpClient() *http.Client {
 	tlsConfig := &tls.Config{}
-	if Env == LocalEnvironment {
+	if Env.IsLocal() {
 		tlsConfig.InsecureSkipVerify = true
 	}
 	return &http.Client{
@@ -291,7 +295,7 @@ func openidProvider(
 
 func awsConfig() *aws.Config {
 	cfg := aws.NewConfig()
-	if Env == LocalEnvironment {
+	if Env.IsLocal() {
 		cfg.BaseEndpoint = &AWSEndpoint
 		cfg.Credentials = credentials.NewStaticCredentialsProvider("test", "test", "")
 	}

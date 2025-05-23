@@ -21,36 +21,17 @@ tools:
 
 lambda-zip:
 	@GOOS=linux GOARCH=amd64 go build -o main ./cmd/server/main.go
-	@zip -r lambda.zip main templates/
+	@zip -r lambda.zip main
 	@rm main
 
 # Runs the main MockBank components.
 run:
 	@make lambda-zip
-	@docker volume rm mock-bank_shared
-	@docker-compose --profile main up
+	@docker-compose up
 
 # Start MockBank along with the Open Finance Conformance Suite.
 run-with-cs:
 	@make lambda-zip
-	@docker volume rm mock-bank_shared
-	@docker-compose --profile main --profile conformance up
-
-# Runs only the MockBank dependencies necessary for debugging. With this
-# command the MockBank server can run and be debugged in the local host.
-debug:
-	@docker volume rm mock-bank_shared
-	@docker-compose --profile debug up
-
-# Runs the local debug environment with both MockBank and the Conformance
-# Suite. With this command the MockBank server can run and be debugged in the
-# local host with the Conformance Suite.
-debug-with-cs:
-	@docker volume rm mock-bank_shared
-	@docker-compose --profile debug --profile conformance up
-
-# Run the Conformance Suite.
-run-cs:
 	@docker-compose --profile conformance up
 
 # Generate certificates, private keys, and JWKS files for both the server and clients.
