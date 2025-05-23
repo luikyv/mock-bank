@@ -91,7 +91,8 @@ awslocal lambda create-function \
   --runtime go1.x \
   --handler main \
   --role arn:aws:iam::000000000000:role/mockbank-lambda-role \
-  --zip-file fileb:///tmp/lambda.zip
+  --zip-file fileb:///tmp/lambda.zip \
+  --environment Variables="{ENV=AWS_LOCAL}"
 
 API_ID=$(awslocal apigateway create-rest-api --name "proxy-api" --query 'id' --output text)
 ROOT_ID=$(awslocal apigateway get-resources --rest-api-id "$API_ID" --query 'items[0].id' --output text)

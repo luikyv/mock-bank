@@ -41,11 +41,17 @@ import (
 type Environment string
 
 const (
-	LocalEnvironment Environment = "LOCAL"
+	AWSEnvironment      Environment = "AWS"
+	AWSLocalEnvironment Environment = "AWS_LOCAL"
+	LocalEnvironment    Environment = "LOCAL"
 )
 
+func (e Environment) IsAWS() bool {
+	return strings.Contains(string(e), "AWS")
+}
+
 func (e Environment) IsLocal() bool {
-	return e == LocalEnvironment
+	return strings.Contains(string(e), "LOCAL")
 }
 
 var (
@@ -134,7 +140,7 @@ func main() {
 	resourcev3.NewServer(APIMTLSHost, resouceService, consentService, op).RegisterRoutes(mux)
 	accountv2.NewServer(APIMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
 
-	if os.Getenv("_LAMBDA_SERVER_PORT") != "" {
+	if Env.IsAWS() {
 		lambdaAdapter := httpadapter.New(mux)
 		lambda.Start(lambdaAdapter.ProxyWithContext)
 		return
