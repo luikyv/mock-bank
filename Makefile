@@ -20,9 +20,9 @@ tools:
 	@go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 lambda-zip:
-	@GOOS=linux GOARCH=amd64 go build -o main ./cmd/server/main.go
-	@zip -r lambda.zip main
-	@rm main
+	@GOOS=linux GOARCH=amd64 go build -o bootstrap ./cmd/server/main.go
+	@zip lambda.zip bootstrap
+	@rm bootstrap
 
 # Runs the main MockBank components.
 run:
