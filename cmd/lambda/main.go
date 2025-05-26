@@ -104,7 +104,9 @@ func main() {
 	slog.Info("starting mock bank lambda", slog.String("env", string(Env)))
 
 	// Database.
+	slog.Info("creating secrets manager client")
 	secretsClient := secretsmanager.NewFromConfig(*awsConfig)
+	slog.Info("secrets manager client created")
 	db, err := dbConnection(ctx, secretsClient)
 	if err != nil {
 		log.Fatalf("failed connecting to database: %v", err)
@@ -164,9 +166,11 @@ func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, err
 		Engine   string `json:"engine"`
 	}
 
+	slog.Info("retrieving database credentials from secrets manager", slog.String("secret_name", DBSecretName))
 	resp, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
 		SecretId: &DBSecretName,
 	})
+	slog.Info("retrieved database credentials from secrets manager")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get secret: %w", err)
 	}
@@ -181,7 +185,7 @@ func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, err
 		secret.Host, secret.Port, secret.Username, secret.Password, secret.DBName,
 	)
 
-	slog.Info("database dsn", slog.String("dsn", dsn))
+	slog.Info("connecting to database dsn", slog.String("dsn", dsn))
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		NowFunc: timeutil.Now,
