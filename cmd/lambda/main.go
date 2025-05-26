@@ -13,6 +13,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
@@ -97,7 +98,7 @@ func main() {
 
 	http.DefaultClient = httpClient()
 	slog.SetDefault(logger())
-	awsConfig := awsConfig()
+	awsConfig := awsConfig(ctx)
 
 	// Database.
 	secretsClient := secretsmanager.NewFromConfig(*awsConfig)
@@ -299,11 +300,16 @@ func openidProvider(
 	return op, nil
 }
 
-func awsConfig() *aws.Config {
-	cfg := aws.NewConfig()
+func awsConfig(ctx context.Context) *aws.Config {
+
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		log.Fatalf("unable to load SDK config, %v", err)
+	}
+
 	if Env.IsLocal() {
 		cfg.BaseEndpoint = &AWSEndpoint
 		cfg.Credentials = credentials.NewStaticCredentialsProvider("test", "test", "")
 	}
-	return cfg
+	return &cfg
 }
