@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -176,12 +175,12 @@ func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, err
 	}
 
 	dsn := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=require",
 		secret.Host, secret.Port, secret.Username, secret.Password, secret.DBName,
 	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		NowFunc: time.Now, // or your custom timeutil.Now
+		NowFunc: timeutil.Now, // or your custom timeutil.Now
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
