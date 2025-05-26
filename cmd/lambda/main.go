@@ -101,6 +101,8 @@ func main() {
 	slog.SetDefault(logger())
 	awsConfig := awsConfig(ctx)
 
+	slog.Info("starting mock bank lambda", slog.String("env", string(Env)))
+
 	// Database.
 	secretsClient := secretsmanager.NewFromConfig(*awsConfig)
 	db, err := dbConnection(ctx, secretsClient)
@@ -175,12 +177,12 @@ func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, err
 	}
 
 	dsn := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=require",
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable connect_timeout=5",
 		secret.Host, secret.Port, secret.Username, secret.Password, secret.DBName,
 	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		NowFunc: timeutil.Now, // or your custom timeutil.Now
+		NowFunc: timeutil.Now,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
