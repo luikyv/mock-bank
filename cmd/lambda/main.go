@@ -19,7 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
+	httpadapter "github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/api/accountv2"
