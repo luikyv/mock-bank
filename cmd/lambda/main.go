@@ -181,12 +181,16 @@ func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, err
 		secret.Host, secret.Port, secret.Username, secret.Password, secret.DBName,
 	)
 
+	slog.Info("database dsn", slog.String("dsn", dsn))
+
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		NowFunc: timeutil.Now,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
+
+	slog.Info("successfully connected to database")
 
 	return db, nil
 }
