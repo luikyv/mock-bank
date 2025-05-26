@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -150,12 +151,13 @@ func main() {
 	resourcev3.NewServer(APIMTLSHost, resouceService, consentService, op).RegisterRoutes(mux)
 	accountv2.NewServer(APIMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
 
+	handler := loggingMiddleware(mux)
 	if Env.IsAWS() {
-		lambdaAdapter := httpadapter.New(mux)
+		lambdaAdapter := httpadapter.New(handler)
 		lambda.Start(lambdaAdapter.ProxyWithContext)
 		return
 	}
-	if err := http.ListenAndServe(":"+Port, mux); err != nil && err != http.ErrServerClosed {
+	if err := http.ListenAndServe(":"+Port, handler); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }
@@ -344,4 +346,18 @@ func awsConfig(ctx context.Context) *aws.Config {
 		cfg.Credentials = credentials.NewStaticCredentialsProvider("test", "test", "")
 	}
 	return &cfg
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := timeutil.Now()
+		defer func() {
+			slog.Info("request completed",
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+				slog.Duration("duration", time.Since(start)),
+			)
+		}()
+		next.ServeHTTP(w, r)
+	})
 }
