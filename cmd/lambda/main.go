@@ -40,6 +40,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// TODO: How to init the resources for lambda?
+
 type Environment string
 
 const (
@@ -113,7 +115,9 @@ func main() {
 	}
 
 	// Keys.
+	slog.Info("creating kms client")
 	kmsClient := kms.NewFromConfig(*awsConfig)
+	slog.Info("kms client created")
 	opSigner, err := joseutil.NewKMSSigner(ctx, OPKMSSigningKeyID, kmsClient)
 	if err != nil {
 		log.Fatalf("could not load kms signer for op: %v\n", err)
