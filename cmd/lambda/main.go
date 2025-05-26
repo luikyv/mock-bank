@@ -153,7 +153,7 @@ func main() {
 
 	handler := loggingMiddleware(mux)
 	if Env.IsAWS() {
-		lambdaAdapter := httpadapter.New(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lambdaAdapter := httpadapter.NewV2(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			log.Printf("RAW Lambda request: method=%s, path=%s, url=%s", r.Method, r.URL.Path, r.URL.String())
 			handler.ServeHTTP(w, r)
 		}))
