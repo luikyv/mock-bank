@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -152,15 +154,34 @@ func main() {
 }
 
 func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, error) {
+	type dbSecret struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Host     string `json:"host"`
+		Port     int    `json:"port"`
+		DBName   string `json:"dbname"`
+		Engine   string `json:"engine"`
+	}
+
 	resp, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
 		SecretId: &DBSecretName,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get secret: %w", err)
 	}
 
-	db, err := gorm.Open(postgres.Open(*resp.SecretString), &gorm.Config{
-		NowFunc: timeutil.Now,
+	var secret dbSecret
+	if err := json.Unmarshal([]byte(*resp.SecretString), &secret); err != nil {
+		return nil, fmt.Errorf("failed to parse secret JSON: %w", err)
+	}
+
+	dsn := fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		secret.Host, secret.Port, secret.Username, secret.Password, secret.DBName,
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		NowFunc: time.Now, // or your custom timeutil.Now
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
