@@ -185,11 +185,9 @@ func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, err
 	}
 
 	dsn := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable connect_timeout=5",
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=require connect_timeout=5",
 		secret.Host, secret.Port, secret.Username, secret.Password, secret.DBName,
 	)
-
-	slog.Info("connecting to database dsn", slog.String("dsn", dsn))
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		NowFunc: timeutil.Now,
