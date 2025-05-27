@@ -30,12 +30,12 @@ jobs:
       - name: Build Lambda binary
         run: |
           mkdir -p build
-          GOOS=linux GOARCH=amd64 go build -o build/main ./cmd/lambda
+          GOOS=linux GOARCH=amd64 go build -o build/bootstrap ./cmd/lambda
 
       - name: Zip Lambda
         run: |
           cd build
-          zip main.zip main
+          zip main.zip bootstrap
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
