@@ -9,6 +9,11 @@ on:
   push:
     branches: [main]
 
+env:
+  S3_BUCKET: mockbank-lambda-artifacts
+  LAMBDA_NAME: mockbank-lambda
+  AWS_ROLE: arn:aws:iam::208072937240:role/mockbank-github-oidc
+
 jobs:
   deploy-s3:
     runs-on: ubuntu-latest
@@ -25,20 +30,29 @@ jobs:
       - name: Build Lambda binary
         run: |
           mkdir -p build
-          GOOS=linux GOARCH=amd64 go build -o build/bootstrap ./cmd/lambda
+          GOOS=linux GOARCH=amd64 go build -o build/main ./cmd/lambda
 
       - name: Zip Lambda
         run: |
           cd build
-          zip main.zip bootstrap
+          zip main.zip main
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: arn:aws:iam::208072937240:role/mockbank-github-oidc
+          role-to-assume: ${{ env.AWS_ROLE }}
           role-session-name: mockbank-github-ci
           aws-region: us-east-1
 
       - name: Upload Lambda to S3
         run: |
-          aws s3 cp build/main.zip s3://mockbank-lambda-artifacts/mockbank/main.zip
+          TIMESTAMP=$(date -u +"%Y-%m-%d")
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          RELEASE_VERSION="${TIMESTAMP}-${COMMIT_SHA}"
+          S3_KEY="$LAMBDA_NAME/$RELEASE_VERSION/main.zip"
+
+          echo "Uploading to s3://$S3_BUCKET/$S3_KEY"
+          aws s3 cp build/main.zip s3://$S3_BUCKET/$S3_KEY
+
+          echo "{\"release_version\": \"$RELEASE_VERSION\"}" > metadata.json
+          aws s3 cp metadata.json s3://$S3_BUCKET/$LAMBDA_NAME/metadata.json

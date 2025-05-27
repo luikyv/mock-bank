@@ -41,8 +41,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// TODO: How to init the resources for lambda?
-
 type Environment string
 
 const (
@@ -61,11 +59,11 @@ func (e Environment) IsLocal() bool {
 
 var (
 	Env                            = getEnv("ENV", LocalEnvironment)
-	Host                           = getEnv("HOST", "https://mockbank.local")
-	APPHost                        = strings.Replace(Host, "https://", "https://app.", 1)
-	APIMTLSHost                    = strings.Replace(Host, "https://", "https://matls-api.", 1)
-	AuthHost                       = strings.Replace(Host, "https://", "https://auth.", 1)
-	AuthMTLSHost                   = strings.Replace(Host, "https://", "https://matls-auth.", 1)
+	BaseDomain                     = getEnv("BASE_DOMAIN", "mockbank.local")
+	APPHost                        = "https://app." + BaseDomain
+	APIMTLSHost                    = "https://matls-api." + BaseDomain
+	AuthHost                       = "https://auth." + BaseDomain
+	AuthMTLSHost                   = "https://matls-auth." + BaseDomain
 	DirectoryIssuer                = getEnv("DIRECTORY_ISSUER", "https://directory.local")
 	DirectoryClientID              = getEnv("DIRECTORY_CLIENT_ID", "mockbank")
 	SoftwareStatementJWKSURL       = getEnv("SS_JWKS_URL", "https://keystore.local/openbanking.jwks")
@@ -77,34 +75,14 @@ var (
 	AWSEndpoint                    = getEnv("AWS_ENDPOINT_URL", "http://localhost:4566")
 )
 
-var Scopes = []goidc.Scope{
-	goidc.ScopeOpenID,
-	consent.ScopeID,
-	consent.Scope,
-	// customer.Scope,
-	account.Scope,
-	// creditcard.Scope,
-	// ScopeLoans,
-	// ScopeFinancings,
-	// ScopeUnarrangedAccountsOverdraft,
-	// ScopeInvoiceFinancings,
-	// ScopeBankFixedIncomes,
-	// ScopeCreditFixedIncomes,
-	// ScopeVariableIncomes,
-	// ScopeTreasureTitles,
-	// ScopeFunds,
-	// ScopeExchanges,
-	resource.Scope,
-}
+var Handler http.Handler
 
-func main() {
+func init() {
 	ctx := context.Background()
 
 	http.DefaultClient = httpClient()
 	slog.SetDefault(logger())
 	awsConfig := awsConfig(ctx)
-
-	slog.Info("starting mock bank lambda", slog.String("env", string(Env)))
 
 	// Database.
 	slog.Info("creating secrets manager client")
@@ -119,6 +97,7 @@ func main() {
 	slog.Info("creating kms client")
 	kmsClient := kms.NewFromConfig(*awsConfig)
 	slog.Info("kms client created")
+
 	opSigner, err := joseutil.NewKMSSigner(ctx, OPKMSSigningKeyID, kmsClient)
 	if err != nil {
 		log.Fatalf("could not load kms signer for op: %v\n", err)
@@ -151,19 +130,21 @@ func main() {
 	resourcev3.NewServer(APIMTLSHost, resouceService, consentService, op).RegisterRoutes(mux)
 	accountv2.NewServer(APIMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
 
-	handler := loggingMiddleware(mux)
-	if Env.IsAWS() {
-		lambdaAdapter := httpadapter.NewV2(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("RAW Lambda request: method=%s, path=%s, url=%s", r.Method, r.URL.Path, r.URL.String())
-			handler.ServeHTTP(w, r)
-		}))
-		// lambdaAdapter := httpadapter.New(handler)
-		lambda.Start(lambdaAdapter.ProxyWithContext)
+	Handler = loggingMiddleware(mux)
+}
+
+func main() {
+	slog.Info("starting mock bank lambda", slog.String("env", string(Env)))
+
+	if !Env.IsAWS() {
+		if err := http.ListenAndServe(":"+Port, Handler); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
 		return
 	}
-	if err := http.ListenAndServe(":"+Port, handler); err != nil && err != http.ErrServerClosed {
-		log.Fatal(err)
-	}
+
+	lambdaAdapter := httpadapter.NewV2(Handler)
+	lambda.Start(lambdaAdapter.ProxyWithContext)
 }
 
 func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, error) {
@@ -176,7 +157,7 @@ func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, err
 		Engine   string `json:"engine"`
 	}
 
-	slog.Info("retrieving database credentials from secrets manager", slog.String("secret_name", DBSecretName))
+	slog.Info("retrieving database credentials from secrets manager")
 	resp, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
 		SecretId: &DBSecretName,
 	})
@@ -195,6 +176,7 @@ func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, err
 		secret.Host, secret.Port, secret.Username, secret.Password, secret.DBName,
 	)
 
+	slog.Info("connecting to database")
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		NowFunc: timeutil.Now,
 	})
@@ -273,6 +255,26 @@ func openidProvider(
 	*provider.Provider,
 	error,
 ) {
+	var scopes = []goidc.Scope{
+		goidc.ScopeOpenID,
+		consent.ScopeID,
+		consent.Scope,
+		// customer.Scope,
+		account.Scope,
+		// creditcard.Scope,
+		// ScopeLoans,
+		// ScopeFinancings,
+		// ScopeUnarrangedAccountsOverdraft,
+		// ScopeInvoiceFinancings,
+		// ScopeBankFixedIncomes,
+		// ScopeCreditFixedIncomes,
+		// ScopeVariableIncomes,
+		// ScopeTreasureTitles,
+		// ScopeFunds,
+		// ScopeExchanges,
+		resource.Scope,
+	}
+
 	op, err := provider.New(goidc.ProfileFAPI1, AuthHost, func(_ context.Context) (goidc.JSONWebKeySet, error) {
 		return goidc.JSONWebKeySet{
 			Keys: []goidc.JSONWebKey{{
@@ -294,7 +296,7 @@ func openidProvider(
 		provider.WithSignerFunc(func(ctx context.Context, alg goidc.SignatureAlgorithm) (kid string, s crypto.Signer, err error) {
 			return "signer", signer, nil
 		}),
-		provider.WithScopes(Scopes...),
+		provider.WithScopes(scopes...),
 		provider.WithTokenOptions(oidc.TokenOptionsFunc()),
 		provider.WithAuthorizationCodeGrant(),
 		provider.WithImplicitGrant(),
@@ -325,7 +327,7 @@ func openidProvider(
 		)),
 		provider.WithNotifyErrorFunc(oidc.LogError),
 		provider.WithDCR(oidc.DCRFunc(oidc.DCRConfig{
-			Scopes:     Scopes,
+			Scopes:     scopes,
 			SSURL:      SoftwareStatementJWKSURL,
 			SSIssuer:   SoftwareStatementIssuer,
 			HTTPClient: httpClient(),
@@ -359,6 +361,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			slog.Info("request completed",
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
+				slog.String("url", r.URL.String()),
 				slog.Duration("duration", time.Since(start)),
 			)
 		}()

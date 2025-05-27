@@ -136,14 +136,14 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 			return goidc.NewError(goidc.ErrorCodeInternalError, "could not fetch the keystore jwks")
 		}
 
-		parsedSsa, err := jwt.ParseSigned(ssa, []jose.SignatureAlgorithm{goidc.PS256})
+		parsedSSA, err := jwt.ParseSigned(ssa, []jose.SignatureAlgorithm{goidc.PS256})
 		if err != nil {
 			return goidc.WrapError(goidc.ErrorCodeInvalidClientMetadata, "invalid software statement", err)
 		}
 
 		var claims jwt.Claims
 		var ss SoftwareStatement
-		if err := parsedSsa.Claims(jwks.ToJOSE(), &claims, &ss); err != nil {
+		if err := parsedSSA.Claims(jwks.ToJOSE(), &claims, &ss); err != nil {
 			return goidc.WrapError(goidc.ErrorCodeInvalidClientMetadata, "invalid software statement signature", err)
 		}
 
