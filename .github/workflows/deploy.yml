@@ -10,7 +10,7 @@ on:
     branches: [main]
 
 env:
-  S3_BUCKET: mockbank-lambda-artifacts
+  S3_BUCKET: mockbank-lambda-deployments
   LAMBDA_NAME: mockbank-lambda
   AWS_ROLE: arn:aws:iam::208072937240:role/mockbank-github-oidc
 
