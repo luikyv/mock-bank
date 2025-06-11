@@ -37,5 +37,4 @@ actions:
       path: github.com/luiky/mock-bank/internal/timeutil
 
 - target: $.components.responses[*].headers.x-fapi-interaction-id
-  description: Remove x-fapi-interaction-id header from all responses
   remove: true

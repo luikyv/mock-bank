@@ -1,0 +1,69 @@
+overlay: 1.0.0
+info:
+  title: Overlay
+  version: 0.0.0
+actions:
+
+- target: $.components.schemas[*].properties.meta
+  update:
+    x-go-type: api.Meta
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/api
+- target: $.components.schemas[*].properties.meta.$ref
+  remove: true
+
+- target: $.components.schemas[*].properties.links
+  update:
+    x-go-type: api.Links
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/api
+- target: $.components.schemas[*].properties.links.$ref
+  remove: true
+
+- target: $..[*][?(@.format == "date")]
+  update:
+    x-go-type: timeutil.Date
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/timeutil
+
+- target: $..[*][?(@.format == "date-time")]
+  update:
+    x-go-type: timeutil.DateTime
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/timeutil2
+
+- target: $.components.schemas.Schedule
+  update:
+    x-go-type: payment.Schedule
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/payment
+
+- target: $.components.responses[*].headers.x-fapi-interaction-id
+  remove: true
+
+- target: $.components.parameters.XIdempotencyKey.schema.pattern
+  remove: true
+
+- target: $.paths./consents.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./consents.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/CreatePaymentConsent'
+
+- target: $.components.responses.201PaymentsConsentsConsentCreated.content.application/jwt
+  remove: true
+- target: $.components.responses.201PaymentsConsentsConsentCreated.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponseCreatePaymentConsent'
+
+- target: $.components.responses.200PaymentsConsentsConsentIdRead.content.application/jwt
+  remove: true
+- target: $.components.responses.200PaymentsConsentsConsentIdRead.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponsePaymentConsent'

@@ -22,7 +22,7 @@ func AuthMiddleware(next http.Handler, op *provider.Provider, scopes ...goidc.Sc
 		tokenInfo, err := op.TokenInfoFromRequest(w, r)
 		if err != nil {
 			slog.InfoContext(r.Context(), "the token is not active", "error", err.Error())
-			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(true))
+			api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(true))
 			return
 		}
 
@@ -35,7 +35,7 @@ func AuthMiddleware(next http.Handler, op *provider.Provider, scopes ...goidc.Sc
 		tokenScopes := strings.Split(tokenInfo.Scopes, " ")
 		if !areScopesValid(scopes, tokenScopes) {
 			slog.InfoContext(r.Context(), "invalid scopes", "token_scopes", tokenInfo.Scopes)
-			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "token missing scopes").Pagination(true))
+			api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "token missing scopes").Pagination(true))
 			return
 		}
 

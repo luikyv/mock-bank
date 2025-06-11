@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"flag"
-	"fmt"
 	"log"
 	"math/big"
 	"os"
@@ -26,6 +25,7 @@ var (
 	oidUID = asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 1}
 )
 
+// TODO: Review this.
 func main() {
 	_, filename, _, _ := runtime.Caller(0)
 	workingDir := filepath.Dir(filename)
@@ -43,13 +43,23 @@ func main() {
 	serverCert, serverKey := generateServerCert("server", keysDir)
 	generateJWKS("server", serverCert, serverKey, keysDir)
 
-	caCert, caKey := generateCACert("client_ca", keysDir)
+	caCert, caKey := generateCACert("ca", keysDir)
 
-	clientOneCert, clientOneKey := generateCert("client_one", *softwareID, *orgID, caCert, caKey, keysDir)
-	generateJWKS("client_one", clientOneCert, clientOneKey, keysDir)
+	orgSigningCert, orgSigningKey := generateSigningCert("org_signing", *softwareID, *orgID, caCert, caKey, keysDir)
+	generateJWKS("org", orgSigningCert, orgSigningKey, keysDir)
 
-	clientTwoCert, clientTwoKey := generateCert("client_two", *softwareID, *orgID, caCert, caKey, keysDir)
-	generateJWKS("client_two", clientTwoCert, clientTwoKey, keysDir)
+	_, _ = generateSigningCert("op_signing", *softwareID, *orgID, caCert, caKey, keysDir)
+
+	generateTransportCert("directory_client_transport", *softwareID, *orgID, caCert, caKey, keysDir)
+	_, _ = generateSigningCert("directory_client_signing", *softwareID, *orgID, caCert, caKey, keysDir)
+
+	generateTransportCert("client_one_transport", *softwareID, *orgID, caCert, caKey, keysDir)
+	clientOneSigningCert, clientOneSigningKey := generateSigningCert("client_one_signing", *softwareID, *orgID, caCert, caKey, keysDir)
+	generateJWKS("client_one", clientOneSigningCert, clientOneSigningKey, keysDir)
+
+	generateTransportCert("client_two_transport", *softwareID, *orgID, caCert, caKey, keysDir)
+	clientTwoTransportCert, clientTwoTransportKey := generateSigningCert("client_two_signing", *softwareID, *orgID, caCert, caKey, keysDir)
+	generateJWKS("client_two", clientTwoTransportCert, clientTwoTransportKey, keysDir)
 }
 
 func generateServerCert(name, dir string) (*x509.Certificate, *rsa.PrivateKey) {
@@ -114,25 +124,24 @@ func generateSelfSignedCert(
 	savePEMFile(filepath.Join(dir, name+".key"), "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(key))
 	savePEMFile(filepath.Join(dir, name+".crt"), "CERTIFICATE", certBytes)
 
-	fmt.Printf("Generated self signed certificate and key for %s\n", name)
+	log.Printf("Generated self signed certificate and key for %s\n", name)
 	return template, key
 }
 
-func generateCert(
+func generateTransportCert(
 	name, softwareID, orgID string,
-	caCert *x509.Certificate,
-	caKey *rsa.PrivateKey,
+	caCert *x509.Certificate, caKey *rsa.PrivateKey,
 	dir string,
 ) (
 	*x509.Certificate,
 	*rsa.PrivateKey,
 ) {
-	clientKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	transportKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
-		log.Fatalf("Failed to generate client private key: %v", err)
+		log.Fatalf("Failed to generate transport private key: %v", err)
 	}
 
-	clientCert := &x509.Certificate{
+	transportCertTmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().UnixNano()),
 		Subject: pkix.Name{
 			CommonName:         softwareID,
@@ -144,33 +153,80 @@ func generateCert(
 				},
 			},
 		},
-		NotBefore:   time.Now(),
+		NotBefore:   time.Now().Add(-5 * time.Minute),
 		NotAfter:    time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:    x509.KeyUsageDigitalSignature,
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		IsCA:        false,
 	}
 
-	// Create client certificate signed by the CA.
-	clientCertBytes, err := x509.CreateCertificate(
-		rand.Reader,
-		clientCert,
-		caCert,
-		&clientKey.PublicKey,
-		caKey,
-	)
+	certDER, err := x509.CreateCertificate(rand.Reader, transportCertTmpl, caCert, &transportKey.PublicKey, caKey)
 	if err != nil {
-		log.Fatalf("Failed to create client certificate: %v", err)
+		log.Fatalf("Failed to create transport certificate: %v", err)
 	}
-	// This is important for when generation the claim "x5c" of the JWK
-	// corresponding to this cert.
-	clientCert.Raw = clientCertBytes
 
-	// Save client private key and certificate.
-	savePEMFile(filepath.Join(dir, name+".key"), "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(clientKey))
-	savePEMFile(filepath.Join(dir, name+".crt"), "CERTIFICATE", clientCertBytes)
+	savePEMFile(filepath.Join(dir, name+".key"), "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(transportKey))
+	savePEMFile(filepath.Join(dir, name+".crt"), "CERTIFICATE", certDER)
 
-	fmt.Printf("Generated key and certificate for %s\n", name)
-	return clientCert, clientKey
+	log.Printf("Generated transport key and certificate for %s\n", name)
+
+	parsedCert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		log.Fatalf("Failed to parse generated certificate: %v", err)
+	}
+
+	return parsedCert, transportKey
+}
+
+func generateSigningCert(
+	name, softwareID, orgID string,
+	caCert *x509.Certificate, caKey *rsa.PrivateKey,
+	dir string,
+) (
+	*x509.Certificate,
+	*rsa.PrivateKey,
+) {
+	signingKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		log.Fatalf("Failed to generate signing private key: %v", err)
+	}
+
+	signingCertTmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(time.Now().UnixNano()),
+		Subject: pkix.Name{
+			CommonName:         softwareID,
+			OrganizationalUnit: []string{orgID},
+			ExtraNames: []pkix.AttributeTypeAndValue{
+				{
+					Type:  oidUID,
+					Value: softwareID,
+				},
+			},
+		},
+		NotBefore:             time.Now().Add(-5 * time.Minute),
+		NotAfter:              time.Now().Add(2 * 365 * 24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{},
+		BasicConstraintsValid: true,
+		IsCA:                  false,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, signingCertTmpl, caCert, &signingKey.PublicKey, caKey)
+	if err != nil {
+		log.Fatalf("Failed to create signing certificate: %v", err)
+	}
+
+	savePEMFile(filepath.Join(dir, name+".key"), "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(signingKey))
+	savePEMFile(filepath.Join(dir, name+".crt"), "CERTIFICATE", certDER)
+
+	log.Printf("Generated signing key and certificate for %s\n", name)
+
+	parsedCert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		log.Fatalf("Failed to parse generated signing certificate: %v", err)
+	}
+
+	return parsedCert, signingKey
 }
 
 // Saves data to a PEM file.
@@ -195,7 +251,7 @@ func generateJWKS(
 ) {
 	sigJWK := goidc.JSONWebKey{
 		Key:          key,
-		KeyID:        uuid.NewString(),
+		KeyID:        "signer",
 		Algorithm:    string(goidc.PS256),
 		Use:          string(goidc.KeyUsageSignature),
 		Certificates: []*x509.Certificate{cert},
@@ -243,7 +299,7 @@ func generateEncryptionJWK() goidc.JSONWebKey {
 
 	return goidc.JSONWebKey{
 		Key:       key,
-		KeyID:     uuid.NewString(),
+		KeyID:     "encrypter",
 		Algorithm: string(goidc.RSA_OAEP),
 		Use:       string(goidc.KeyUsageEncryption),
 	}

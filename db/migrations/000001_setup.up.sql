@@ -6,6 +6,7 @@ CREATE TABLE sessions (
     username TEXT NOT NULL,
     organizations JSONB NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
+    code_verifier TEXT,
 
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
@@ -167,3 +168,38 @@ SELECT
 FROM consent_accounts ca
 JOIN consents c ON ca.consent_id = c.id
 WHERE c.status = 'AUTHORISED';
+
+CREATE TABLE payment_consents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    status TEXT NOT NULL,
+    status_updated_at TIMESTAMPTZ DEFAULT now(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    user_id UUID REFERENCES mock_users(id),
+    user_cpf TEXT NOT NULL,
+    business_cnpj TEXT,
+    client_id TEXT NOT NULL REFERENCES oauth_clients(id),
+    creditor_type TEXT NOT NULL,
+    creditor_cpf_cnpj TEXT NOT NULL,
+    creditor_name TEXT NOT NULL,
+    creditor_account_isbp TEXT NOT NULL,
+    creditor_account_issuer TEXT,
+    creditor_account_number TEXT NOT NULL,
+    creditor_account_type TEXT NOT NULL,
+    payment_type TEXT NOT NULL,
+    payment_schedule JSONB,
+    payment_date TIMESTAMPTZ,
+    currency TEXT NOT NULL,
+    amount TEXT NOT NULL,
+    ibge_town_code TEXT,
+    local_instrument TEXT NOT NULL,
+    qr_code TEXT,
+    proxy TEXT,
+    account_id UUID REFERENCES accounts(id),
+    rejection_reason_code TEXT,
+    rejection_reason_detail TEXT,
+
+    org_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_payment_consents_org_id_account_id ON payment_consents (org_id, account_id);

@@ -1,3 +1,4 @@
+//go:generate oapi-codegen -config=../oapi-config.yml -package=resourcev3 -o=./api_gen.go ./swagger.yml
 package resourcev3
 
 import (
@@ -40,28 +41,28 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	if err != nil {
 		panic(err)
 	}
-	spec.Servers = nil
 	swaggerMiddleware := netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
+		DoNotValidateServers: true,
 		Options: openapi3filter.Options{
 			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
 				return nil
 			},
 		},
 		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
+			api.WriteError(w, nil, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
 		},
 	})
 
 	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeResponseError(w, err)
+			writeResponseError(w, r, err)
 		},
 	})
 	wrapper := ServerInterfaceWrapper{
 		Handler:            strictHandler,
 		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, api.FAPIIDMiddleware(nil)},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
 	}
 
@@ -108,6 +109,6 @@ func (s Server) ResourcesGetResources(ctx context.Context, req ResourcesGetResou
 	return ResourcesGetResources200JSONResponse{OKResponseResourceListJSONResponse(resp)}, nil
 }
 
-func writeResponseError(w http.ResponseWriter, err error) {
-	api.WriteError(w, err)
+func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
+	api.WriteError(w, r, err)
 }

@@ -14,8 +14,12 @@ type IDToken struct {
 }
 
 type directoryWellKnown struct {
-	AuthEndpoint       string                    `json:"authorization_endpoint"`
-	PushedAuthEndpoint string                    `json:"pushed_authorization_request_endpoint"`
-	JWKSURI            string                    `json:"jwks_uri"`
-	IDTokenSigAlgs     []jose.SignatureAlgorithm `json:"id_token_signing_alg_values_supported"`
+	AuthEndpoint   string                    `json:"authorization_endpoint"`
+	JWKSURI        string                    `json:"jwks_uri"`
+	TokenEndpoint  string                    `json:"token_endpoint"`
+	IDTokenSigAlgs []jose.SignatureAlgorithm `json:"id_token_signing_alg_values_supported"`
+	MTLS           struct {
+		PushedAuthEndpoint string `json:"pushed_authorization_request_endpoint"`
+		TokenEndpoint      string `json:"token_endpoint"`
+	} `json:"mtls_endpoint_aliases"`
 }

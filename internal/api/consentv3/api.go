@@ -1,3 +1,4 @@
+//go:generate oapi-codegen -config=../oapi-config.yml -package=consentv3 -o=./api_gen.go ./swagger.yml
 package consentv3
 
 import (
@@ -38,28 +39,28 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	if err != nil {
 		panic(err)
 	}
-	spec.Servers = nil
 	swaggerMiddleware := netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
+		DoNotValidateServers: true,
 		Options: openapi3filter.Options{
 			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
 				return nil
 			},
 		},
 		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
+			api.WriteError(w, nil, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
 		},
 	})
 
 	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeResponseError(w, err)
+			writeResponseError(w, r, err)
 		},
 	})
 	wrapper := ServerInterfaceWrapper{
 		Handler:            strictHandler,
 		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, api.FAPIIDMiddleware(nil)},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
 	}
 
@@ -286,46 +287,46 @@ func (s Server) ConsentsGetConsentsConsentIDExtensions(ctx context.Context, req 
 	return ConsentsGetConsentsConsentIDExtensions200JSONResponse{N200ConsentsConsentIDReadExtensionsJSONResponse(resp)}, nil
 }
 
-func writeResponseError(w http.ResponseWriter, err error) {
+func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, consent.ErrAccessNotAllowed) {
-		api.WriteError(w, api.NewError("FORBIDDEN", http.StatusForbidden, consent.ErrAccessNotAllowed.Error()))
+		api.WriteError(w, r, api.NewError("FORBIDDEN", http.StatusForbidden, consent.ErrAccessNotAllowed.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrExtensionNotAllowed) {
-		api.WriteError(w, api.NewError("FORBIDDEN", http.StatusForbidden, consent.ErrExtensionNotAllowed.Error()))
+		api.WriteError(w, r, api.NewError("FORBIDDEN", http.StatusForbidden, consent.ErrExtensionNotAllowed.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrInvalidPermissionGroup) {
-		api.WriteError(w, api.NewError("COMBINACAO_PERMISSOES_INCORRETA", http.StatusUnprocessableEntity, consent.ErrInvalidPermissionGroup.Error()))
+		api.WriteError(w, r, api.NewError("COMBINACAO_PERMISSOES_INCORRETA", http.StatusUnprocessableEntity, consent.ErrInvalidPermissionGroup.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrPersonalAndBusinessPermissionsTogether) {
-		api.WriteError(w, api.NewError("PERMISSAO_PF_PJ_EM_CONJUNTO", http.StatusUnprocessableEntity, consent.ErrPersonalAndBusinessPermissionsTogether.Error()))
+		api.WriteError(w, r, api.NewError("PERMISSAO_PF_PJ_EM_CONJUNTO", http.StatusUnprocessableEntity, consent.ErrPersonalAndBusinessPermissionsTogether.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrInvalidExpiration) {
-		api.WriteError(w, api.NewError("DATA_EXPIRACAO_INVALIDA", http.StatusUnprocessableEntity, consent.ErrInvalidExpiration.Error()))
+		api.WriteError(w, r, api.NewError("DATA_EXPIRACAO_INVALIDA", http.StatusUnprocessableEntity, consent.ErrInvalidExpiration.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrAlreadyRejected) {
-		api.WriteError(w, api.NewError("CONSENTIMENTO_EM_STATUS_REJEITADO", http.StatusUnprocessableEntity, consent.ErrAlreadyRejected.Error()))
+		api.WriteError(w, r, api.NewError("CONSENTIMENTO_EM_STATUS_REJEITADO", http.StatusUnprocessableEntity, consent.ErrAlreadyRejected.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrCannotExtendConsentNotAuthorized) {
-		api.WriteError(w, api.NewError("ESTADO_CONSENTIMENTO_INVALIDO", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentNotAuthorized.Error()))
+		api.WriteError(w, r, api.NewError("ESTADO_CONSENTIMENTO_INVALIDO", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentNotAuthorized.Error()))
 		return
 	}
 
 	if errors.Is(err, consent.ErrCannotExtendConsentForJointAccount) {
-		api.WriteError(w, api.NewError("DEPENDE_MULTIPLA_ALCADA", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentForJointAccount.Error()))
+		api.WriteError(w, r, api.NewError("DEPENDE_MULTIPLA_ALCADA", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentForJointAccount.Error()))
 		return
 	}
 
-	api.WriteError(w, api.NewError("INTERNAL_ERROR", http.StatusInternalServerError, "internal error"))
+	api.WriteError(w, r, api.NewError("INTERNAL_ERROR", http.StatusInternalServerError, "internal error"))
 }

@@ -1,5 +1,7 @@
 package timeutil
 
+// TODO: Review these dates, how should I handle Brazilian dates?
+
 import (
 	"encoding/json"
 	"time"

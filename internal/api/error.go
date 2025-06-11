@@ -38,16 +38,13 @@ func NewError(code string, status int, description string) Error {
 	return err
 }
 
-// func HandleError(w http.ResponseWriter, _ *http.Request, err error) {
-// 	WriteError(w, err)
-// }
-
-func WriteError(w http.ResponseWriter, err error) {
+// WriteError writes an API error response to the provided http.ResponseWriter.
+func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	var apiErr Error
 	if !errors.As(err, &apiErr) {
-		slog.Error("unknown error", slog.String("error", err.Error()))
+		slog.ErrorContext(r.Context(), "unknown error", slog.String("error", err.Error()))
 		// TODO: Review this.
-		WriteError(w, Error{"INTERNAL_ERROR", http.StatusInternalServerError, "internal error", false})
+		WriteError(w, r, Error{"INTERNAL_ERROR", http.StatusInternalServerError, "internal error", false})
 		return
 	}
 

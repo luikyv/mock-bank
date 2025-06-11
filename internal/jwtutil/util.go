@@ -1,4 +1,4 @@
-package joseutil
+package jwtutil
 
 import (
 	"crypto"

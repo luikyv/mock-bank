@@ -23,18 +23,39 @@ func NewService(db *gorm.DB, directoryService directory.Service) Service {
 	}
 }
 
-func (s Service) CreateSession(ctx context.Context, idToken, nonceHash string) (*Session, error) {
-	idTkn, err := s.directoryService.IDToken(ctx, idToken, nonceHash)
+func (s Service) CreateSession(ctx context.Context) (session *Session, authURL string, err error) {
+	authURL, codeVerifier, err := s.directoryService.AuthURL(ctx)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	session := &Session{
-		Username:      idTkn.Sub,
-		Organizations: Organizations{},
-		CreatedAt:     timeutil.Now(),
-		ExpiresAt:     timeutil.Now().Add(1 * time.Hour),
+	session = &Session{
+		CodeVerifier: codeVerifier,
+		ExpiresAt:    timeutil.Now().Add(10 * time.Minute),
 	}
+	if err := s.db.WithContext(ctx).Create(&session).Error; err != nil {
+		return nil, "", fmt.Errorf("could not create session: %w", err)
+	}
+
+	return session, authURL, nil
+}
+
+func (s Service) AuthorizeSession(ctx context.Context, sessionID, authCode string) error {
+	var session Session
+	if err := s.db.WithContext(ctx).First(&session, "id = ?", sessionID).Error; err != nil {
+		return fmt.Errorf("could not find session: %w", err)
+	}
+
+	idTkn, err := s.directoryService.IDToken(ctx, authCode, session.CodeVerifier)
+	if err != nil {
+		return err
+	}
+
+	session.Username = idTkn.Sub
+	session.CreatedAt = timeutil.Now()
+	session.ExpiresAt = session.CreatedAt.Add(1 * time.Hour)
+	session.CodeVerifier = ""
+	session.Organizations = Organizations{}
 	for orgID, org := range idTkn.Profile.OrgAccessDetails {
 		session.Organizations[orgID] = struct {
 			Name string `json:"name"`
@@ -43,11 +64,11 @@ func (s Service) CreateSession(ctx context.Context, idToken, nonceHash string) (
 		}
 	}
 
-	if err := s.db.WithContext(ctx).Create(&session).Error; err != nil {
-		return nil, fmt.Errorf("could not create session: %w", err)
+	if err := s.db.WithContext(ctx).Save(&session).Error; err != nil {
+		return fmt.Errorf("could not authorize session: %w", err)
 	}
 
-	return session, nil
+	return nil
 }
 
 func (s Service) Session(ctx context.Context, id string) (*Session, error) {

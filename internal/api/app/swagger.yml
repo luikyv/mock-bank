@@ -17,19 +17,16 @@ paths:
                 $ref: '#/components/schemas/AuthUrlResponse'
           headers:
             Set-Cookie:
-              $ref: '#/components/headers/NonceCookie'
+              $ref: '#/components/headers/SessionCookie'
 
   /api/directory/callback:
     get:
       operationId: handleDirectoryCallback
+      security:
+        - SessionCookie: []
       parameters:
-        - name: id_token
+        - name: code
           in: query
-          required: true
-          schema:
-            type: string
-        - name: nonce
-          in: cookie
           required: true
           schema:
             type: string
@@ -712,10 +709,6 @@ components:
         type: string
     SessionCookie:
       description: Session ID for authentication
-      schema:
-        type: string
-    NonceCookie:
-      description: Nonce for authentication
       schema:
         type: string
   securitySchemes:

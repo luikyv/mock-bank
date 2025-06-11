@@ -1,3 +1,4 @@
+//go:generate oapi-codegen -config=../oapi-config.yml -package=accountv2 -o=./api_gen.go ./swagger.yml
 package accountv2
 
 import (
@@ -43,28 +44,28 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	if err != nil {
 		panic(err)
 	}
-	spec.Servers = nil
 	swaggerMiddleware := netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
+		DoNotValidateServers: true,
 		Options: openapi3filter.Options{
 			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
 				return nil
 			},
 		},
 		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
+			api.WriteError(w, nil, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
 		},
 	})
 
 	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeResponseError(w, err, !strings.Contains(r.URL.Path, "/transactions-current"))
+			writeResponseError(w, r, err, !strings.Contains(r.URL.Path, "/transactions-current"))
 		},
 	})
 	wrapper := ServerInterfaceWrapper{
 		Handler:            strictHandler,
 		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, api.FAPIIDMiddleware(nil)},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
 	}
 
@@ -312,16 +313,16 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 	return AccountsGetAccountsAccountIDTransactionsCurrent200JSONResponse{OKResponseAccountTransactionsJSONResponse(resp)}, nil
 }
 
-func writeResponseError(w http.ResponseWriter, err error, pagination bool) {
+func writeResponseError(w http.ResponseWriter, r *http.Request, err error, pagination bool) {
 	if errors.Is(err, account.ErrNotAllowed) {
-		api.WriteError(w, api.NewError("FORBIDDEN", http.StatusForbidden, account.ErrNotAllowed.Error()).Pagination(pagination))
+		api.WriteError(w, r, api.NewError("FORBIDDEN", http.StatusForbidden, account.ErrNotAllowed.Error()).Pagination(pagination))
 		return
 	}
 
 	if errors.Is(err, account.ErrJointAccountPendingAuthorization) {
-		api.WriteError(w, api.NewError("STATUS_RESOURCE_PENDING_AUTHORISATION", http.StatusForbidden, account.ErrJointAccountPendingAuthorization.Error()).Pagination(pagination))
+		api.WriteError(w, r, api.NewError("STATUS_RESOURCE_PENDING_AUTHORISATION", http.StatusForbidden, account.ErrJointAccountPendingAuthorization.Error()).Pagination(pagination))
 		return
 	}
 
-	api.WriteError(w, err)
+	api.WriteError(w, r, err)
 }

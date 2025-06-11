@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/consent"
+	"github.com/luiky/mock-bank/internal/payment"
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luiky/mock-bank/internal/user"
 	"github.com/luikyv/go-oidc/pkg/goidc"
@@ -26,6 +27,7 @@ func Policy(
 	userService user.Service,
 	consentService consent.Service,
 	accountService account.Service,
+	paymentService payment.Service,
 ) goidc.AuthnPolicy {
 	tmpl, err := template.ParseFS(templates, "login.html", "consent.html")
 	if err != nil {
@@ -37,6 +39,7 @@ func Policy(
 		userService:    userService,
 		consentService: consentService,
 		accountService: accountService,
+		paymentService: paymentService,
 	}
 	return goidc.NewPolicy(
 		"main",
@@ -86,6 +89,7 @@ type authenticator struct {
 	userService    user.Service
 	consentService consent.Service
 	accountService account.Service
+	paymentService payment.Service
 }
 
 func (a authenticator) authenticate(w http.ResponseWriter, r *http.Request, session *goidc.AuthnSession) (goidc.AuthnStatus, error) {

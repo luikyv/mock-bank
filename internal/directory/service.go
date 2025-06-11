@@ -6,10 +6,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -19,7 +20,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/joseutil"
+	"github.com/luiky/mock-bank/internal/jwtutil"
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
@@ -40,23 +41,23 @@ type Service struct {
 	issuer      string
 	clientID    string
 	redirectURI string
-	signer      crypto.Signer
-	httpClient  *http.Client
+	jwtSigner   crypto.Signer
+	mtlsClient  *http.Client
 }
 
-func NewService(issuer, clientID, redirectURI string, signer crypto.Signer, httpClient *http.Client) Service {
+func NewService(issuer, clientID, redirectURI string, jwtSigner crypto.Signer, mtlsClient *http.Client) Service {
 	return Service{
 		issuer:      issuer,
 		clientID:    clientID,
 		redirectURI: redirectURI,
-		signer:      signer,
-		httpClient:  httpClient,
+		jwtSigner:   jwtSigner,
+		mtlsClient:  mtlsClient,
 	}
 }
 
-func (ds Service) AuthURL(ctx context.Context) (uri string, nonceHash string, err error) {
-	nonce, nonceHash := generateNonce()
-	reqURI, err := ds.requestURI(ctx, nonce)
+func (ds Service) AuthURL(ctx context.Context) (uri, codeVerifier string, err error) {
+	codeVerifier, codeChallenge := generateCodeVerifierAndChallenge()
+	reqURI, err := ds.requestURI(ctx, codeChallenge)
 	if err != nil {
 		return "", "", err
 	}
@@ -70,72 +71,20 @@ func (ds Service) AuthURL(ctx context.Context) (uri string, nonceHash string, er
 	query := authURL.Query()
 	query.Set("client_id", ds.clientID)
 	query.Set("request_uri", reqURI)
-	query.Set("response_type", "id_token")
-	query.Set("scope", "openid")
+	query.Set("response_type", "code")
+	query.Set("scope", "openid trust_framework_profile")
 	query.Set("redirect_uri", ds.redirectURI)
-	query.Set("nonce", nonce)
 	authURL.RawQuery = query.Encode()
-	return authURL.String(), nonceHash, nil
+	return authURL.String(), codeVerifier, nil
 }
 
-func (ds Service) requestURI(ctx context.Context, nonce string) (string, error) {
-	wellKnown, err := ds.wellKnown()
+func (s Service) IDToken(ctx context.Context, authCode, codeVerifier string) (IDToken, error) {
+	idTkn, err := s.idToken(ctx, authCode, codeVerifier)
 	if err != nil {
-		return "", err
+		return IDToken{}, err
 	}
 
-	now := timeutil.Timestamp()
-	claims := map[string]any{
-		"iss": ds.clientID,
-		"sub": ds.clientID,
-		"aud": wellKnown.PushedAuthEndpoint,
-		"jti": uuid.NewString(),
-		"iat": now,
-		"exp": now + 300,
-	}
-
-	clientAssertion, err := joseutil.Sign(claims, ds.signer)
-	if err != nil {
-		return "", fmt.Errorf("could not sign the client assertion")
-	}
-
-	form := url.Values{}
-	form.Set("client_id", ds.clientID)
-	form.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
-	form.Set("client_assertion", clientAssertion)
-	form.Set("response_type", "id_token")
-	form.Set("scope", "openid")
-	form.Set("redirect_uri", ds.redirectURI)
-	form.Set("nonce", nonce)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, wellKnown.PushedAuthEndpoint, strings.NewReader(form.Encode()))
-	if err != nil {
-		return "", fmt.Errorf("error creating par request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := ds.httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("par request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("par endpoint returned status %d", resp.StatusCode)
-	}
-
-	var result struct {
-		RequestURI string `json:"request_uri"`
-		ExpiresIn  int    `json:"expires_in"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("error decoding par response: %w", err)
-	}
-
-	return result.RequestURI, nil
-}
-
-func (ds Service) IDToken(_ context.Context, idTkn, nonceHash string) (IDToken, error) {
-	wellKnown, err := ds.wellKnown()
+	wellKnown, err := s.wellKnown()
 	if err != nil {
 		return IDToken{}, fmt.Errorf("failed to fetch the directory well known for decoding id token: %w", err)
 	}
@@ -145,7 +94,7 @@ func (ds Service) IDToken(_ context.Context, idTkn, nonceHash string) (IDToken, 
 		return IDToken{}, fmt.Errorf("failed to parse id token: %w", err)
 	}
 
-	jwks, err := ds.jwks()
+	jwks, err := s.jwks()
 	if err != nil {
 		return IDToken{}, fmt.Errorf("failed to fetch jwks for verifying id token: %w", err)
 	}
@@ -165,18 +114,130 @@ func (ds Service) IDToken(_ context.Context, idTkn, nonceHash string) (IDToken, 
 	}
 
 	if err := idTokenClaims.Validate(jwt.Expected{
-		Issuer:      ds.issuer,
-		AnyAudience: []string{ds.clientID},
+		Issuer:      s.issuer,
+		AnyAudience: []string{s.clientID},
 	}); err != nil {
 		return IDToken{}, fmt.Errorf("invalid id token claims: %w", err)
 	}
 
-	h := sha256.Sum256([]byte(idToken.Nonce))
-	if nonceHash != hex.EncodeToString(h[:]) {
-		return IDToken{}, fmt.Errorf("invalid id token nonce")
+	return idToken, nil
+}
+
+func (s Service) idToken(ctx context.Context, authCode, codeVerifier string) (string, error) {
+	wellKnown, err := s.wellKnown()
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch the directory well known for requesting an id token: %w", err)
 	}
 
-	return idToken, nil
+	assertion, err := s.clientAssertion()
+	if err != nil {
+		return "", err
+	}
+
+	form := url.Values{}
+	form.Set("client_id", s.clientID)
+	form.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+	form.Set("client_assertion", assertion)
+	form.Set("grant_type", "authorization_code")
+	form.Set("code", authCode)
+	form.Set("redirect_uri", s.redirectURI)
+	form.Set("code_verifier", codeVerifier)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, wellKnown.MTLS.TokenEndpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("error creating token request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := s.mtlsClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("token request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		slog.Debug("error calling the token endpoint", "status_code", resp.StatusCode, "body", string(bodyBytes))
+		return "", fmt.Errorf("token endpoint returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		IDToken string `json:"id_token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("error decoding token response: %w", err)
+	}
+
+	return result.IDToken, nil
+}
+
+func (ds Service) requestURI(ctx context.Context, codeChallenge string) (string, error) {
+	wellKnown, err := ds.wellKnown()
+	if err != nil {
+		return "", err
+	}
+
+	assertion, err := ds.clientAssertion()
+	if err != nil {
+		return "", err
+	}
+	form := url.Values{}
+	form.Set("client_id", ds.clientID)
+	form.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+	form.Set("client_assertion", assertion)
+	form.Set("response_type", "code")
+	form.Set("scope", "openid trust_framework_profile")
+	form.Set("redirect_uri", ds.redirectURI)
+	form.Set("code_challenge", codeChallenge)
+	form.Set("code_challenge_method", "S256")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, wellKnown.MTLS.PushedAuthEndpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("error creating par request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := ds.mtlsClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("par request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("par endpoint returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		RequestURI string `json:"request_uri"`
+		ExpiresIn  int    `json:"expires_in"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("error decoding par response: %w", err)
+	}
+
+	return result.RequestURI, nil
+}
+
+func (s Service) clientAssertion() (string, error) {
+	wellKnown, err := s.wellKnown()
+	if err != nil {
+		return "", err
+	}
+
+	now := timeutil.Timestamp()
+	claims := map[string]any{
+		"iss": s.clientID,
+		"sub": s.clientID,
+		"aud": wellKnown.TokenEndpoint,
+		"jti": uuid.NewString(),
+		"iat": now,
+		"exp": now + 300,
+	}
+
+	assertion, err := jwtutil.Sign(claims, s.jwtSigner)
+	if err != nil {
+		return "", fmt.Errorf("could not sign the client assertion: %w", err)
+	}
+
+	return assertion, nil
 }
 
 func (ds Service) wellKnown() (directoryWellKnown, error) {
@@ -189,7 +250,7 @@ func (ds Service) wellKnown() (directoryWellKnown, error) {
 	}
 
 	url := fmt.Sprintf("%s/.well-known/openid-configuration", ds.issuer)
-	resp, err := ds.httpClient.Get(url)
+	resp, err := ds.mtlsClient.Get(url)
 	if err != nil {
 		return directoryWellKnown{}, err
 	}
@@ -223,7 +284,7 @@ func (ds Service) jwks() (goidc.JSONWebKeySet, error) {
 		return goidc.JSONWebKeySet{}, err
 	}
 
-	resp, err := ds.httpClient.Get(wellKnown.JWKSURI)
+	resp, err := ds.mtlsClient.Get(wellKnown.JWKSURI)
 	if err != nil {
 		return goidc.JSONWebKeySet{}, err
 	}
@@ -248,16 +309,19 @@ func (ds Service) PublicJWKS() jose.JSONWebKeySet {
 		Keys: []jose.JSONWebKey{{
 			KeyID:     "signer",
 			Algorithm: string(jose.PS256),
-			Key:       ds.signer.Public(),
+			Key:       ds.jwtSigner.Public(),
 		}},
 	}
 }
 
-func generateNonce() (nonce, nonceHash string) {
+func generateCodeVerifierAndChallenge() (verifier, challenge string) {
 	b := make([]byte, 32)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
 
-	nonce = base64.RawURLEncoding.EncodeToString(b)
-	h := sha256.Sum256([]byte(nonce))
-	return nonce, hex.EncodeToString(h[:])
+	verifier = base64.RawURLEncoding.EncodeToString(b)
+	hash := sha256.Sum256([]byte(verifier))
+	challenge = base64.RawURLEncoding.EncodeToString(hash[:])
+	return verifier, challenge
 }

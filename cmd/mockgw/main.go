@@ -21,15 +21,6 @@ import (
 )
 
 func main() {
-	nonce := ""
-
-	mockbankHostBytes, err := os.ReadFile("/shared/mockbank_url.txt")
-	if err != nil {
-		log.Fatalf("failed to read mockbank url: %v", err)
-	}
-	mockbankHost := strings.TrimSpace(string(mockbankHostBytes))
-	log.Printf("mockbank host: %v\n", mockbankHost)
-
 	directoryJWKSBytes, err := os.ReadFile("/mocks/directory_jwks.json")
 	if err != nil {
 		log.Fatal("failed to read directory jwks:", err)
@@ -81,18 +72,25 @@ func main() {
 		_ = json.NewEncoder(w).Encode(jwks)
 	})
 
-	mux.HandleFunc("POST directory.local/token", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET directory.local/authorize", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("request directory authorize")
+		http.Redirect(w, r, "https://app.mockbank.local/api/directory/callback?code=random_code", http.StatusSeeOther)
+	})
+
+	mux.HandleFunc("POST matls-directory.local/token", func(w http.ResponseWriter, r *http.Request) {
 		log.Println("request directory token")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		_, _ = io.WriteString(w, `{
-			"access_token": "random_token",
-			"token_type": "bearer"
-		}`)
-	})
 
-	mux.HandleFunc("GET directory.local/authorize", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request directory authorize")
+		grantType := r.FormValue("grant_type")
+		if grantType == "client_credentials" {
+			_, _ = io.WriteString(w, `{
+				"access_token": "random_token",
+				"token_type": "bearer"
+			}`)
+			return
+		}
+
 		key := directoryJWKS.Keys[0]
 		joseSigner, _ := jose.NewSigner(jose.SigningKey{
 			Algorithm: jose.SignatureAlgorithm(key.Algorithm),
@@ -101,18 +99,19 @@ func main() {
 
 		idTokenClaims["iat"] = time.Now().Unix()
 		idTokenClaims["exp"] = time.Now().Unix() + 60
-		idTokenClaims["nonce"] = nonce
 		idToken, _ := jwt.Signed(joseSigner).Claims(idTokenClaims).Serialize()
 
-		http.Redirect(w, r, fmt.Sprintf("https://app.mockbank.local/api/directory/callback?id_token=%s", idToken), http.StatusSeeOther)
+		_, _ = io.WriteString(w, fmt.Sprintf(`{
+			"access_token": "random_token",
+			"id_token": "%s",
+			"token_type": "bearer"
+		}`, idToken))
 	})
 
-	mux.HandleFunc("POST directory.local/par", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST matls-directory.local/par", func(w http.ResponseWriter, r *http.Request) {
 		log.Println("request directory par")
 
 		_ = r.ParseForm()
-		nonce = r.Form.Get("nonce")
-		log.Printf("nonce received: %s", nonce)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -150,6 +149,12 @@ func main() {
 		http.ServeFile(w, r, "/mocks/client.jwks")
 	})
 
+	mux.HandleFunc("GET keystore.local/{org_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("request keystore organization jwks")
+		w.Header().Set("Content-Type", "application/json")
+		http.ServeFile(w, r, "/mocks/org.jwks")
+	})
+
 	mux.HandleFunc("GET keystore.local/openbanking.jwks", func(w http.ResponseWriter, r *http.Request) {
 		log.Println("request keystore open banking jwks")
 		w.Header().Set("Content-Type", "application/json")
@@ -161,11 +166,9 @@ func main() {
 		_ = json.NewEncoder(w).Encode(jwks)
 	})
 
-	// Reverse proxy fallback.
 	mockbankLocalhostURL, _ := url.Parse("http://host.docker.internal")
 	mockbankLocalhostReverseProxy := httputil.NewSingleHostReverseProxy(mockbankLocalhostURL)
-	// Reverse proxy for mockbank.
-	mockbankURL, _ := url.Parse(mockbankHost)
+	mockbankURL, _ := url.Parse("http://mockbank")
 	mockbankReverseProxy := httputil.NewSingleHostReverseProxy(mockbankURL)
 	mbHandler := mockbankHandler(mockbankLocalhostReverseProxy, mockbankReverseProxy)
 	mux.HandleFunc("auth.mockbank.local/", mbHandler)
@@ -188,13 +191,13 @@ func main() {
 		}
 	}()
 
-	caCertPEM, err := os.ReadFile("/mocks/client_ca.crt")
+	caCertPEM, err := os.ReadFile("/mocks/ca.crt")
 	if err != nil {
-		log.Fatal("Failed to read client CA file:", err)
+		log.Fatal("Failed to read CA file:", err)
 	}
-	clientCAPool := x509.NewCertPool()
-	if ok := clientCAPool.AppendCertsFromPEM(caCertPEM); !ok {
-		log.Fatal("Failed to append client CA certs")
+	caPool := x509.NewCertPool()
+	if ok := caPool.AppendCertsFromPEM(caCertPEM); !ok {
+		log.Fatal("Failed to append CA certs")
 	}
 	serverCert, err := tls.LoadX509KeyPair("/mocks/server.crt", "/mocks/server.key")
 	if err != nil {
@@ -214,7 +217,7 @@ func main() {
 				if strings.HasPrefix(hello.ServerName, "matls-") {
 					log.Println("mtls is required")
 					cfg.ClientAuth = tls.RequireAndVerifyClientCert
-					cfg.ClientCAs = clientCAPool
+					cfg.ClientCAs = caPool
 				}
 				return cfg, nil
 			},
@@ -254,17 +257,11 @@ func mockbankHandler(reverseProxy, fallbackProxy *httputil.ReverseProxy) http.Ha
 		}
 		r.Body.Close()
 
-		// Replace with a new ReadCloser for ReverseProxy.
-		r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-
-		// Make a copy of the request in case fallback is needed.
-		rCopy := r.Clone(r.Context())
-		rCopy.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-
 		reverseProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 			log.Println("Proxy error:", err)
 			if strings.Contains(err.Error(), "connection refused") {
 				log.Println("Connection refused, serving fallback")
+				r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 				fallbackProxy.ServeHTTP(w, r)
 				return
 			}
@@ -272,6 +269,7 @@ func mockbankHandler(reverseProxy, fallbackProxy *httputil.ReverseProxy) http.Ha
 			http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		}
 
+		r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 		reverseProxy.ServeHTTP(w, r)
 	}
 

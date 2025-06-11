@@ -1,3 +1,4 @@
+//go:generate oapi-codegen -config=../oapi-config.yml -package=app -o=./api_gen.go ./swagger.yml
 package app
 
 import (
@@ -12,7 +13,6 @@ import (
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/directory"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/resource"
 	"github.com/luiky/mock-bank/internal/session"
@@ -25,40 +25,35 @@ import (
 
 const (
 	cookieSessionId = "sessionId"
-	cookieNonce     = "nonce"
-	sessionValidity = 24 * time.Hour
-	nonceValidity   = 15 * time.Minute
+	sessionValidity = 3 * time.Hour
 )
 
 var _ StrictServerInterface = Server{}
 
 type Server struct {
-	host             string
-	sessionService   session.Service
-	directoryService directory.Service
-	userService      user.Service
-	consentService   consent.Service
-	resourceService  resource.Service
-	accountService   account.Service
+	host            string
+	sessionService  session.Service
+	userService     user.Service
+	consentService  consent.Service
+	resourceService resource.Service
+	accountService  account.Service
 }
 
 func NewServer(
 	host string,
 	service session.Service,
-	directoryService directory.Service,
 	userService user.Service,
 	consentService consent.Service,
 	resourceService resource.Service,
 	accountService account.Service,
 ) Server {
 	return Server{
-		host:             host,
-		sessionService:   service,
-		directoryService: directoryService,
-		userService:      userService,
-		consentService:   consentService,
-		resourceService:  resourceService,
-		accountService:   accountService,
+		host:            host,
+		sessionService:  service,
+		userService:     userService,
+		consentService:  consentService,
+		resourceService: resourceService,
+		accountService:  accountService,
 	}
 }
 
@@ -68,15 +63,15 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	if err != nil {
 		panic(err)
 	}
-	spec.Servers = nil
 	swaggerMiddleware := netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
+		DoNotValidateServers: true,
 		Options: openapi3filter.Options{
 			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
 				return nil
 			},
 		},
 		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
+			api.WriteError(w, nil, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
 		},
 	})
 
@@ -105,7 +100,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeResponseError(w, err)
+			writeResponseError(w, r, err)
 		},
 	})
 
@@ -122,44 +117,42 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			},
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			api.WriteError(w, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
 	})
 	mux.Handle("/api/", handler)
 }
 
-func writeResponseError(w http.ResponseWriter, err error) {
+func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, session.ErrNotFound) {
-		api.WriteError(w, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, err.Error()))
+		api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, err.Error()))
 		return
 	}
 
 	if errors.Is(err, user.ErrAlreadyExists) {
-		api.WriteError(w, api.NewError("USER_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
+		api.WriteError(w, r, api.NewError("USER_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
 		return
 	}
 
 	if errors.Is(err, account.ErrAlreadyExists) {
-		api.WriteError(w, api.NewError("ACCOUNT_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
+		api.WriteError(w, r, api.NewError("ACCOUNT_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
 		return
 	}
 
-	api.WriteError(w, err)
+	api.WriteError(w, r, err)
 }
 
 func (s Server) GetDirectoryAuthURL(ctx context.Context, request GetDirectoryAuthURLRequestObject) (GetDirectoryAuthURLResponseObject, error) {
-
-	authURL, nonceHash, err := s.directoryService.AuthURL(ctx)
+	session, authURL, err := s.sessionService.CreateSession(ctx)
 	if err != nil {
 		return nil, err
 	}
-
 	headers := GetDirectoryAuthURL200ResponseHeaders{
 		SetCookie: (&http.Cookie{
-			Name:     cookieNonce,
-			Value:    nonceHash,
-			Path:     "/api/directory/callback",
-			Expires:  timeutil.Now().Add(nonceValidity),
+			Name:     cookieSessionId,
+			Value:    session.ID.String(),
+			Path:     "/api",
+			Expires:  timeutil.Now().Add(sessionValidity),
 			HttpOnly: true,
 			Secure:   true,
 			Domain:   strings.TrimPrefix(s.host, "https://"),
@@ -178,22 +171,12 @@ func (s Server) GetDirectoryAuthURL(ctx context.Context, request GetDirectoryAut
 }
 
 func (s Server) HandleDirectoryCallback(ctx context.Context, req HandleDirectoryCallbackRequestObject) (HandleDirectoryCallbackResponseObject, error) {
-	session, err := s.sessionService.CreateSession(ctx, req.Params.IDToken, req.Params.Nonce)
-	if err != nil {
+	sessionID := ctx.Value(api.CtxKeySessionID).(string)
+	if err := s.sessionService.AuthorizeSession(ctx, sessionID, req.Params.Code); err != nil {
 		return nil, err
 	}
 
 	headers := HandleDirectoryCallback303ResponseHeaders{
-		SetCookie: (&http.Cookie{
-			Name:     cookieSessionId,
-			Value:    session.ID.String(),
-			Path:     "/api",
-			Expires:  timeutil.Now().Add(sessionValidity),
-			HttpOnly: true,
-			Secure:   true,
-			Domain:   strings.TrimPrefix(s.host, "https://"),
-			SameSite: http.SameSiteLaxMode,
-		}).String(),
 		Location: s.host + "/",
 	}
 	return HandleDirectoryCallback303Response{Headers: headers}, nil

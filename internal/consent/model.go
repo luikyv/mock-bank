@@ -29,7 +29,7 @@ type Consent struct {
 	Permissions     []Permission `gorm:"serializer:json"`
 	StatusUpdatedAt time.Time
 	ExpiresAt       *time.Time
-	UserID          uuid.UUID
+	UserID          *uuid.UUID
 	UserCPF         string
 	BusinessCNPJ    string
 	ClientID        string

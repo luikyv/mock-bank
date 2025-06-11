@@ -1,0 +1,160 @@
+package jwtutil
+
+import (
+	"bytes"
+	"crypto"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
+	"github.com/google/uuid"
+	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/timeutil"
+	"github.com/luikyv/go-oidc/pkg/goidc"
+)
+
+func Middleware(baseURL, bankOrgID, keystoreHost string, signer crypto.Signer) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		next = requestMiddlewareHandler(next, baseURL, keystoreHost)
+		next = responseMiddlewareHandler(next, bankOrgID, signer)
+		return next
+	}
+}
+
+func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		if r.Method == http.MethodGet || r.Method == http.MethodDelete {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		jwsBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			slog.InfoContext(r.Context(), "failed to read request jwt body", slog.String("error", err.Error()))
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to read request body"))
+			return
+		}
+		defer r.Body.Close()
+
+		jws := string(jwsBytes)
+		parsedJWT, err := jwt.ParseSigned(jws, []jose.SignatureAlgorithm{goidc.PS256})
+		if err != nil {
+			slog.InfoContext(r.Context(), "invalid jwt", slog.String("error", err.Error()))
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "invalid jwt"))
+			return
+		}
+
+		clientOrgID := r.Context().Value(api.CtxKeyOrgID).(string)
+		resp, err := http.Get(keystoreHost + fmt.Sprintf("/%s/application.jwks", clientOrgID))
+		if err != nil {
+			slog.InfoContext(r.Context(), "failed to fetch jwks", slog.String("error", err.Error()))
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to fetch JWKS"))
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			slog.InfoContext(r.Context(), "failed to fetch jwks", slog.String("status", resp.Status))
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to fetch jwks"))
+			return
+		}
+
+		var jwks jose.JSONWebKeySet
+		if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+			slog.InfoContext(r.Context(), "failed to decode jwks", slog.String("error", err.Error()))
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to decode organization jwks"))
+			return
+		}
+
+		var jwtClaims jwt.Claims
+		var claims map[string]any
+		if err := parsedJWT.Claims(jwks, &jwtClaims, &claims); err != nil {
+			slog.InfoContext(r.Context(), "invalid jwt signature", slog.String("error", err.Error()))
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "invalid jwt signature"))
+			return
+		}
+
+		if jwtClaims.IssuedAt == nil {
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "iat claim is missing"))
+			return
+		}
+
+		if jwtClaims.ID == "" {
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "jti claim is missing"))
+			return
+		}
+
+		if err := jwtClaims.Validate(jwt.Expected{
+			Issuer:      clientOrgID,
+			AnyAudience: []string{baseURL + r.URL.Path},
+		}); err != nil {
+			slog.InfoContext(r.Context(), "invalid jwt claims", slog.String("error", err.Error()))
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "JWT validation failed"))
+			return
+		}
+
+		jsonBytes, err := json.Marshal(claims)
+		if err != nil {
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to convert claims to json"))
+			return
+		}
+
+		r.Body = io.NopCloser(bytes.NewReader(jsonBytes))
+		r.ContentLength = int64(len(jsonBytes))
+		r.Header.Set("Content-Type", "application/json")
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func responseMiddlewareHandler(next http.Handler, bankOrgID string, signer crypto.Signer) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rec := &responseRecorder{
+			ResponseWriter: w,
+			Body:           &bytes.Buffer{},
+			StatusCode:     http.StatusOK,
+		}
+		next.ServeHTTP(rec, r)
+
+		var respPayload map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &respPayload); err != nil {
+			api.WriteError(w, r, fmt.Errorf("failed to parse response for jwt encoding: %w", err))
+			return
+		}
+
+		respPayload["iss"] = bankOrgID
+		respPayload["aud"] = r.Context().Value(api.CtxKeyOrgID)
+		respPayload["jti"] = uuid.NewString()
+		now := timeutil.Timestamp()
+		respPayload["iat"] = now
+
+		jwsResp, err := Sign(respPayload, signer)
+		if err != nil {
+			api.WriteError(w, r, fmt.Errorf("failed to sign jwt: %w", err))
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/jwt")
+		w.WriteHeader(rec.StatusCode)
+		_, _ = w.Write([]byte(jwsResp))
+	})
+}
+
+type responseRecorder struct {
+	http.ResponseWriter
+	Body       *bytes.Buffer
+	StatusCode int
+}
+
+func (rr *responseRecorder) WriteHeader(statusCode int) {
+	rr.StatusCode = statusCode
+}
+
+func (rr *responseRecorder) Write(b []byte) (int, error) {
+	return rr.Body.Write(b)
+}

@@ -14,6 +14,7 @@ type Session struct {
 	ID            uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Username      string
 	Organizations Organizations `gorm:"type:jsonb"`
+	CodeVerifier  string
 
 	CreatedAt time.Time
 	ExpiresAt time.Time

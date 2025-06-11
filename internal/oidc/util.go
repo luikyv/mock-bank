@@ -108,10 +108,9 @@ func LogError(ctx context.Context, err error) {
 }
 
 type DCRConfig struct {
-	Scopes     []goidc.Scope
-	SSURL      string
-	SSIssuer   string
-	HTTPClient *http.Client
+	Scopes       []goidc.Scope
+	KeyStoreHost string
+	SSIssuer     string
 }
 
 func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
@@ -131,7 +130,7 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 			return goidc.NewError(goidc.ErrorCodeInvalidClientMetadata, "software statement is required")
 		}
 
-		jwks, err := fetchSoftwareStatementJWKS(config.SSURL, config.HTTPClient)
+		jwks, err := fetchSoftwareStatementJWKS(config.KeyStoreHost)
 		if err != nil {
 			return goidc.NewError(goidc.ErrorCodeInternalError, "could not fetch the keystore jwks")
 		}
@@ -212,7 +211,7 @@ func extractUID(cert *x509.Certificate) string {
 	return ""
 }
 
-func fetchSoftwareStatementJWKS(ssURL string, httpClient *http.Client) (goidc.JSONWebKeySet, error) {
+func fetchSoftwareStatementJWKS(keystoreHost string) (goidc.JSONWebKeySet, error) {
 	ssJWKSMu.Lock()
 	defer ssJWKSMu.Unlock()
 
@@ -220,7 +219,7 @@ func fetchSoftwareStatementJWKS(ssURL string, httpClient *http.Client) (goidc.JS
 		return *ssJWKSCache, nil
 	}
 
-	resp, err := httpClient.Get(ssURL)
+	resp, err := http.Get(keystoreHost + "/openbanking.jwks")
 	if err != nil {
 		return goidc.JSONWebKeySet{}, err
 	}
