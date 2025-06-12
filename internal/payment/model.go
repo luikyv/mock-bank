@@ -57,6 +57,14 @@ func (c Consent) URN() string {
 	return consent.URNPrefix + c.ID.String()
 }
 
+func (c Consent) IsAwaitingAuthorization() bool {
+	return c.Status == ConsentStatusAwaitingAuthorization
+}
+
+func (c Consent) IsAuthorized() bool {
+	return c.Status == ConsentStatusAuthorized
+}
+
 type ConsentStatus string
 
 const (

@@ -18,6 +18,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/luiky/mock-bank/internal/consent"
+	"github.com/luiky/mock-bank/internal/payment"
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
@@ -42,7 +43,33 @@ func TokenOptionsFunc() goidc.TokenOptionsFunc {
 	}
 }
 
-func HandleGrantFunc(op *provider.Provider, consentService consent.Service) goidc.HandleGrantFunc {
+func HandleGrantFunc(op *provider.Provider, consentService consent.Service, paymentService payment.Service) goidc.HandleGrantFunc {
+	verifyPaymentConsent := func(ctx context.Context, id, orgID string) error {
+		c, err := paymentService.Consent(ctx, id, orgID)
+		if err != nil {
+			return fmt.Errorf("could not fetch payment consent for verifying grant: %w", err)
+		}
+
+		if !c.IsAuthorized() {
+			return goidc.NewError(goidc.ErrorCodeInvalidGrant, "payment consent is not authorized")
+		}
+
+		return nil
+	}
+
+	verifyConsent := func(ctx context.Context, id, orgID string) error {
+		c, err := consentService.Consent(ctx, id, orgID)
+		if err != nil {
+			return fmt.Errorf("could not fetch consent for verifying grant: %w", err)
+		}
+
+		if !c.IsAuthorized() {
+			return goidc.NewError(goidc.ErrorCodeInvalidGrant, "consent is not authorized")
+		}
+
+		return nil
+	}
+
 	return func(r *http.Request, gi *goidc.GrantInfo) error {
 		if gi.AdditionalTokenClaims == nil {
 			gi.AdditionalTokenClaims = make(map[string]any)
@@ -55,18 +82,14 @@ func HandleGrantFunc(op *provider.Provider, consentService consent.Service) goid
 		orgID := client.CustomAttribute("org_id").(string)
 		gi.AdditionalTokenClaims["org_id"] = orgID
 
-		consentID, ok := consent.IDFromScopes(gi.ActiveScopes)
-		if !ok {
-			return nil
+		consentID, _ := consent.IDFromScopes(gi.ActiveScopes)
+
+		if strings.Contains(gi.ActiveScopes, payment.Scope.ID) && consentID != "" {
+			return verifyPaymentConsent(r.Context(), consentID, orgID)
 		}
 
-		consent, err := consentService.Consent(r.Context(), consentID, orgID)
-		if err != nil {
-			return fmt.Errorf("could not fetch consent for verifying grant: %w", err)
-		}
-
-		if !consent.IsAuthorized() {
-			return goidc.NewError(goidc.ErrorCodeInvalidGrant, "consent is not authorized")
+		if consentID != "" {
+			return verifyConsent(r.Context(), consentID, orgID)
 		}
 
 		return nil

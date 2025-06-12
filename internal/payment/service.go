@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/consent"
@@ -57,6 +58,28 @@ func (s Service) CreateConsent(ctx context.Context, consent *Consent, debtorAcc 
 	return s.db.Create(consent).Error
 }
 
+func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
+
+	if !c.IsAwaitingAuthorization() {
+		return errors.New("consent is not awaiting authorization")
+	}
+
+	c.Status = ConsentStatusAuthorized
+	c.StatusUpdatedAt = timeutil.Now()
+	return s.db.WithContext(ctx).Save(c).Error
+}
+
+func (s Service) UpdateDebtorAccount(ctx context.Context, consentID, accountID, orgID string) error {
+	c, err := s.Consent(ctx, consentID, orgID)
+	if err != nil {
+		return err
+	}
+
+	accID := uuid.MustParse(accountID)
+	c.DebtorAccountID = &accID
+	return s.db.WithContext(ctx).Save(c).Error
+}
+
 func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error) {
 	id = strings.TrimPrefix(id, consent.URNPrefix)
 	var consent Consent
@@ -72,4 +95,20 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 	}
 
 	return &consent, nil
+}
+
+func (s Service) RejectConsent(ctx context.Context, id, orgID string, code RejectionReasonCode, detail string) error {
+	c, err := s.Consent(ctx, id, orgID)
+	if err != nil {
+		return err
+	}
+	if c.Status == ConsentStatusRejected {
+		return ErrConsentAlreadyRejected
+	}
+
+	c.Status = ConsentStatusRejected
+	c.StatusUpdatedAt = timeutil.Now()
+	c.RejectionReasonCode = code
+	c.RejectionReasonDetail = detail
+	return s.db.WithContext(ctx).Save(c).Error
 }
