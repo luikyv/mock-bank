@@ -185,7 +185,7 @@ func (s Server) AccountsGetAccountsAccountIDBalances(ctx context.Context, req Ac
 				Amount:   acc.BlockedAmount,
 				Currency: api.DefaultCurrency,
 			},
-			UpdateDateTime: timeutil.NewDateTime(acc.UpdatedAt),
+			UpdateDateTime: acc.UpdatedAt,
 		},
 		Meta:  *api.NewSingleRecordMeta(),
 		Links: *api.NewLinks(s.baseURL + "/accounts/" + req.AccountID + "/balances"),

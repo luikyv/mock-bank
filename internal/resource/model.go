@@ -1,8 +1,7 @@
 package resource
 
 import (
-	"time"
-
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
 
@@ -31,8 +30,8 @@ type Resource struct {
 	Type       Type `gorm:"column:resource_type"`
 
 	OrgID     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt timeutil.DateTime
+	UpdatedAt timeutil.DateTime
 }
 
 func (Resource) TableName() string {

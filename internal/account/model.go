@@ -58,8 +58,8 @@ type Account struct {
 	OverdraftLimitUnarranged    string
 
 	OrgID     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt timeutil.DateTime
+	UpdatedAt timeutil.DateTime
 }
 
 type Type string
@@ -140,15 +140,15 @@ const (
 )
 
 type TransactionFilter struct {
-	from timeutil.Date
-	to   timeutil.Date
+	from timeutil.BrazilDate
+	to   timeutil.BrazilDate
 }
 
-func NewTransactionFilter(from, to *timeutil.Date, current bool) (TransactionFilter, error) {
-	now := timeutil.DateNow()
+func NewTransactionFilter(from, to *timeutil.BrazilDate, current bool) (TransactionFilter, error) {
+	brazilNow := timeutil.BrazilDateNow()
 	filter := TransactionFilter{
-		from: now,
-		to:   timeutil.NewDate(now.AddDate(0, 0, 1)),
+		from: brazilNow,
+		to:   brazilNow.AddDate(0, 0, 1),
 	}
 
 	if from != nil {
@@ -167,12 +167,12 @@ func NewTransactionFilter(from, to *timeutil.Date, current bool) (TransactionFil
 	}
 
 	if current {
-		nowMinus7Days := now.AddDate(0, 0, -7)
-		if filter.from.Before(nowMinus7Days) {
+		nowMinus7Days := brazilNow.AddDate(0, 0, -7)
+		if filter.from.Before(nowMinus7Days.Time) {
 			return TransactionFilter{}, errors.New("from booking date too far in the past")
 		}
 
-		if filter.to.Before(nowMinus7Days) {
+		if filter.to.Before(nowMinus7Days.Time) {
 			return TransactionFilter{}, errors.New("to booking date too far in the past")
 		}
 	}

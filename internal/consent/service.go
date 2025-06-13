@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luiky/mock-bank/internal/errorutil"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luiky/mock-bank/internal/user"
@@ -29,17 +30,22 @@ func NewService(db *gorm.DB, userService user.Service) Service {
 func (s Service) Authorize(ctx context.Context, c *Consent) error {
 
 	if !c.IsAwaitingAuthorization() {
-		return errors.New("consent is not in the AWAITING_AUTHORIZATION status")
+		return errorutil.New("consent is not in the awaiting authorization status")
 	}
 
 	c.Status = StatusAuthorized
-	c.StatusUpdatedAt = timeutil.Now()
+	c.StatusUpdatedAt = timeutil.DateTimeNow()
+	c.UpdatedAt = timeutil.DateTimeNow()
 	return s.save(ctx, c)
 }
 
 func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error) {
-	c, err := s.consent(ctx, id, orgID)
-	if err != nil {
+	id = strings.TrimPrefix(id, URNPrefix)
+	c := &Consent{}
+	if err := s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).First(c).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
 		return nil, err
 	}
 
@@ -59,12 +65,18 @@ func (s Service) Reject(ctx context.Context, id, orgID string, by RejectedBy, re
 	if err != nil {
 		return err
 	}
+
+	return s.reject(ctx, c, by, reason)
+}
+
+func (s Service) reject(ctx context.Context, c *Consent, by RejectedBy, reason RejectionReason) error {
 	if c.Status == StatusRejected {
 		return ErrAlreadyRejected
 	}
 
 	c.Status = StatusRejected
-	c.StatusUpdatedAt = timeutil.Now()
+	c.StatusUpdatedAt = timeutil.DateTimeNow()
+	c.UpdatedAt = timeutil.DateTimeNow()
 	c.RejectedBy = by
 	c.RejectionReason = reason
 	return s.save(ctx, c)
@@ -86,7 +98,7 @@ func (s Service) Delete(ctx context.Context, id, orgID string) error {
 }
 
 func (s Service) Create(ctx context.Context, c *Consent) error {
-	if err := validate(c); err != nil {
+	if err := s.validate(ctx, c); err != nil {
 		return err
 	}
 
@@ -98,32 +110,15 @@ func (s Service) Create(ctx context.Context, c *Consent) error {
 }
 
 // modify will evaluated the consent information and modify it to be compliant.
-func (s Service) modify(ctx context.Context, consent *Consent) error {
-	consentWasModified := false
-
-	if consent.HasAuthExpired() {
+func (s Service) modify(ctx context.Context, c *Consent) error {
+	if c.HasAuthExpired() {
 		slog.DebugContext(ctx, "consent awaiting authorization for too long, moving to rejected")
-		consent.Status = StatusRejected
-		consent.RejectedBy = RejectedByUser
-		consent.RejectionReason = RejectionReasonConsentExpired
-		consent.StatusUpdatedAt = timeutil.Now()
-		consentWasModified = true
+		return s.reject(ctx, c, RejectedByUser, RejectionReasonConsentExpired)
 	}
 
-	if consent.IsExpired() {
+	if c.IsExpired() {
 		slog.DebugContext(ctx, "consent reached expiration, moving to rejected")
-		consent.Status = StatusRejected
-		consent.RejectedBy = RejectedByASPSP
-		consent.RejectionReason = RejectionReasonConsentMaxDateReached
-		consent.StatusUpdatedAt = timeutil.Now()
-		consentWasModified = true
-	}
-
-	if consentWasModified {
-		slog.DebugContext(ctx, "the consent was modified")
-		if err := s.save(ctx, consent); err != nil {
-			return err
-		}
+		return s.reject(ctx, c, RejectedByASPSP, RejectionReasonConsentMaxDateReached)
 	}
 
 	return nil
@@ -152,17 +147,13 @@ func (s Service) Extend(ctx context.Context, id, orgID string, ext *Extension) (
 	return c, nil
 }
 
-func validate(c *Consent) error {
+func (s Service) validate(ctx context.Context, c *Consent) error {
 	if err := validatePermissions(c.Permissions); err != nil {
 		return err
 	}
 
 	now := timeutil.Now()
-	if c.ExpiresAt != nil && c.ExpiresAt.After(now.AddDate(1, 0, 0)) {
-		return ErrInvalidExpiration
-	}
-
-	if c.ExpiresAt != nil && c.ExpiresAt.Before(now) {
+	if c.ExpiresAt != nil && (c.ExpiresAt.After(now.AddDate(1, 0, 0)) || c.ExpiresAt.Before(now)) {
 		return ErrInvalidExpiration
 	}
 
@@ -171,16 +162,6 @@ func validate(c *Consent) error {
 
 func (s Service) save(ctx context.Context, c *Consent) error {
 	return s.db.WithContext(ctx).Save(c).Error
-}
-
-func (s Service) consent(ctx context.Context, id, orgID string) (*Consent, error) {
-	id = strings.TrimPrefix(id, URNPrefix)
-	c := &Consent{}
-	err := s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).First(c).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrNotFound
-	}
-	return c, err
 }
 
 func (s Service) Consents(ctx context.Context, userID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Consent], error) {
@@ -198,6 +179,12 @@ func (s Service) Consents(ctx context.Context, userID uuid.UUID, orgID string, p
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return page.Page[*Consent]{}, err
+	}
+
+	for _, c := range consents {
+		if err := s.modify(ctx, c); err != nil {
+			return page.Page[*Consent]{}, err
+		}
 	}
 
 	return page.New(consents, pag, int(total)), nil

@@ -10,7 +10,8 @@ import (
 
 const (
 	MockBankBrand   string = "MockBank"
-	MockBankCNPJ    string = "58540569000120"
+	MockBankCNPJ    string = "00000000000000"
+	MockBankISPB    string = "00000000"
 	DefaultCurrency string = "BRL"
 )
 

@@ -498,9 +498,10 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 		}{
 			ClientID:             c.ClientID,
 			ConsentID:            c.URN(),
-			CreationDateTime:     timeutil.NewDateTime(c.CreatedAt),
+			CreationDateTime:     c.CreatedAt,
 			Status:               string(c.Status),
-			StatusUpdateDateTime: timeutil.NewDateTime(c.StatusUpdatedAt),
+			StatusUpdateDateTime: c.StatusUpdatedAt,
+			ExpirationDateTime:   c.ExpiresAt,
 			UserID:               c.UserID.String(),
 		}
 		perms := make([]string, len(c.Permissions))
@@ -516,10 +517,6 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 			data.RejectionReason = &rejectionReason
 		}
 
-		if c.ExpiresAt != nil {
-			exp := timeutil.NewDateTime(*c.ExpiresAt)
-			data.ExpirationDateTime = &exp
-		}
 		resp.Data = append(resp.Data, data)
 	}
 	return GetConsents200JSONResponse(resp), nil
@@ -557,7 +554,7 @@ func (s Server) GetResources(ctx context.Context, req GetResourcesRequestObject)
 			ResourceID:       r.ResourceID,
 			Status:           ResourceStatus(r.Status),
 			Type:             ResourceType(r.Type),
-			CreationDateTime: timeutil.NewDateTime(r.CreatedAt),
+			CreationDateTime: r.CreatedAt,
 		})
 	}
 

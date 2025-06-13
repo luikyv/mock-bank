@@ -25,7 +25,7 @@ func ConsentPolicy(
 	if err != nil {
 		panic(err)
 	}
-	p := consentPolicy{
+	policy := consentPolicy{
 		consentService: consentService,
 		accountService: accountService,
 		policy: policy{
@@ -34,7 +34,7 @@ func ConsentPolicy(
 			userService: userService,
 		},
 	}
-	return goidc.NewPolicy(
+	return goidc.NewPolicyWithSteps(
 		"consent",
 		func(r *http.Request, c *goidc.Client, as *goidc.AuthnSession) bool {
 			consentID, ok := consent.IDFromScopes(as.Scopes)
@@ -43,11 +43,13 @@ func ConsentPolicy(
 			}
 
 			as.StoreParameter(paramConsentID, consentID)
-			as.StoreParameter(paramStepID, stepIDSetUp)
 			as.StoreParameter(paramOrgID, c.CustomAttribute(ClientAttrOrgID))
 			return true
 		},
-		p.authenticate,
+		goidc.NewAuthnStep("setup", policy.setUp),
+		goidc.NewAuthnStep("login", policy.login),
+		goidc.NewAuthnStep("consent", policy.grantConsent),
+		goidc.NewAuthnStep("finish", policy.finishFlow),
 	)
 }
 
@@ -57,45 +59,7 @@ type consentPolicy struct {
 	policy
 }
 
-func (p consentPolicy) authenticate(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (status goidc.AuthnStatus, err error) {
-	defer func() {
-		if status != goidc.StatusFailure {
-			return
-		}
-		consentID := as.StoredParameter(paramConsentID).(string)
-		orgID := as.StoredParameter(paramOrgID).(string)
-		_ = p.consentService.Reject(r.Context(), consentID, orgID, consent.RejectedByUser, consent.RejectionReasonCustomerManuallyRejected)
-	}()
-
-	if as.StoredParameter(paramStepID) == stepIDSetUp {
-		if status, err = p.setUp(r, as); status != goidc.StatusSuccess {
-			return status, err
-		}
-		as.StoreParameter(paramStepID, stepIDLogin)
-	}
-
-	if as.StoredParameter(paramStepID) == stepIDLogin {
-		if status, err = p.login(w, r, as); status != goidc.StatusSuccess {
-			return status, err
-		}
-		as.StoreParameter(paramStepID, stepIDConsent)
-	}
-
-	if as.StoredParameter(paramStepID) == stepIDConsent {
-		if status, err = p.grantConsent(w, r, as); status != goidc.StatusSuccess {
-			return status, err
-		}
-		as.StoreParameter(paramStepID, stepIDFinishFlow)
-	}
-
-	if as.StoredParameter(paramStepID) == stepIDFinishFlow {
-		return p.finishFlow(r, as)
-	}
-
-	return goidc.StatusFailure, errors.New("access denied")
-}
-
-func (a consentPolicy) setUp(r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
+func (a consentPolicy) setUp(_ http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
 	orgID := as.StoredParameter(paramOrgID).(string)
 	consentID := as.StoredParameter(paramConsentID).(string)
 

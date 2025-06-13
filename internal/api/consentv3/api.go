@@ -11,6 +11,7 @@ import (
 
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/consent"
+	"github.com/luiky/mock-bank/internal/errorutil"
 	"github.com/luiky/mock-bank/internal/oidc"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timeutil"
@@ -98,7 +99,7 @@ func (s Server) ConsentsPostConsents(ctx context.Context, req ConsentsPostConsen
 		Status:      consent.StatusAwaitingAuthorization,
 		UserCPF:     req.Body.Data.LoggedUser.Document.Identification,
 		Permissions: perms,
-		ExpiresAt:   &req.Body.Data.ExpirationDateTime.Time,
+		ExpiresAt:   req.Body.Data.ExpirationDateTime,
 		ClientID:    ctx.Value(api.CtxKeyClientID).(string),
 		OrgID:       ctx.Value(api.CtxKeyOrgID).(string),
 	}
@@ -122,15 +123,12 @@ func (s Server) ConsentsPostConsents(ctx context.Context, req ConsentsPostConsen
 			ConsentID:            c.URN(),
 			Status:               ResponseConsentDataStatus(c.Status),
 			Permissions:          respPerms,
-			CreationDateTime:     timeutil.NewDateTime(c.CreatedAt),
-			StatusUpdateDateTime: timeutil.NewDateTime(c.StatusUpdatedAt),
+			CreationDateTime:     c.CreatedAt,
+			StatusUpdateDateTime: c.StatusUpdatedAt,
+			ExpirationDateTime:   c.ExpiresAt,
 		},
 		Links: api.NewLinks(s.baseURL + "/consents/" + c.URN()),
 		Meta:  api.NewMeta(),
-	}
-	if c.ExpiresAt != nil {
-		exp := timeutil.NewDateTime(*c.ExpiresAt)
-		resp.Data.ExpirationDateTime = &exp
 	}
 
 	return ConsentsPostConsents201JSONResponse{N201ConsentsCreatedJSONResponse(resp)}, nil
@@ -164,17 +162,14 @@ func (s Server) ConsentsGetConsentsConsentID(ctx context.Context, req ConsentsGe
 			StatusUpdateDateTime timeutil.DateTime             `json:"statusUpdateDateTime"`
 		}{
 			ConsentID:            c.URN(),
-			CreationDateTime:     timeutil.NewDateTime(c.CreatedAt),
+			CreationDateTime:     c.CreatedAt,
 			Permissions:          respPerms,
 			Status:               ResponseConsentReadDataStatus(c.Status),
-			StatusUpdateDateTime: timeutil.NewDateTime(c.StatusUpdatedAt),
+			StatusUpdateDateTime: c.StatusUpdatedAt,
+			ExpirationDateTime:   c.ExpiresAt,
 		},
 		Links: api.NewLinks(s.baseURL + "/consents/" + c.URN()),
 		Meta:  api.NewMeta(),
-	}
-	if c.ExpiresAt != nil {
-		exp := timeutil.NewDateTime(*c.ExpiresAt)
-		resp.Data.ExpirationDateTime = &exp
 	}
 	if c.RejectedBy != "" {
 		resp.Data.Rejection = &struct {
@@ -227,15 +222,12 @@ func (s Server) ConsentsPostConsentsConsentIDExtends(ctx context.Context, req Co
 			StatusUpdateDateTime timeutil.DateTime                          `json:"statusUpdateDateTime"`
 		}{
 			ConsentID:            c.URN(),
-			CreationDateTime:     timeutil.NewDateTime(c.CreatedAt),
+			CreationDateTime:     c.CreatedAt,
 			Permissions:          respPerms,
 			Status:               ResponseConsentExtensionsDataStatus(c.Status),
-			StatusUpdateDateTime: timeutil.NewDateTime(c.StatusUpdatedAt),
+			StatusUpdateDateTime: c.StatusUpdatedAt,
+			ExpirationDateTime:   c.ExpiresAt,
 		},
-	}
-	if c.ExpiresAt != nil {
-		exp := timeutil.NewDateTime(*c.ExpiresAt)
-		resp.Data.ExpirationDateTime = &exp
 	}
 	return ConsentsPostConsentsConsentIDExtends201JSONResponse{N201ConsentsCreatedExtensionsJSONResponse(resp)}, nil
 }
@@ -268,17 +260,11 @@ func (s Server) ConsentsGetConsentsConsentIDExtensions(ctx context.Context, req 
 					Rel:            consent.DefaultUserDocumentRelation,
 				},
 			},
-			RequestDateTime:        timeutil.NewDateTime(ext.RequestedAt),
-			XCustomerUserAgent:     &ext.UserAgent,
-			XFapiCustomerIPAddress: &ext.UserIPAddress,
-		}
-		if ext.ExpiresAt != nil {
-			exp := timeutil.NewDateTime(*ext.ExpiresAt)
-			extResp.ExpirationDateTime = &exp
-		}
-		if ext.PreviousExpiresAt != nil {
-			exp := timeutil.NewDateTime(*ext.PreviousExpiresAt)
-			extResp.PreviousExpirationDateTime = &exp
+			RequestDateTime:            ext.RequestedAt,
+			ExpirationDateTime:         ext.ExpiresAt,
+			PreviousExpirationDateTime: ext.PreviousExpiresAt,
+			XCustomerUserAgent:         &ext.UserAgent,
+			XFapiCustomerIPAddress:     &ext.UserIPAddress,
 		}
 
 		resp.Data = append(resp.Data, extResp)
@@ -325,6 +311,11 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 
 	if errors.Is(err, consent.ErrCannotExtendConsentForJointAccount) {
 		api.WriteError(w, r, api.NewError("DEPENDE_MULTIPLA_ALCADA", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentForJointAccount.Error()))
+		return
+	}
+
+	if errors.As(err, &errorutil.Error{}) {
+		api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusUnprocessableEntity, err.Error()))
 		return
 	}
 

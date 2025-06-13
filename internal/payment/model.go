@@ -10,43 +10,146 @@ import (
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
 
+const (
+	maxTimeAwaitingAuthorizationSecs = 3600
+)
+
 var (
 	Scope = goidc.NewScope("payments")
+)
+
+type Payment struct {
+	ID                        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Status                    Status
+	StatusUpdatedAt           timeutil.DateTime
+	EndToEndID                string
+	LocalInstrument           LocalInstrument
+	Amount                    string
+	Currency                  string
+	CreditorAccountISBP       string
+	CreditorAccountIssuer     *string
+	CreditorAccountNumber     string
+	CreditorAccountType       AccountType
+	RemittanceInformation     *string
+	QRCode                    *string
+	Proxy                     *string
+	CNPJInitiator             string
+	TransactionIdentification *string
+	IBGETownCode              *string
+	AuthorisationFlow         *AuthorisationFlow
+	ConsentID                 uuid.UUID
+	ClientID                  string
+	DebtorAccountID           *uuid.UUID `gorm:"column:account_id"`
+	DebtorAccount             *account.Account
+	Date                      timeutil.BrazilDate
+
+	OrgID     string
+	CreatedAt timeutil.DateTime
+	UpdatedAt timeutil.DateTime
+}
+
+func (Payment) TableName() string {
+	return "payments"
+}
+
+type Status string
+
+const (
+	StatusRCVD Status = "RCVD" // Received
+	StatusCANC Status = "CANC" // Cancelled
+	StatusACCP Status = "ACCP" // Accepted Customer Profile
+	StatusACPD Status = "ACPD" // Accepted Clearing Processed
+	StatusRJCT Status = "RJCT" // Rejected
+	StatusACSC Status = "ACSC" // Accepted Settlement Completed Debitor Account
+	StatusPDNG Status = "PDNG" // Pending
+	StatusSCHD Status = "SCHD" // Scheduled
 )
 
 type Consent struct {
 	ID                    uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Status                ConsentStatus
-	StatusUpdatedAt       time.Time
-	ExpiresAt             time.Time
+	StatusUpdatedAt       timeutil.DateTime
+	ExpiresAt             timeutil.DateTime
 	UserID                uuid.UUID
 	UserCPF               string
-	BusinessCNPJ          string
+	BusinessCNPJ          *string
 	ClientID              string
 	CreditorType          CreditorType
 	CreditorCPFCNPJ       string `gorm:"column:creditor_cpf_cnpj"`
 	CreditorName          string
 	CreditorAccountISBP   string
-	CreditorAccountIssuer string
+	CreditorAccountIssuer *string
 	CreditorAccountNumber string
 	CreditorAccountType   AccountType
 	PaymentType           Type
 	PaymentSchedule       *Schedule `gorm:"serializer:json"`
-	PaymentDate           *time.Time
-	Currency              string
-	Amount                string
-	IBGETownCode          string
+	PaymentDate           *timeutil.BrazilDate
+	PaymentCurrency       string
+	PaymentAmount         string
+	IBGETownCode          *string
 	LocalInstrument       LocalInstrument
-	QRCode                string
-	Proxy                 string
+	QRCode                *string
+	Proxy                 *string
 	DebtorAccountID       *uuid.UUID `gorm:"column:account_id"`
 	DebtorAccount         *account.Account
 	RejectionReasonCode   RejectionReasonCode
 	RejectionReasonDetail string
 
 	OrgID     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt timeutil.DateTime
+	UpdatedAt timeutil.DateTime
+}
+
+func (c *Consent) PaymentDates() []timeutil.BrazilDate {
+	if c.PaymentDate != nil {
+		return []timeutil.BrazilDate{*c.PaymentDate}
+	}
+
+	schedule := c.PaymentSchedule
+	switch {
+	case schedule.Single != nil:
+		return []timeutil.BrazilDate{schedule.Single.Date}
+
+	case schedule.Daily != nil:
+		start := schedule.Daily.StartDate
+		var dates []timeutil.BrazilDate
+		for i := range schedule.Daily.Quantity {
+			dates = append(dates, start.AddDate(0, 0, i))
+		}
+		return dates
+
+	// TODO.
+	// case schedule.Weekly != nil:
+	// 	start := schedule.Weekly.StartDate
+	// 	targetDay := parseWeekday(schedule.Weekly.DayOfWeek)
+	// 	var dates []timeutil.BrazilDate
+	// 	current := nextWeekdayOnOrAfter(start, targetDay)
+	// 	for i := 0; i < schedule.Weekly.Quantity; i++ {
+	// 		dates = append(dates, timeutil.BrazilDate{Time: current})
+	// 		current = current.AddDate(0, 0, 7)
+	// 	}
+	// 	return dates
+
+	// case schedule.Monthly != nil:
+	// 	start := schedule.Monthly.StartDate.Time
+	// 	day := schedule.Monthly.DayOfMonth
+	// 	var dates []timeutil.BrazilDate
+	// 	for i := 0; i < schedule.Monthly.Quantity; i++ {
+	// 		y, m := start.AddDate(0, i, 0).Date()
+	// 		d := time.Date(y, m, 1, 0, 0, 0, 0, time.UTC)
+	// 		lastDay := lastDayOfMonth(d)
+	// 		if day > lastDay {
+	// 			day = lastDay
+	// 		}
+	// 		dates = append(dates, timeutil.BrazilDate{Time: time.Date(y, m, day, 0, 0, 0, 0, time.UTC)})
+	// 	}
+	// 	return dates
+
+	case schedule.Custom != nil:
+		return schedule.Custom.Dates
+	}
+
+	return nil
 }
 
 func (Consent) TableName() string {
@@ -54,7 +157,7 @@ func (Consent) TableName() string {
 }
 
 func (c Consent) URN() string {
-	return consent.URNPrefix + c.ID.String()
+	return consent.URN(c.ID)
 }
 
 func (c Consent) IsAwaitingAuthorization() bool {
@@ -63,6 +166,17 @@ func (c Consent) IsAwaitingAuthorization() bool {
 
 func (c Consent) IsAuthorized() bool {
 	return c.Status == ConsentStatusAuthorized
+}
+
+func (c Consent) HasAuthExpired() bool {
+	now := timeutil.Now()
+	return c.IsAwaitingAuthorization() &&
+		now.After(c.CreatedAt.Add(time.Second*maxTimeAwaitingAuthorizationSecs).Time)
+}
+
+func (c Consent) IsExpired() bool {
+	now := timeutil.Now()
+	return c.IsAuthorized() && now.After(c.ExpiresAt.Time)
 }
 
 type ConsentStatus string
@@ -103,29 +217,29 @@ const (
 type LocalInstrument string
 
 const (
-	LocalInstrumentManul         LocalInstrument = "MANUAL"
-	LocalInstrumentPIX           LocalInstrument = "DICT"
-	LocalInstrumentDynamicQRCode LocalInstrument = "QRDN"
-	LocalInstrumentStaticQRCode  LocalInstrument = "QRES"
-	LocalInstrumentInitiator     LocalInstrument = "INIC"
+	LocalInstrumentMANU LocalInstrument = "MANU" // Manual.
+	LocalInstrumentDICT LocalInstrument = "DICT" // PIX key.
+	LocalInstrumentQRDN LocalInstrument = "QRDN" // Dynamic QR code.
+	LocalInstrumentQRES LocalInstrument = "QRES" // Static QR code.
+	LocalInstrumentINIC LocalInstrument = "INIC" // Initiator.
 )
 
 type AccountType string
 
 const (
-	AccountTypeCurrent            AccountType = "CACC"
-	AccountTypeSavings            AccountType = "SVGS"
-	AccountTypeTransactingAccount AccountType = "TRAN"
+	AccountTypeCACC AccountType = "CACC" // Current.
+	AccountTypeSVGS AccountType = "SVGS" // Savings.
+	AccountTypeTRAN AccountType = "TRAN" // Transacting account.
 )
 
 func ConvertAccountType(accType account.Type) AccountType {
 	switch accType {
 	case account.TypeCheckingAccount:
-		return AccountTypeCurrent
+		return AccountTypeCACC
 	case account.TypeSavingsAccount:
-		return AccountTypeSavings
+		return AccountTypeSVGS
 	case account.TypePrepaidPayment:
-		return AccountTypeTransactingAccount
+		return AccountTypeTRAN
 	default:
 		return ""
 	}
@@ -133,25 +247,25 @@ func ConvertAccountType(accType account.Type) AccountType {
 
 type Schedule struct {
 	Single *struct {
-		Date timeutil.Date `json:"date"`
+		Date timeutil.BrazilDate `json:"date"`
 	} `json:"single,omitempty"`
 	Daily *struct {
-		StartDate timeutil.Date `json:"start_date"`
-		Quantity  int           `json:"quantity"`
+		StartDate timeutil.BrazilDate `json:"start_date"`
+		Quantity  int                 `json:"quantity"`
 	} `json:"daily,omitempty"`
 	Weekly *struct {
-		DayOfWeek DayOfWeek     `json:"day_of_week"`
-		StartDate timeutil.Date `json:"start_date"`
-		Quantity  int           `json:"quantity"`
+		DayOfWeek DayOfWeek           `json:"day_of_week"`
+		StartDate timeutil.BrazilDate `json:"start_date"`
+		Quantity  int                 `json:"quantity"`
 	} `json:"weekly,omitempty"`
 	Monthly *struct {
-		DayOfMonth int           `json:"day_of_week"`
-		StartDate  timeutil.Date `json:"start_date"`
-		Quantity   int           `json:"quantity"`
+		DayOfMonth int                 `json:"day_of_week"`
+		StartDate  timeutil.BrazilDate `json:"start_date"`
+		Quantity   int                 `json:"quantity"`
 	} `json:"monthly,omitempty"`
 	Custom *struct {
-		Dates          []timeutil.Date `json:"dates"`
-		AdditionalInfo string          `json:"additional_info,omitempty"`
+		Dates          []timeutil.BrazilDate `json:"dates"`
+		AdditionalInfo string                `json:"additional_info,omitempty"`
 	} `json:"custom,omitempty"`
 }
 
@@ -176,4 +290,42 @@ type DebtorAccount struct {
 	Issuer string
 	Number string
 	Type   AccountType
+}
+
+type AuthorisationFlow string
+
+const (
+	AuthorisationFlowHybridFlow AuthorisationFlow = "HYBRID_FLOW"
+	AuthorisationFlowCIBAFlow   AuthorisationFlow = "CIBA_FLOW"
+	AuthorisationFlowFIDOFlow   AuthorisationFlow = "FIDO_FLOW"
+)
+
+func parseWeekday(weekDay DayOfWeek) time.Weekday {
+	switch weekDay {
+	case "DOMINGO":
+		return time.Sunday
+	case "SEGUNDA_FEIRA":
+		return time.Monday
+	case "TERCA_FEIRA":
+		return time.Tuesday
+	case "QUARTA_FEIRA":
+		return time.Wednesday
+	case "QUINTA_FEIRA":
+		return time.Thursday
+	case "SEXTA_FEIRA":
+		return time.Friday
+	case "SABADO":
+		return time.Saturday
+	default:
+		return time.Sunday
+	}
+}
+
+func nextWeekdayOnOrAfter(t time.Time, target time.Weekday) time.Time {
+	daysAhead := (int(target) - int(t.Weekday()) + 7) % 7
+	return t.AddDate(0, 0, daysAhead)
+}
+
+func lastDayOfMonth(t time.Time) int {
+	return t.AddDate(0, 1, -t.Day()).Day()
 }

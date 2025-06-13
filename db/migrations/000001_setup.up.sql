@@ -187,9 +187,9 @@ CREATE TABLE payment_consents (
     creditor_account_type TEXT NOT NULL,
     payment_type TEXT NOT NULL,
     payment_schedule JSONB,
-    payment_date TIMESTAMPTZ,
-    currency TEXT NOT NULL,
-    amount TEXT NOT NULL,
+    payment_date DATE,
+    payment_currency TEXT NOT NULL,
+    payment_amount TEXT NOT NULL,
     ibge_town_code TEXT,
     local_instrument TEXT NOT NULL,
     qr_code TEXT,
@@ -203,3 +203,34 @@ CREATE TABLE payment_consents (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_payment_consents_org_id_account_id ON payment_consents (org_id, account_id);
+
+CREATE TABLE payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    status TEXT NOT NULL,
+    status_updated_at TIMESTAMPTZ DEFAULT now(),
+    end_to_end_id TEXT NOT NULL UNIQUE,
+    local_instrument TEXT NOT NULL,
+    amount TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    creditor_account_isbp TEXT NOT NULL,
+    creditor_account_issuer TEXT,
+    creditor_account_number TEXT NOT NULL,
+    creditor_account_type TEXT NOT NULL,
+    remittance_information TEXT,
+    qr_code TEXT,
+    proxy TEXT,
+    cnpj_initiator TEXT NOT NULL,
+    transaction_identification TEXT,
+    ibge_town_code TEXT,
+    authorisation_flow TEXT,
+    consent_id UUID NOT NULL REFERENCES payment_consents(id),
+    client_id TEXT NOT NULL REFERENCES oauth_clients(id),
+    account_id UUID NOT NULL REFERENCES accounts(id),
+    date DATE,
+
+    org_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_payments_org_id_consent_id ON payments (org_id, consent_id);
+

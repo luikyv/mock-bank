@@ -26,7 +26,7 @@ actions:
 
 - target: $..[*][?(@.format == "date")]
   update:
-    x-go-type: timeutil.Date
+    x-go-type: timeutil.BrazilDate
     x-go-type-import:
       path: github.com/luiky/mock-bank/internal/timeutil
 

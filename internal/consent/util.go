@@ -4,8 +4,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/timeutil"
 )
+
+func URN(id uuid.UUID) string {
+	return URNPrefix + id.String()
+}
 
 func IDFromScopes(scopes string) (string, bool) {
 	for _, s := range strings.Split(scopes, " ") {
@@ -77,7 +82,7 @@ func validateExtension(c *Consent, ext *Extension) error {
 		return ErrInvalidExpiration
 	}
 
-	if c.ExpiresAt != nil && !ext.ExpiresAt.After(*c.ExpiresAt) {
+	if c.ExpiresAt != nil && !ext.ExpiresAt.After(c.ExpiresAt.Time) {
 		return ErrInvalidExpiration
 	}
 

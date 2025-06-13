@@ -22,7 +22,7 @@ actions:
 
 - target: $..[*][?(@.format == "date")]
   update:
-    x-go-type: timeutil.Date
+    x-go-type: timeutil.BrazilDate
     x-go-type-import:
       path: github.com/luiky/mock-bank/internal/timeutil
 
@@ -67,3 +67,27 @@ actions:
     application/json:
       schema:
         $ref: '#/components/schemas/ResponsePaymentConsent'
+
+- target: $.paths./pix/payments.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./pix/payments.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/CreatePixPayment'
+
+- target: $.components.responses.201PaymentsInitiationPixPaymentCreated.content.application/jwt
+  remove: true
+- target: $.components.responses.201PaymentsInitiationPixPaymentCreated.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponseCreatePixPayment'
+
+- target: $.components.responses.200PaymentsInitiationPixPaymentIdRead.content.application/jwt
+  remove: true
+- target: $.components.responses.200PaymentsInitiationPixPaymentIdRead.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponsePixPayment'

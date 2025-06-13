@@ -1,9 +1,9 @@
 package timeutil
 
-// TODO: Review these dates, how should I handle Brazilian dates?
-
 import (
+	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"time"
 )
 
@@ -41,17 +41,36 @@ func (d *DateTime) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (d *DateTime) Scan(value any) error {
+	if value == nil {
+		d.Time = time.Time{}
+		return nil
+	}
+
+	t, ok := value.(time.Time)
+	if !ok {
+		return errors.New("failed to scan DateTime: value is not time.Time")
+	}
+
+	d.Time = t.UTC()
+	return nil
+}
+
+func (d DateTime) Value() (driver.Value, error) {
+	return d.Time.UTC(), nil
+}
+
 func (d DateTime) String() string {
 	return d.Time.Format(dateTimeFormat)
 }
 
-func (d DateTime) ToDate() Date {
-	return NewDate(d.Time.Truncate(24 * time.Hour))
+func (d DateTime) BrazilDate() BrazilDate {
+	return NewBrazilDate(d.Time)
 }
 
-func NewDateTime(t time.Time) DateTime {
+func (d DateTime) Add(duration time.Duration) DateTime {
 	return DateTime{
-		Time: t,
+		Time: d.Time.Add(duration),
 	}
 }
 
@@ -59,28 +78,38 @@ func DateTimeNow() DateTime {
 	return NewDateTime(Now())
 }
 
-type Date struct {
+func NewDateTime(t time.Time) DateTime {
+	return DateTime{
+		Time: t.In(time.UTC),
+	}
+}
+
+type BrazilDate struct {
 	time.Time
 }
 
-func (d Date) MarshalJSON() ([]byte, error) {
-	if d.IsZero() {
-		return json.Marshal(nil)
+func (d BrazilDate) AddDate(years int, months int, days int) BrazilDate {
+	return BrazilDate{
+		Time: d.Time.AddDate(years, months, days),
 	}
-
-	t := d.In(brazilLocation)
-	return json.Marshal(t.Format(dateFormat))
 }
 
-func (d *Date) UnmarshalJSON(data []byte) error {
+func (d BrazilDate) Equal(t BrazilDate) bool {
+	return d.Time.Equal(t.Time)
+}
+
+func (d BrazilDate) After(t BrazilDate) bool {
+	return d.Time.After(t.Time)
+}
+
+func (d BrazilDate) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
+}
+
+func (d *BrazilDate) UnmarshalJSON(data []byte) error {
 	var dateStr string
 	if err := json.Unmarshal(data, &dateStr); err != nil {
 		return err
-	}
-
-	if dateStr == "" {
-		d.Time = time.Time{}
-		return nil
 	}
 
 	parsed, err := time.ParseInLocation(dateFormat, dateStr, brazilLocation)
@@ -92,35 +121,46 @@ func (d *Date) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (d Date) String() string {
+func (d BrazilDate) String() string {
 	return d.Time.Format(dateFormat)
 }
 
-func NewDate(t time.Time) Date {
-	return Date{
-		Time: t.Truncate(24 * time.Hour),
+func (d *BrazilDate) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
+	t, ok := value.(time.Time)
+	if !ok {
+		return errors.New("failed to scan Date: value is not time.Time")
+	}
+
+	d.Time = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, brazilLocation)
+	return nil
+}
+
+func (d BrazilDate) Value() (driver.Value, error) {
+	t := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, brazilLocation)
+	return t, nil
+}
+
+func BrazilDateNow() BrazilDate {
+	return NewBrazilDate(Now())
+}
+
+func NewBrazilDate(t time.Time) BrazilDate {
+	brTime := t.In(brazilLocation)
+	return BrazilDate{
+		Time: time.Date(brTime.Year(), brTime.Month(), brTime.Day(), 0, 0, 0, 0, brazilLocation),
 	}
 }
 
-func DateNow() Date {
-	return NewDate(Now())
-}
-
-func ParseDate(s string) (Date, error) {
-	parsed, err := time.Parse(dateFormat, s)
-	if err != nil {
-		return Date{}, err
-	}
-
-	return Date{
-		Time: parsed.UTC(),
-	}, nil
-}
-
+// Now returns the current time in UTC.
 func Now() time.Time {
 	return time.Now().UTC()
 }
 
+// Timestamp returns the current Unix timestamp in seconds (UTC).
 func Timestamp() int {
 	return int(Now().Unix())
 }

@@ -33,18 +33,22 @@ func PaymentPolicy(
 			userService: userService,
 		},
 	}
-	return goidc.NewPolicy(
+
+	return goidc.NewPolicyWithSteps(
 		"payment",
 		func(r *http.Request, c *goidc.Client, as *goidc.AuthnSession) bool {
 			if !strings.Contains(as.Scopes, payment.Scope.ID) {
 				return false
 			}
 
-			as.StoreParameter(paramStepID, stepIDSetUp)
 			as.StoreParameter(paramOrgID, c.CustomAttribute(ClientAttrOrgID))
 			return true
 		},
-		policy.authenticate,
+		goidc.NewAuthnStep("setup", policy.setUp),
+		goidc.NewAuthnStep("login", policy.login),
+		goidc.NewAuthnStep("account", policy.chooseAccount),
+		goidc.NewAuthnStep("payment", policy.grantPayment),
+		goidc.NewAuthnStep("finish", policy.finishFlow),
 	)
 }
 
@@ -54,43 +58,7 @@ type paymentPolicy struct {
 	policy
 }
 
-func (p paymentPolicy) authenticate(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
-	if as.StoredParameter(paramStepID) == stepIDSetUp {
-		if status, err := p.setUp(r, as); status != goidc.StatusSuccess {
-			return status, err
-		}
-		as.StoreParameter(paramStepID, stepIDLogin)
-	}
-
-	if as.StoredParameter(paramStepID) == stepIDLogin {
-		if status, err := p.login(w, r, as); status != goidc.StatusSuccess {
-			return status, err
-		}
-		as.StoreParameter(paramStepID, stepIDAccount)
-	}
-
-	if as.StoredParameter(paramStepID) == stepIDAccount {
-		if status, err := p.chooseAccount(w, r, as); status != goidc.StatusSuccess {
-			return status, err
-		}
-		as.StoreParameter(paramStepID, stepIDPayment)
-	}
-
-	if as.StoredParameter(paramStepID) == stepIDPayment {
-		if status, err := p.grantPayment(w, r, as); status != goidc.StatusSuccess {
-			return status, err
-		}
-		as.StoreParameter(paramStepID, stepIDFinishFlow)
-	}
-
-	if as.StoredParameter(paramStepID) == stepIDFinishFlow {
-		return p.finishFlow(r, as)
-	}
-
-	return goidc.StatusFailure, errors.New("access denied")
-}
-
-func (policy paymentPolicy) setUp(r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
+func (policy paymentPolicy) setUp(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
 	orgID := as.StoredParameter(paramOrgID).(string)
 
 	consentID, ok := consent.IDFromScopes(as.Scopes)
@@ -117,11 +85,11 @@ func (policy paymentPolicy) setUp(r *http.Request, as *goidc.AuthnSession) (goid
 
 	as.StoreParameter(paramPaymentConsentID, consentID)
 	as.StoreParameter(paramCPF, c.UserCPF)
-	if c.BusinessCNPJ != "" {
-		as.StoreParameter(paramCNPJ, c.BusinessCNPJ)
+	if c.BusinessCNPJ != nil {
+		as.StoreParameter(paramCNPJ, *c.BusinessCNPJ)
 	}
 	if c.DebtorAccountID != nil {
-		as.StoreParameter(paramAccountID, *c.DebtorAccount)
+		as.StoreParameter(paramAccountID, *c.DebtorAccountID)
 	}
 	return goidc.StatusSuccess, nil
 }
@@ -154,6 +122,7 @@ func (p paymentPolicy) chooseAccount(w http.ResponseWriter, r *http.Request, as 
 
 	if err := p.paymentService.UpdateDebtorAccount(r.Context(), consentID, accountID, orgID); err != nil {
 		slog.ErrorContext(r.Context(), "could not update debtor account", "error", err)
+		return goidc.StatusFailure, errors.New("could not update debtor account")
 	}
 	return goidc.StatusSuccess, nil
 }
@@ -180,8 +149,8 @@ func (p paymentPolicy) grantPayment(w http.ResponseWriter, r *http.Request, as *
 			"CreditorAccountISBP":   c.CreditorAccountISBP,
 			"CreditorAccountIssuer": c.CreditorAccountIssuer,
 			"CreditorAccountNumber": c.CreditorAccountNumber,
-			"Amount":                c.Amount,
-			"Currency":              c.Currency,
+			"PaymentAmount":         c.PaymentAmount,
+			"PaymentCurrency":       c.PaymentCurrency,
 			"PaymentDate":           c.PaymentDate,
 		}
 

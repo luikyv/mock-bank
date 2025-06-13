@@ -27,8 +27,8 @@ type Consent struct {
 	ID              uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Status          Status
 	Permissions     []Permission `gorm:"serializer:json"`
-	StatusUpdatedAt time.Time
-	ExpiresAt       *time.Time
+	StatusUpdatedAt timeutil.DateTime
+	ExpiresAt       *timeutil.DateTime
 	UserID          *uuid.UUID
 	UserCPF         string
 	BusinessCNPJ    string
@@ -37,12 +37,12 @@ type Consent struct {
 	RejectionReason RejectionReason
 
 	OrgID     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt timeutil.DateTime
+	UpdatedAt timeutil.DateTime
 }
 
 func (c Consent) URN() string {
-	return URNPrefix + c.ID.String()
+	return URN(c.ID)
 }
 
 // HasAuthExpired returns true if the status is [StatusAwaitingAuthorization] and
@@ -50,7 +50,7 @@ func (c Consent) URN() string {
 func (c Consent) HasAuthExpired() bool {
 	now := timeutil.Now()
 	return c.IsAwaitingAuthorization() &&
-		now.After(c.CreatedAt.Add(time.Second*maxTimeAwaitingAuthorizationSecs))
+		now.After(c.CreatedAt.Add(time.Second*maxTimeAwaitingAuthorizationSecs).Time)
 }
 
 // IsExpired returns true if the status is [StatusAuthorized] and the consent
@@ -60,7 +60,7 @@ func (c Consent) IsExpired() bool {
 		return false
 	}
 	now := timeutil.Now()
-	return c.Status == StatusAuthorized && now.After(*c.ExpiresAt)
+	return c.Status == StatusAuthorized && now.After(c.ExpiresAt.Time)
 }
 
 func (c Consent) IsAuthorized() bool {
@@ -297,9 +297,9 @@ type Extension struct {
 	ConsentID         uuid.UUID
 	UserCPF           string
 	BusinessCNPJ      string
-	ExpiresAt         *time.Time
-	PreviousExpiresAt *time.Time
-	RequestedAt       time.Time
+	ExpiresAt         *timeutil.DateTime
+	PreviousExpiresAt *timeutil.DateTime
+	RequestedAt       timeutil.DateTime
 	UserIPAddress     string
 	UserAgent         string
 }

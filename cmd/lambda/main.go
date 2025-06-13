@@ -86,6 +86,7 @@ var (
 
 var Handler http.Handler
 
+// TODO: Do I need this?
 func init() {
 	ctx := context.Background()
 
@@ -155,7 +156,7 @@ func init() {
 }
 
 func main() {
-	slog.Info("starting mock bank lambda", slog.String("env", string(Env)))
+	slog.Info("starting mock bank", slog.String("env", string(Env)))
 
 	if !Env.IsAWS() {
 		if err := http.ListenAndServe(":"+Port, Handler); err != nil && err != http.ErrServerClosed {
@@ -246,14 +247,6 @@ type logCtxHandler struct {
 func (h *logCtxHandler) Handle(ctx context.Context, r slog.Record) error {
 	if interactionID, ok := ctx.Value(api.CtxKeyInteractionID).(string); ok {
 		r.AddAttrs(slog.String("interaction_id", interactionID))
-	}
-
-	if orgID, ok := ctx.Value(api.CtxKeyOrgID).(string); ok {
-		r.AddAttrs(slog.String("org_id", orgID))
-	}
-
-	if sessionID, ok := ctx.Value(api.CtxKeySessionID).(string); ok {
-		r.AddAttrs(slog.String("session_id", sessionID))
 	}
 
 	return h.Handler.Handle(ctx, r)

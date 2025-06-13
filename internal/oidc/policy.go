@@ -20,17 +20,9 @@ const (
 	paramCPF              = "cpf"
 	paramCNPJ             = "cnpj"
 	paramUserID           = "user_id"
-	paramStepID           = "step_id"
 	paramOrgID            = "org_id"
 	paramPaymentConsentID = "payment_consent_id"
 	paramAccountID        = "account_id"
-
-	stepIDSetUp      = "setup"
-	stepIDLogin      = "login"
-	stepIDConsent    = "consent"
-	stepIDAccount    = "account"
-	stepIDPayment    = "payment"
-	stepIDFinishFlow = "finish_flow"
 
 	formParamUsername   = "username"
 	formParamPassword   = "password"
@@ -90,7 +82,7 @@ func (p policy) login(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSes
 	return goidc.StatusSuccess, nil
 }
 
-func (a policy) finishFlow(r *http.Request, session *goidc.AuthnSession) (goidc.AuthnStatus, error) {
+func (a policy) finishFlow(_ http.ResponseWriter, r *http.Request, session *goidc.AuthnSession) (goidc.AuthnStatus, error) {
 	slog.InfoContext(r.Context(), "auth flow finished, filling oauth session")
 	session.SetUserID(session.StoredParameter(paramUserID).(string))
 	session.GrantScopes(session.Scopes)
