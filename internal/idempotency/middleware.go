@@ -2,6 +2,7 @@ package idempotency
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"io"
 	"log/slog"
@@ -12,9 +13,9 @@ import (
 
 const headerIdempotencyID = "X-Idempotency-Key"
 
-// IdempotencyMiddleware ensures that requests with the same idempotency ID
+// Middleware ensures that requests with the same idempotency ID
 // are not processed multiple times, returning a cached response if available.
-func IdempotencyMiddleware(next http.Handler, service Service) http.Handler {
+func Middleware(next http.Handler, service Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		idempotencyID := r.Header.Get(headerIdempotencyID)
 		if idempotencyID == "" {
@@ -22,7 +23,7 @@ func IdempotencyMiddleware(next http.Handler, service Service) http.Handler {
 			return
 		}
 
-		// Read and cache request body for comparison or forwarding
+		// Read and cache request body for comparison or forwarding.
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			api.WriteError(w, r, api.NewError("ERRO_IDEMPOTENCIA", http.StatusBadRequest, "unable to read request body"))
@@ -33,12 +34,12 @@ func IdempotencyMiddleware(next http.Handler, service Service) http.Handler {
 		rec, err := service.Response(r.Context(), idempotencyID)
 		if err == nil {
 			// Validate if the current request body matches the stored one.
-			if string(bodyBytes) != rec.Request {
+			if base64.RawStdEncoding.EncodeToString(bodyBytes) != rec.Request {
 				slog.DebugContext(r.Context(),
 					"mismatched idempotent request payload",
-					slog.String("id", rec.ID),
-					slog.String("got", string(bodyBytes)),
-					slog.String("expected", rec.Request),
+					"id", rec.ID,
+					"got", base64.RawStdEncoding.EncodeToString(bodyBytes),
+					"expected", rec.Request,
 				)
 				api.WriteError(w, r, api.NewError("ERRO_IDEMPOTENCIA", http.StatusUnprocessableEntity, "request payload does not match previous idempotent request"))
 				return
@@ -60,7 +61,7 @@ func IdempotencyMiddleware(next http.Handler, service Service) http.Handler {
 
 		err = service.Create(r.Context(), &Record{
 			ID:         idempotencyID,
-			Request:    string(bodyBytes),
+			Request:    base64.RawStdEncoding.EncodeToString(bodyBytes),
 			Response:   recorder.Body.String(),
 			StatusCode: recorder.StatusCode,
 		})
@@ -71,15 +72,17 @@ func IdempotencyMiddleware(next http.Handler, service Service) http.Handler {
 }
 
 func writeIdempotencyResp(w http.ResponseWriter, r *http.Request, rec *Record) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(rec.StatusCode)
 
 	if len(rec.Response) == 0 {
-		slog.DebugContext(r.Context(), "idempotency record has no response body", slog.String("id", rec.ID))
+		slog.DebugContext(r.Context(), "idempotency record has no response body", "id", rec.ID)
 		return
 	}
 
-	if _, err := w.Write([]byte(rec.Response)); err != nil {
-		slog.ErrorContext(r.Context(), "failed to write cached idempotent response body", slog.Any("err", err))
+	resp, _ := base64.RawStdEncoding.DecodeString(rec.Response)
+	if _, err := w.Write(resp); err != nil {
+		slog.ErrorContext(r.Context(), "failed to write cached idempotent response body", "error", err)
 	}
 }
 

@@ -105,21 +105,21 @@ func (s Service) ConsentedAccount(ctx context.Context, accountID, consentID, org
 	return consentAcc.Account, nil
 }
 
-func (s Service) AccountByNumber(ctx context.Context, number, orgID string) (Account, error) {
-	var account Account
+func (s Service) AccountByNumber(ctx context.Context, number, orgID string) (*Account, error) {
+	acc := &Account{}
 	if err := s.db.WithContext(ctx).
 		Where("number = ? AND org_id = ?", number, orgID).
-		First(&account).Error; err != nil {
+		First(acc).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return Account{}, ErrNotFound
+			return nil, ErrNotFound
 		}
-		return Account{}, fmt.Errorf("could not fetch account: %w", err)
+		return nil, fmt.Errorf("could not fetch account: %w", err)
 	}
-	return account, nil
+	return acc, nil
 }
 
-func (s Service) AllAccounts(ctx context.Context, userID, orgID string) ([]Account, error) {
-	var accounts []Account
+func (s Service) AllAccounts(ctx context.Context, userID, orgID string) ([]*Account, error) {
+	var accounts []*Account
 	if err := s.db.WithContext(ctx).
 		Where("user_id = ? AND org_id = ?", userID, orgID).
 		Find(&accounts).Error; err != nil {

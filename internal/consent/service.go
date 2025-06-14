@@ -147,7 +147,7 @@ func (s Service) Extend(ctx context.Context, id, orgID string, ext *Extension) (
 	return c, nil
 }
 
-func (s Service) validate(ctx context.Context, c *Consent) error {
+func (s Service) validate(_ context.Context, c *Consent) error {
 	if err := validatePermissions(c.Permissions); err != nil {
 		return err
 	}

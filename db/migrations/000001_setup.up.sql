@@ -234,3 +234,13 @@ CREATE TABLE payments (
 );
 CREATE INDEX idx_payments_org_id_consent_id ON payments (org_id, consent_id);
 
+CREATE TABLE idempotency_records (
+    id TEXT PRIMARY KEY,
+    status_code INTEGER NOT NULL,
+    request TEXT NOT NULL,
+    response TEXT NOT NULL,
+
+    org_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

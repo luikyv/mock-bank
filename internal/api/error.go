@@ -42,12 +42,16 @@ func NewError(code string, status int, description string) Error {
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	var apiErr Error
 	if !errors.As(err, &apiErr) {
-		slog.ErrorContext(r.Context(), "unknown error", slog.String("error", err.Error()))
-		// TODO: Review this.
+		slog.ErrorContext(r.Context(), "unknown error", "error", err)
 		WriteError(w, r, Error{"INTERNAL_ERROR", http.StatusInternalServerError, "internal error", false})
 		return
 	}
 
+	slog.InfoContext(r.Context(), "returning error", "error", err)
+	description := apiErr.description
+	if len(description) > 2048 {
+		description = description[:2048]
+	}
 	errResp := response{
 		Errors: []struct {
 			Code   string `json:"code"`
@@ -57,7 +61,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 			{
 				Code:   apiErr.code,
 				Title:  apiErr.code,
-				Detail: apiErr.description,
+				Detail: description,
 			},
 		},
 		Meta: NewMeta(),

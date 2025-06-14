@@ -70,8 +70,8 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 				return nil
 			},
 		},
-		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
-			api.WriteError(w, nil, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
+		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts netmiddleware.ErrorHandlerOpts) {
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusUnprocessableEntity, err.Error()))
 		},
 	})
 

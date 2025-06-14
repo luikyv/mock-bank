@@ -168,11 +168,11 @@ func NewTransactionFilter(from, to *timeutil.BrazilDate, current bool) (Transact
 
 	if current {
 		nowMinus7Days := brazilNow.AddDate(0, 0, -7)
-		if filter.from.Before(nowMinus7Days.Time) {
+		if filter.from.Before(nowMinus7Days) {
 			return TransactionFilter{}, errors.New("from booking date too far in the past")
 		}
 
-		if filter.to.Before(nowMinus7Days.Time) {
+		if filter.to.Before(nowMinus7Days) {
 			return TransactionFilter{}, errors.New("to booking date too far in the past")
 		}
 	}

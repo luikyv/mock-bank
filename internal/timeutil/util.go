@@ -102,6 +102,10 @@ func (d BrazilDate) After(t BrazilDate) bool {
 	return d.Time.After(t.Time)
 }
 
+func (d BrazilDate) Before(t BrazilDate) bool {
+	return d.Time.Before(t.Time)
+}
+
 func (d BrazilDate) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.String())
 }

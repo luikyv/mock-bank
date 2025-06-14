@@ -51,8 +51,8 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 				return nil
 			},
 		},
-		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
-			api.WriteError(w, nil, api.NewError("INVALID_REQUEST", http.StatusBadRequest, message))
+		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts netmiddleware.ErrorHandlerOpts) {
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusUnprocessableEntity, err.Error()))
 		},
 	})
 
@@ -63,7 +63,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	})
 	wrapper := ServerInterfaceWrapper{
 		Handler:            strictHandler,
-		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, api.FAPIIDMiddleware(nil)},
+		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
@@ -101,7 +101,8 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = oidc.AuthMiddleware(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
 	accountMux.Handle("GET /accounts/{accountId}/transactions-current", handler)
 
-	mux.Handle("/open-banking/accounts/v2/", http.StripPrefix("/open-banking/accounts/v2", accountMux))
+	handler = api.FAPIIDHandler(accountMux, nil)
+	mux.Handle("/open-banking/accounts/v2/", http.StripPrefix("/open-banking/accounts/v2", handler))
 }
 
 func (s Server) AccountsGetAccounts(ctx context.Context, req AccountsGetAccountsRequestObject) (AccountsGetAccountsResponseObject, error) {

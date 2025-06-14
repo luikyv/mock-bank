@@ -13,4 +13,8 @@ var (
 	ErrInvalidData                       = errors.New("invalid data")
 	ErrInvalidEndToEndID                 = errors.New("invalid end to end id")
 	ErrCreditorAndDebtorAccountsAreEqual = errors.New("creditor and debtor accounts cannot be equal")
+	ErrPaymentDoesNotMatchConsent        = errors.New("payment does not match the consent")
+	ErrInvalidDate                       = errors.New("invalid payment date")
+	ErrMissingValue                      = errors.New("parameter is missing")
+	ErrCancelNotAllowed                  = errors.New("cannot cancel the payment")
 )

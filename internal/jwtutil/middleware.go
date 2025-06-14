@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
@@ -113,6 +114,13 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 }
 
 func responseMiddlewareHandler(next http.Handler, bankOrgID string, signer crypto.Signer) http.Handler {
+	statusCodes := []int{
+		http.StatusOK,
+		http.StatusCreated,
+		http.StatusAccepted,
+		http.StatusUnprocessableEntity,
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &responseRecorder{
 			ResponseWriter: w,
@@ -120,6 +128,13 @@ func responseMiddlewareHandler(next http.Handler, bankOrgID string, signer crypt
 			StatusCode:     http.StatusOK,
 		}
 		next.ServeHTTP(rec, r)
+
+		if !slices.Contains(statusCodes, rec.StatusCode) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(rec.StatusCode)
+			_, _ = w.Write(rec.Body.Bytes())
+			return
+		}
 
 		var respPayload map[string]any
 		if err := json.Unmarshal(rec.Body.Bytes(), &respPayload); err != nil {

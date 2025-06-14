@@ -10,10 +10,6 @@ import (
 	"github.com/luikyv/go-oidc/pkg/goidc"
 )
 
-const (
-	maxTimeAwaitingAuthorizationSecs = 3600
-)
-
 var (
 	Scope = goidc.NewScope("payments")
 )
@@ -38,6 +34,7 @@ type Payment struct {
 	IBGETownCode              *string
 	AuthorisationFlow         *AuthorisationFlow
 	ConsentID                 uuid.UUID
+	Consent                   *Consent
 	ClientID                  string
 	DebtorAccountID           *uuid.UUID `gorm:"column:account_id"`
 	DebtorAccount             *account.Account
@@ -168,12 +165,15 @@ func (c Consent) IsAuthorized() bool {
 	return c.Status == ConsentStatusAuthorized
 }
 
+// IsExpired returns true if the status is [ConsentStatusAwaitingAuthorization] and the consent
+// reached the expiration date.
 func (c Consent) HasAuthExpired() bool {
 	now := timeutil.Now()
-	return c.IsAwaitingAuthorization() &&
-		now.After(c.CreatedAt.Add(time.Second*maxTimeAwaitingAuthorizationSecs).Time)
+	return c.IsAwaitingAuthorization() && now.After(c.ExpiresAt.Time)
 }
 
+// IsExpired returns true if the status is [ConsentStatusAuthorized] and the consent
+// reached the expiration date.
 func (c Consent) IsExpired() bool {
 	now := timeutil.Now()
 	return c.IsAuthorized() && now.After(c.ExpiresAt.Time)
@@ -250,22 +250,22 @@ type Schedule struct {
 		Date timeutil.BrazilDate `json:"date"`
 	} `json:"single,omitempty"`
 	Daily *struct {
-		StartDate timeutil.BrazilDate `json:"start_date"`
+		StartDate timeutil.BrazilDate `json:"startDate"`
 		Quantity  int                 `json:"quantity"`
 	} `json:"daily,omitempty"`
 	Weekly *struct {
-		DayOfWeek DayOfWeek           `json:"day_of_week"`
-		StartDate timeutil.BrazilDate `json:"start_date"`
+		DayOfWeek DayOfWeek           `json:"dayOfWeek"`
+		StartDate timeutil.BrazilDate `json:"startDate"`
 		Quantity  int                 `json:"quantity"`
 	} `json:"weekly,omitempty"`
 	Monthly *struct {
-		DayOfMonth int                 `json:"day_of_week"`
-		StartDate  timeutil.BrazilDate `json:"start_date"`
+		DayOfMonth int                 `json:"dayOfWeek"`
+		StartDate  timeutil.BrazilDate `json:"startDate"`
 		Quantity   int                 `json:"quantity"`
 	} `json:"monthly,omitempty"`
 	Custom *struct {
 		Dates          []timeutil.BrazilDate `json:"dates"`
-		AdditionalInfo string                `json:"additional_info,omitempty"`
+		AdditionalInfo string                `json:"additionalInformation,omitempty"`
 	} `json:"custom,omitempty"`
 }
 

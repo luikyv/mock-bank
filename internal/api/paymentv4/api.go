@@ -13,6 +13,7 @@ import (
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/consent"
 	"github.com/luiky/mock-bank/internal/errorutil"
+	"github.com/luiky/mock-bank/internal/idempotency"
 	"github.com/luiky/mock-bank/internal/jwtutil"
 	"github.com/luiky/mock-bank/internal/oidc"
 	"github.com/luiky/mock-bank/internal/payment"
@@ -24,29 +25,32 @@ import (
 var _ StrictServerInterface = Server{}
 
 type Server struct {
-	baseURL      string
-	service      payment.Service
-	op           *provider.Provider
-	keystoreHost string
-	orgID        string
-	signer       crypto.Signer
+	baseURL            string
+	service            payment.Service
+	idempotencyService idempotency.Service
+	op                 *provider.Provider
+	keystoreHost       string
+	orgID              string
+	signer             crypto.Signer
 }
 
 func NewServer(
 	host string,
 	service payment.Service,
+	idempotencyService idempotency.Service,
 	op *provider.Provider,
 	keystoreHost string,
 	orgID string,
 	signer crypto.Signer,
 ) Server {
 	return Server{
-		baseURL:      host + "/open-banking/payments/v4",
-		service:      service,
-		op:           op,
-		keystoreHost: keystoreHost,
-		orgID:        orgID,
-		signer:       signer,
+		baseURL:            host + "/open-banking/payments/v4",
+		service:            service,
+		idempotencyService: idempotencyService,
+		op:                 op,
+		keystoreHost:       keystoreHost,
+		orgID:              orgID,
+		signer:             signer,
 	}
 }
 
@@ -64,8 +68,8 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 				return nil
 			},
 		},
-		ErrorHandler: func(w http.ResponseWriter, message string, _ int) {
-			api.WriteError(w, nil, api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, message))
+		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts netmiddleware.ErrorHandlerOpts) {
+			api.WriteError(w, r, api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
 		},
 	})
 
@@ -78,7 +82,6 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		Handler: strictHandler,
 		HandlerMiddlewares: []MiddlewareFunc{
 			swaggerMiddleware,
-			api.FAPIIDMiddleware(nil),
 			jwtutil.Middleware(s.baseURL, s.orgID, s.keystoreHost, s.signer),
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
@@ -97,6 +100,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	paymentMux.Handle("GET /consents/{consentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.PaymentsPostPixPayments)
+	handler = idempotency.Middleware(handler, s.idempotencyService)
 	handler = oidc.AuthMiddleware(handler, s.op, consent.ScopeID)
 	paymentMux.Handle("POST /pix/payments", handler)
 
@@ -104,7 +108,8 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = oidc.AuthMiddleware(handler, s.op, payment.Scope)
 	paymentMux.Handle("GET /pix/payments/{paymentId}", handler)
 
-	mux.Handle("/open-banking/payments/v4/", http.StripPrefix("/open-banking/payments/v4", paymentMux))
+	handler = api.FAPIIDHandler(paymentMux, nil)
+	mux.Handle("/open-banking/payments/v4/", http.StripPrefix("/open-banking/payments/v4", handler))
 }
 
 func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsentsRequestObject) (PaymentsPostConsentsResponseObject, error) {
@@ -379,7 +384,7 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 		payments = append(payments, p)
 	}
 
-	if err := s.service.Create(ctx, payments); err != nil {
+	if err := s.service.CreatePayments(ctx, payments); err != nil {
 		return nil, err
 	}
 
@@ -519,8 +524,28 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
+	if errors.Is(err, payment.ErrPaymentDoesNotMatchConsent) {
+		api.WriteError(w, r, api.NewError("PAGAMENTO_DIVERGENTE_CONSENTIMENTO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, payment.ErrInvalidDate) {
+		api.WriteError(w, r, api.NewError("DATA_PAGAMENTO_INVALIDA", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, payment.ErrMissingValue) {
+		api.WriteError(w, r, api.NewError("PARAMETRO_NAO_INFORMADO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, payment.ErrCancelNotAllowed) {
+		api.WriteError(w, r, api.NewError("PAGAMENTO_NAO_PERMITE_CANCELAMENTO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
 	if errors.As(err, &errorutil.Error{}) {
-		api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
+		api.WriteError(w, r, api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
 		return
 	}
 

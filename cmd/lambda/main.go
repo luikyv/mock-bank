@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/luiky/mock-bank/internal/api/resourcev3"
 	"github.com/luiky/mock-bank/internal/consent"
 	"github.com/luiky/mock-bank/internal/directory"
+	"github.com/luiky/mock-bank/internal/idempotency"
 	"github.com/luiky/mock-bank/internal/oidc"
 	"github.com/luiky/mock-bank/internal/payment"
 	"github.com/luiky/mock-bank/internal/resource"
@@ -131,6 +133,7 @@ func init() {
 	// Services.
 	directoryService := directory.NewService(DirectoryIssuer, DirectoryClientID, APPHost+"/api/directory/callback", directoryClientSigner, mtlsHTTPClient(directoryClientTLSCert))
 	sessionService := session.NewService(db, directoryService)
+	idempotencyService := idempotency.NewService(db)
 	userService := user.NewService(db)
 	consentService := consent.NewService(db, userService)
 	resouceService := resource.NewService(db)
@@ -150,9 +153,9 @@ func init() {
 	consentv3.NewServer(APIMTLSHost, consentService, op).RegisterRoutes(mux)
 	resourcev3.NewServer(APIMTLSHost, resouceService, consentService, op).RegisterRoutes(mux)
 	accountv2.NewServer(APIMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
-	paymentv4.NewServer(APIMTLSHost, paymentService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
+	paymentv4.NewServer(APIMTLSHost, paymentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 
-	Handler = loggingMiddleware(mux)
+	Handler = loggingMiddleware(recoverMiddleware(mux))
 }
 
 func main() {
@@ -386,27 +389,6 @@ func awsConfig(ctx context.Context) *aws.Config {
 	return &cfg
 }
 
-func loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slog.InfoContext(r.Context(), "request received",
-			slog.String("method", r.Method),
-			slog.String("path", r.URL.Path),
-			slog.String("url", r.URL.String()),
-		)
-
-		start := timeutil.Now()
-		defer func() {
-			slog.InfoContext(r.Context(), "request completed",
-				slog.String("method", r.Method),
-				slog.String("path", r.URL.Path),
-				slog.String("url", r.URL.String()),
-				slog.Duration("duration", time.Since(start)),
-			)
-		}()
-		next.ServeHTTP(w, r)
-	})
-}
-
 func signerFromSSM(ctx context.Context, ssmClient *ssm.Client, paramName string) (crypto.Signer, error) {
 	withDecryption := true
 	out, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
@@ -473,4 +455,38 @@ func tlsCertFromSSM(ctx context.Context, ssmClient *ssm.Client, certParamName, k
 	}
 
 	return tlsCert, nil
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		slog.InfoContext(r.Context(), "request received",
+			slog.String("method", r.Method),
+			slog.String("path", r.URL.Path),
+			slog.String("url", r.URL.String()),
+		)
+
+		start := timeutil.Now()
+		defer func() {
+			slog.InfoContext(r.Context(), "request completed",
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+				slog.String("url", r.URL.String()),
+				slog.Duration("duration", time.Since(start)),
+			)
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func recoverMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				slog.Error("panic recovered", "error", rec, "stack", string(debug.Stack()))
+				api.WriteError(w, r, fmt.Errorf("internal error: %v", rec))
+			}
+		}()
+
+		next.ServeHTTP(w, r)
+	})
 }
