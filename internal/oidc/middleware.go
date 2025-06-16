@@ -12,35 +12,38 @@ import (
 	"github.com/luikyv/go-oidc/pkg/provider"
 )
 
-func AuthMiddleware(next http.Handler, op *provider.Provider, scopes ...goidc.Scope) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		if r.Header.Get(api.HeaderXFAPIInteractionID) != "" {
-			ctx = context.WithValue(r.Context(), api.CtxKeyInteractionID, r.Header.Get(api.HeaderXFAPIInteractionID))
-		}
+func AuthMiddleware(op *provider.Provider, scopes ...goidc.Scope) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			if r.Header.Get(api.HeaderXFAPIInteractionID) != "" {
+				ctx = context.WithValue(r.Context(), api.CtxKeyInteractionID, r.Header.Get(api.HeaderXFAPIInteractionID))
+			}
 
-		tokenInfo, err := op.TokenInfoFromRequest(w, r)
-		if err != nil {
-			slog.InfoContext(r.Context(), "the token is not active", "error", err.Error())
-			api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(true))
-			return
-		}
+			tokenInfo, err := op.TokenInfoFromRequest(w, r)
+			if err != nil {
+				slog.InfoContext(r.Context(), "the token is not active", "error", err.Error())
+				api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(true))
+				return
+			}
 
-		ctx = context.WithValue(ctx, api.CtxKeyClientID, tokenInfo.ClientID)
-		ctx = context.WithValue(ctx, api.CtxKeySubject, tokenInfo.Subject)
-		ctx = context.WithValue(ctx, api.CtxKeyScopes, tokenInfo.Scopes)
-		ctx = context.WithValue(ctx, api.CtxKeyOrgID, tokenInfo.AdditionalTokenClaims["org_id"])
-		r = r.WithContext(ctx)
+			ctx = context.WithValue(ctx, api.CtxKeyClientID, tokenInfo.ClientID)
+			ctx = context.WithValue(ctx, api.CtxKeySubject, tokenInfo.Subject)
+			ctx = context.WithValue(ctx, api.CtxKeyScopes, tokenInfo.Scopes)
+			ctx = context.WithValue(ctx, api.CtxKeyOrgID, tokenInfo.AdditionalTokenClaims["org_id"])
+			r = r.WithContext(ctx)
 
-		tokenScopes := strings.Split(tokenInfo.Scopes, " ")
-		if !areScopesValid(scopes, tokenScopes) {
-			slog.InfoContext(r.Context(), "invalid scopes", "token_scopes", tokenInfo.Scopes)
-			api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "token missing scopes").Pagination(true))
-			return
-		}
+			tokenScopes := strings.Split(tokenInfo.Scopes, " ")
+			if !areScopesValid(scopes, tokenScopes) {
+				slog.InfoContext(r.Context(), "invalid scopes", "token_scopes", tokenInfo.Scopes)
+				api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "token missing scopes").Pagination(true))
+				return
+			}
 
-		next.ServeHTTP(w, r)
-	})
+			next.ServeHTTP(w, r)
+		})
+	}
+
 }
 
 // areScopesValid verifies every scope in requiredScopes has a match among scopes.

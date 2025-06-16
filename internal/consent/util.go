@@ -1,6 +1,7 @@
 package consent
 
 import (
+	"reflect"
 	"slices"
 	"strings"
 
@@ -69,7 +70,7 @@ func validateExtension(c *Consent, ext *Extension) error {
 		return ErrExtensionNotAllowed
 	}
 
-	if c.BusinessCNPJ != "" && c.BusinessCNPJ != ext.BusinessCNPJ {
+	if c.BusinessCNPJ != nil && reflect.DeepEqual(c.BusinessCNPJ, ext.BusinessCNPJ) {
 		return ErrExtensionNotAllowed
 	}
 

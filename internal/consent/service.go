@@ -77,8 +77,10 @@ func (s Service) reject(ctx context.Context, c *Consent, by RejectedBy, reason R
 	c.Status = StatusRejected
 	c.StatusUpdatedAt = timeutil.DateTimeNow()
 	c.UpdatedAt = timeutil.DateTimeNow()
-	c.RejectedBy = by
-	c.RejectionReason = reason
+	c.Rejection = &Rejection{
+		By:     by,
+		Reason: reason,
+	}
 	return s.save(ctx, c)
 }
 

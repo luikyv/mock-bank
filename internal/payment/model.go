@@ -39,6 +39,8 @@ type Payment struct {
 	DebtorAccountID           *uuid.UUID `gorm:"column:account_id"`
 	DebtorAccount             *account.Account
 	Date                      timeutil.BrazilDate
+	Rejection                 *Rejection    `gorm:"serializer:json"`
+	Cancellation              *Cancellation `gorm:"serializer:json"`
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -52,14 +54,62 @@ func (Payment) TableName() string {
 type Status string
 
 const (
-	StatusRCVD Status = "RCVD" // Received
-	StatusCANC Status = "CANC" // Cancelled
-	StatusACCP Status = "ACCP" // Accepted Customer Profile
-	StatusACPD Status = "ACPD" // Accepted Clearing Processed
-	StatusRJCT Status = "RJCT" // Rejected
-	StatusACSC Status = "ACSC" // Accepted Settlement Completed Debitor Account
-	StatusPDNG Status = "PDNG" // Pending
-	StatusSCHD Status = "SCHD" // Scheduled
+	StatusRCVD Status = "RCVD" // Received.
+	StatusCANC Status = "CANC" // Cancelled.
+	StatusACCP Status = "ACCP" // Accepted Customer Profile.
+	StatusACPD Status = "ACPD" // Accepted Clearing Processed.
+	StatusRJCT Status = "RJCT" // Rejected.
+	StatusACSC Status = "ACSC" // Accepted Settlement Completed Debitor Account.
+	StatusPDNG Status = "PDNG" // Pending.
+	StatusSCHD Status = "SCHD" // Scheduled.
+)
+
+type Rejection struct {
+	Code   RejectionReasonCode `json:"code"`
+	Detail string              `json:"detail"`
+}
+
+type RejectionReasonCode string
+
+const (
+	RejectionInsufficientBalance             RejectionReasonCode = "SALDO_INSUFICIENTE"
+	RejectionExceedsLimit                    RejectionReasonCode = "VALOR_ACIMA_LIMITE"
+	RejectionInvalidAmount                   RejectionReasonCode = "VALOR_INVALIDO"
+	RejectionInvalidCharge                   RejectionReasonCode = "COBRANCA_INVALIDA"
+	RejectionNotInformed                     RejectionReasonCode = "NAO_INFORMADO"
+	RejectionPaymentConsentMismatch          RejectionReasonCode = "PAGAMENTO_DIVERGENTE_CONSENTIMENTO"
+	RejectionInvalidPaymentDetail            RejectionReasonCode = "DETALHE_PAGAMENTO_INVALIDO"
+	RejectionRefusedByHolder                 RejectionReasonCode = "PAGAMENTO_RECUSADO_DETENTORA"
+	RejectionRefusedBySPI                    RejectionReasonCode = "PAGAMENTO_RECUSADO_SPI"
+	RejectionInfrastructureFailure           RejectionReasonCode = "FALHA_INFRAESTRUTURA"
+	RejectionSPIFailure                      RejectionReasonCode = "FALHA_INFRAESTRUTURA_SPI"
+	RejectionDICTFailure                     RejectionReasonCode = "FALHA_INFRAESTRUTURA_DICT"
+	RejectionICPFailure                      RejectionReasonCode = "FALHA_INFRAESTRUTURA_ICP"
+	RejectionReceiverPSPFailure              RejectionReasonCode = "FALHA_INFRAESTRUTURA_PSP_RECEBEDOR"
+	RejectionHolderInstitutionFailure        RejectionReasonCode = "FALHA_INFRAESTRUTURA_DETENTORA"
+	RejectionSameOriginAndDestinationAccount RejectionReasonCode = "CONTAS_ORIGEM_DESTINO_IGUAIS"
+	RejectionPaymentSchedulingFailure        RejectionReasonCode = "FALHA_AGENDAMENTO_PAGAMENTOS"
+)
+
+type Cancellation struct {
+	Reason CancellationReason `json:"cancellation_reason"`
+	From   CancelledFrom      `json:"cancellation_from"`
+	At     timeutil.DateTime  `json:"cancelled_at"`
+	By     string             `json:"cancelled_by"`
+}
+
+type CancellationReason string
+
+const (
+	CancellationReasonPending   CancellationReason = "CANCELADO_PENDENCIA"
+	CancellationReasonScheduled CancellationReason = "CANCELADO_AGENDAMENTO"
+)
+
+type CancelledFrom string
+
+const (
+	CancelledFromInitiator CancelledFrom = "INICIADORA"
+	CancelledFromHolder    CancelledFrom = "DETENTORA"
 )
 
 type Consent struct {
@@ -89,8 +139,7 @@ type Consent struct {
 	Proxy                 *string
 	DebtorAccountID       *uuid.UUID `gorm:"column:account_id"`
 	DebtorAccount         *account.Account
-	RejectionReasonCode   RejectionReasonCode
-	RejectionReasonDetail string
+	Rejection             *ConsentRejection `gorm:"serializer:json"`
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -165,18 +214,8 @@ func (c Consent) IsAuthorized() bool {
 	return c.Status == ConsentStatusAuthorized
 }
 
-// IsExpired returns true if the status is [ConsentStatusAwaitingAuthorization] and the consent
-// reached the expiration date.
-func (c Consent) HasAuthExpired() bool {
-	now := timeutil.Now()
-	return c.IsAwaitingAuthorization() && now.After(c.ExpiresAt.Time)
-}
-
-// IsExpired returns true if the status is [ConsentStatusAuthorized] and the consent
-// reached the expiration date.
 func (c Consent) IsExpired() bool {
-	now := timeutil.Now()
-	return c.IsAuthorized() && now.After(c.ExpiresAt.Time)
+	return timeutil.Now().After(c.ExpiresAt.Time)
 }
 
 type ConsentStatus string
@@ -259,7 +298,7 @@ type Schedule struct {
 		Quantity  int                 `json:"quantity"`
 	} `json:"weekly,omitempty"`
 	Monthly *struct {
-		DayOfMonth int                 `json:"dayOfWeek"`
+		DayOfMonth int                 `json:"dayOfMonth"`
 		StartDate  timeutil.BrazilDate `json:"startDate"`
 		Quantity   int                 `json:"quantity"`
 	} `json:"monthly,omitempty"`
@@ -269,20 +308,25 @@ type Schedule struct {
 	} `json:"custom,omitempty"`
 }
 
-type RejectionReasonCode string
+type ConsentRejection struct {
+	Code   ConsentRejectionReasonCode `json:"code"`
+	Detail string                     `json:"detail"`
+}
+
+type ConsentRejectionReasonCode string
 
 const (
-	RejectionReasonCodeInvalidAmount               RejectionReasonCode = "VALOR_INVALIDO"
-	RejectionReasonCodeNotProvided                 RejectionReasonCode = "NAO_INFORMADO"
-	RejectionReasonCodeInfrastructureFailure       RejectionReasonCode = "FALHA_INFRAESTRUTURA"
-	RejectionReasonCodeAuthorizationTimeout        RejectionReasonCode = "TEMPO_EXPIRADO_AUTORIZACAO"
-	RejectionReasonCodeConsumptionTimeout          RejectionReasonCode = "TEMPO_EXPIRADO_CONSUMO"
-	RejectionReasonCodeRejectedByUser              RejectionReasonCode = "REJEITADO_USUARIO"
-	RejectionReasonCodeSourceAndTargetAccountsSame RejectionReasonCode = "CONTAS_ORIGEM_DESTINO_IGUAIS"
-	RejectionReasonCodeAccountDoesNotAllowPayment  RejectionReasonCode = "CONTA_NAO_PERMITE_PAGAMENTO"
-	RejectionReasonCodeInsufficientFunds           RejectionReasonCode = "SALDO_INSUFICIENTE"
-	RejectionReasonCodeAmountAboveLimit            RejectionReasonCode = "VALOR_ACIMA_LIMITE"
-	RejectionReasonCodeInvalidQRCode               RejectionReasonCode = "QRCODE_INVALIDO"
+	ConsentRejectionInvalidAmount               ConsentRejectionReasonCode = "VALOR_INVALIDO"
+	ConsentRejectionNotProvided                 ConsentRejectionReasonCode = "NAO_INFORMADO"
+	ConsentRejectionInfrastructureFailure       ConsentRejectionReasonCode = "FALHA_INFRAESTRUTURA"
+	ConsentRejectionAuthorizationTimeout        ConsentRejectionReasonCode = "TEMPO_EXPIRADO_AUTORIZACAO"
+	ConsentRejectionConsumptionTimeout          ConsentRejectionReasonCode = "TEMPO_EXPIRADO_CONSUMO"
+	ConsentRejectionRejectedByUser              ConsentRejectionReasonCode = "REJEITADO_USUARIO"
+	ConsentRejectionSourceAndTargetAccountsSame ConsentRejectionReasonCode = "CONTAS_ORIGEM_DESTINO_IGUAIS"
+	ConsentRejectionAccountDoesNotAllowPayment  ConsentRejectionReasonCode = "CONTA_NAO_PERMITE_PAGAMENTO"
+	ConsentRejectionInsufficientFunds           ConsentRejectionReasonCode = "SALDO_INSUFICIENTE"
+	ConsentRejectionAmountAboveLimit            ConsentRejectionReasonCode = "VALOR_ACIMA_LIMITE"
+	ConsentRejectionInvalidQRCode               ConsentRejectionReasonCode = "QRCODE_INVALIDO"
 )
 
 type DebtorAccount struct {
@@ -299,6 +343,11 @@ const (
 	AuthorisationFlowCIBAFlow   AuthorisationFlow = "CIBA_FLOW"
 	AuthorisationFlowFIDOFlow   AuthorisationFlow = "FIDO_FLOW"
 )
+
+type Document struct {
+	Identification string
+	Rel            string
+}
 
 func parseWeekday(weekDay DayOfWeek) time.Weekday {
 	switch weekDay {

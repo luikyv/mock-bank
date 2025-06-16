@@ -84,8 +84,8 @@ func (a consentPolicy) setUp(_ http.ResponseWriter, r *http.Request, as *goidc.A
 
 	as.StoreParameter(paramPermissions, strings.Join(permissionsStr, " "))
 	as.StoreParameter(paramCPF, consent.UserCPF)
-	if consent.BusinessCNPJ != "" {
-		as.StoreParameter(paramCNPJ, consent.BusinessCNPJ)
+	if consent.BusinessCNPJ != nil {
+		as.StoreParameter(paramCNPJ, *consent.BusinessCNPJ)
 	}
 	return goidc.StatusSuccess, nil
 }

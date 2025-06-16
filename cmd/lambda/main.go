@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	httpadapter "github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
+	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/api/accountv2"
@@ -155,7 +156,7 @@ func init() {
 	accountv2.NewServer(APIMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
 	paymentv4.NewServer(APIMTLSHost, paymentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 
-	Handler = loggingMiddleware(recoverMiddleware(mux))
+	Handler = middleware(mux)
 }
 
 func main() {
@@ -234,8 +235,8 @@ func logger() *slog.Logger {
 			// Make sure time is logged in UTC.
 			ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
 				if attr.Key == slog.TimeKey {
-					utcTime := timeutil.Now()
-					return slog.Attr{Key: slog.TimeKey, Value: slog.TimeValue(utcTime)}
+					now := timeutil.DateTimeNow()
+					return slog.Attr{Key: slog.TimeKey, Value: slog.StringValue(now.String())}
 				}
 				return attr
 			},
@@ -248,6 +249,10 @@ type logCtxHandler struct {
 }
 
 func (h *logCtxHandler) Handle(ctx context.Context, r slog.Record) error {
+	if correlationID, ok := ctx.Value(api.CtxKeyCorrelationID).(string); ok {
+		r.AddAttrs(slog.String("correlation_id", correlationID))
+	}
+
 	if interactionID, ok := ctx.Value(api.CtxKeyInteractionID).(string); ok {
 		r.AddAttrs(slog.String("interaction_id", interactionID))
 	}
@@ -457,36 +462,24 @@ func tlsCertFromSSM(ctx context.Context, ssmClient *ssm.Client, certParamName, k
 	return tlsCert, nil
 }
 
-func loggingMiddleware(next http.Handler) http.Handler {
+func middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slog.InfoContext(r.Context(), "request received",
-			slog.String("method", r.Method),
-			slog.String("path", r.URL.Path),
-			slog.String("url", r.URL.String()),
-		)
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, api.CtxKeyCorrelationID, uuid.NewString())
+		slog.InfoContext(ctx, "request received", "method", r.Method, "path", r.URL.Path, "url", r.URL.String())
 
 		start := timeutil.Now()
-		defer func() {
-			slog.InfoContext(r.Context(), "request completed",
-				slog.String("method", r.Method),
-				slog.String("path", r.URL.Path),
-				slog.String("url", r.URL.String()),
-				slog.Duration("duration", time.Since(start)),
-			)
-		}()
-		next.ServeHTTP(w, r)
-	})
-}
-
-func recoverMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if rec := recover(); rec != nil {
 				slog.Error("panic recovered", "error", rec, "stack", string(debug.Stack()))
 				api.WriteError(w, r, fmt.Errorf("internal error: %v", rec))
 			}
 		}()
+		defer func() {
+			slog.InfoContext(ctx, "request completed", slog.Duration("duration", time.Since(start)))
+		}()
 
+		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	})
 }

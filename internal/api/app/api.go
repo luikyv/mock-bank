@@ -510,10 +510,11 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 		}
 		data.Permissions = perms
 
-		if c.RejectedBy != "" {
-			rejectedBy := string(c.RejectedBy)
+		// TODO: Make the rejection an object.
+		if c.Rejection != nil {
+			rejectedBy := string(c.Rejection.By)
 			data.RejectedBy = &rejectedBy
-			rejectionReason := string(c.RejectionReason)
+			rejectionReason := string(c.Rejection.Reason)
 			data.RejectionReason = &rejectionReason
 		}
 

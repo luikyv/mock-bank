@@ -59,8 +59,11 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		},
 	})
 	wrapper := ServerInterfaceWrapper{
-		Handler:            strictHandler,
-		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware},
+		Handler: strictHandler,
+		HandlerMiddlewares: []MiddlewareFunc{
+			swaggerMiddleware,
+			api.FAPIIDMiddleware(nil),
+		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
@@ -69,12 +72,11 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	var handler http.Handler
 
 	handler = http.HandlerFunc(wrapper.ResourcesGetResources)
-	handler = consent.PermissionMiddleware(handler, s.consentService, consent.PermissionResourcesRead)
-	handler = oidc.AuthMiddleware(handler, s.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = consent.PermissionMiddleware(s.consentService, consent.PermissionResourcesRead)(handler)
+	handler = oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, consent.ScopeID)(handler)
 	resourceMux.Handle("GET /resources", handler)
 
-	handler = api.FAPIIDHandler(resourceMux, nil)
-	mux.Handle("/open-banking/resources/v3/", http.StripPrefix("/open-banking/resources/v3", handler))
+	mux.Handle("/open-banking/resources/v3/", http.StripPrefix("/open-banking/resources/v3", resourceMux))
 }
 
 func (s Server) ResourcesGetResources(ctx context.Context, req ResourcesGetResourcesRequestObject) (ResourcesGetResourcesResponseObject, error) {

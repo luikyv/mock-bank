@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 
 	"github.com/luiky/mock-bank/internal/api"
 )
@@ -15,60 +16,68 @@ const headerIdempotencyID = "X-Idempotency-Key"
 
 // Middleware ensures that requests with the same idempotency ID
 // are not processed multiple times, returning a cached response if available.
-func Middleware(next http.Handler, service Service) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		idempotencyID := r.Header.Get(headerIdempotencyID)
-		if idempotencyID == "" {
-			api.WriteError(w, r, api.NewError("ERRO_IDEMPOTENCIA", http.StatusUnprocessableEntity, "missing idempotency key header"))
-			return
-		}
-
-		// Read and cache request body for comparison or forwarding.
-		bodyBytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			api.WriteError(w, r, api.NewError("ERRO_IDEMPOTENCIA", http.StatusBadRequest, "unable to read request body"))
-			return
-		}
-		r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-
-		rec, err := service.Response(r.Context(), idempotencyID)
-		if err == nil {
-			// Validate if the current request body matches the stored one.
-			if base64.RawStdEncoding.EncodeToString(bodyBytes) != rec.Request {
-				slog.DebugContext(r.Context(),
-					"mismatched idempotent request payload",
-					"id", rec.ID,
-					"got", base64.RawStdEncoding.EncodeToString(bodyBytes),
-					"expected", rec.Request,
-				)
-				api.WriteError(w, r, api.NewError("ERRO_IDEMPOTENCIA", http.StatusUnprocessableEntity, "request payload does not match previous idempotent request"))
+func Middleware(service Service) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			idempotencyID := r.Header.Get(headerIdempotencyID)
+			if idempotencyID == "" {
+				api.WriteError(w, r, api.NewError("ERRO_IDEMPOTENCIA", http.StatusUnprocessableEntity, "missing idempotency key header"))
 				return
 			}
 
-			slog.InfoContext(r.Context(), "return cached idempotency response")
-			writeIdempotencyResp(w, r, rec)
-			return
-		}
+			// Read and cache request body for comparison or forwarding.
+			bodyBytes, err := io.ReadAll(r.Body)
+			if err != nil {
+				api.WriteError(w, r, api.NewError("ERRO_IDEMPOTENCIA", http.StatusBadRequest, "unable to read request body"))
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
-		if !errors.Is(err, ErrNotFound) {
-			api.WriteError(w, r, api.NewError("ERRO_IDEMPOTENCIA", http.StatusUnprocessableEntity, err.Error()))
-			return
-		}
+			rec, err := service.Response(r.Context(), idempotencyID)
+			if err == nil {
+				// Validate if the current request body matches the stored one.
+				if base64.RawStdEncoding.EncodeToString(bodyBytes) != rec.Request {
+					slog.DebugContext(r.Context(),
+						"mismatched idempotent request payload",
+						"id", rec.ID,
+						"got", base64.RawStdEncoding.EncodeToString(bodyBytes),
+						"expected", rec.Request,
+					)
+					api.WriteError(w, r, api.NewError("ERRO_IDEMPOTENCIA", http.StatusUnprocessableEntity, "request payload does not match previous idempotent request"))
+					return
+				}
 
-		// No previous record, continue and capture response.
-		recorder := &responseRecorder{ResponseWriter: w, Body: &bytes.Buffer{}, StatusCode: http.StatusOK}
-		next.ServeHTTP(recorder, r)
+				slog.InfoContext(r.Context(), "return cached idempotency response")
+				writeIdempotencyResp(w, r, rec)
+				return
+			}
 
-		err = service.Create(r.Context(), &Record{
-			ID:         idempotencyID,
-			Request:    base64.RawStdEncoding.EncodeToString(bodyBytes),
-			Response:   recorder.Body.String(),
-			StatusCode: recorder.StatusCode,
+			if !errors.Is(err, ErrNotFound) {
+				api.WriteError(w, r, api.NewError("ERRO_IDEMPOTENCIA", http.StatusUnprocessableEntity, err.Error()))
+				return
+			}
+
+			// No previous record, continue and capture response.
+			recorder := &responseRecorder{ResponseWriter: w, Body: &bytes.Buffer{}, StatusCode: http.StatusOK}
+			next.ServeHTTP(recorder, r)
+
+			// Only successful responses are stored.
+			if !slices.Contains([]int{http.StatusOK, http.StatusCreated, http.StatusAccepted}, recorder.StatusCode) {
+				return
+			}
+
+			err = service.Create(r.Context(), &Record{
+				ID:         idempotencyID,
+				Request:    base64.RawStdEncoding.EncodeToString(bodyBytes),
+				Response:   recorder.Body.String(),
+				StatusCode: recorder.StatusCode,
+			})
+			if err != nil {
+				slog.ErrorContext(r.Context(), "failed to store idempotent response", slog.Any("err", err))
+			}
 		})
-		if err != nil {
-			slog.ErrorContext(r.Context(), "failed to store idempotent response", slog.Any("err", err))
-		}
-	})
+	}
+
 }
 
 func writeIdempotencyResp(w http.ResponseWriter, r *http.Request, rec *Record) {

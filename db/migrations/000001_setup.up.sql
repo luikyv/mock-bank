@@ -79,8 +79,7 @@ CREATE TABLE consents (
     user_cpf TEXT NOT NULL,
     business_cnpj TEXT,
     client_id TEXT NOT NULL REFERENCES oauth_clients(id),
-    rejected_by TEXT,
-    rejection_reason TEXT,
+    rejection JSONB,
 
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -195,8 +194,7 @@ CREATE TABLE payment_consents (
     qr_code TEXT,
     proxy TEXT,
     account_id UUID REFERENCES accounts(id),
-    rejection_reason_code TEXT,
-    rejection_reason_detail TEXT,
+    rejection JSONB,
 
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -227,6 +225,8 @@ CREATE TABLE payments (
     client_id TEXT NOT NULL REFERENCES oauth_clients(id),
     account_id UUID NOT NULL REFERENCES accounts(id),
     date DATE,
+    rejection JSONB,
+    cancellation JSONB,
 
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

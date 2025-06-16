@@ -66,6 +66,11 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *Debto
 	}
 
 	c.DebtorAccountID = &acc.ID
+
+	if err := s.runConsentPreCreationAutomations(ctx, c); err != nil {
+		return err
+	}
+
 	return s.createConsent(ctx, c)
 }
 
@@ -105,14 +110,14 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 		return nil, ErrClientNotAllowed
 	}
 
-	if err := s.modifyConsent(ctx, c); err != nil {
+	if err := s.runConsentPostCreationAutomations(ctx, c); err != nil {
 		return nil, err
 	}
 
 	return c, nil
 }
 
-func (s Service) RejectConsent(ctx context.Context, id, orgID string, code RejectionReasonCode, detail string) error {
+func (s Service) RejectConsent(ctx context.Context, id, orgID string, code ConsentRejectionReasonCode, detail string) error {
 	c, err := s.Consent(ctx, id, orgID)
 	if err != nil {
 		return err
@@ -153,6 +158,10 @@ func (s Service) CreatePayments(ctx context.Context, payments []*Payment) error 
 		p.DebtorAccount = c.DebtorAccount
 		date, _ := ParseEndToEndDate(p.EndToEndID)
 		p.Date = date.BrazilDate()
+
+		if err := s.runPreCreationAutomations(ctx, p); err != nil {
+			return err
+		}
 	}
 	return s.db.Create(&payments).Error
 }
@@ -170,32 +179,82 @@ func (s Service) Payment(ctx context.Context, id, orgID string) (*Payment, error
 		return nil, ErrClientNotAllowed
 	}
 
-	if err := s.modify(ctx, p); err != nil {
+	if err := s.runPostCreationAutomations(ctx, p); err != nil {
 		return nil, err
 	}
 
 	return p, nil
 }
 
-func (s Service) Cancel(ctx context.Context, id, orgID, userCPF string) error {
+func (s Service) Cancel(ctx context.Context, id, orgID string, doc Document) (*Payment, error) {
 	p, err := s.Payment(ctx, id, orgID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	c, err := s.Consent(ctx, p.ConsentID.String(), orgID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if c.UserCPF != userCPF {
-		return errorutil.New("invalid user identification")
+	if doc.Rel != "CPF" {
+		return nil, errorutil.Format("%w: invalid rel", ErrCancelNotAllowed)
 	}
 
-	if !slices.Contains([]Status{
-		StatusPDNG,
-		StatusSCHD,
-	}, p.Status) {
+	if c.UserCPF != doc.Identification {
+		return nil, errorutil.Format("%w: invalid identification", ErrCancelNotAllowed)
+	}
+
+	if err := s.cancel(ctx, p, CancelledFromInitiator, c.UserCPF); err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
+
+func (s Service) CancelAll(ctx context.Context, consentID, orgID string, doc Document) ([]*Payment, error) {
+	c, err := s.Consent(ctx, consentID, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	if doc.Rel != "CPF" {
+		return nil, errorutil.Format("%w: invalid rel", ErrCancelNotAllowed)
+	}
+
+	if c.UserCPF != doc.Identification {
+		return nil, errorutil.Format("%w: invalid identification", ErrCancelNotAllowed)
+	}
+
+	var payments []*Payment
+	if err := s.db.WithContext(ctx).
+		Where("consent_id = ? AND org_id = ?", c.ID, orgID).
+		Find(&payments).Error; err != nil {
+		return nil, fmt.Errorf("could not find payments: %w", err)
+	}
+
+	var cancelled []*Payment
+	var cancelErrs error
+	for _, p := range payments {
+		if err := s.cancel(ctx, p, CancelledFromInitiator, c.UserCPF); err != nil {
+			if !errors.Is(err, ErrCancelNotAllowed) {
+				return nil, err
+			}
+			cancelErrs = errors.Join(cancelErrs, err)
+			continue
+		}
+		cancelled = append(cancelled, p)
+	}
+
+	if len(cancelled) == 0 {
+		return nil, errorutil.Format("no payment could be cancelled: %w", cancelErrs)
+	}
+
+	return cancelled, nil
+}
+
+func (s Service) cancel(ctx context.Context, p *Payment, from CancelledFrom, by string) error {
+	if !slices.Contains([]Status{StatusPDNG, StatusSCHD}, p.Status) {
 		return errorutil.Format("%w: payment with status %s cannot be cancelled, only payments with status PDNG or SCHD can be cancelled", ErrCancelNotAllowed, p.Status)
 	}
 
@@ -203,44 +262,17 @@ func (s Service) Cancel(ctx context.Context, id, orgID, userCPF string) error {
 		return errorutil.Format("%w: scheduled payments can only be cancelled until 23:59 (BRT) of the day before the payment date (%s)", ErrCancelNotAllowed, p.Date.String())
 	}
 
+	reason := CancellationReasonPending
+	if p.Status == StatusSCHD {
+		reason = CancellationReasonScheduled
+	}
+	p.Cancellation = &Cancellation{
+		At:     timeutil.DateTimeNow(),
+		Reason: reason,
+		From:   from,
+		By:     by,
+	}
 	return s.updateStatus(ctx, p, StatusCANC)
-}
-
-func (s Service) CancelAll(ctx context.Context, consentID, orgID, userCPF string) error {
-	c, err := s.Consent(ctx, consentID, orgID)
-	if err != nil {
-		return err
-	}
-
-	if c.UserCPF != userCPF {
-		return errorutil.New("invalid user identification")
-	}
-
-	var payments []*Payment
-	if err := s.db.WithContext(ctx).
-		Where("consent_id = ? AND org_id = ?", consentID, orgID).
-		Find(&payments).Error; err != nil {
-		return fmt.Errorf("could not find payments: %w", err)
-	}
-
-	for _, p := range payments {
-		if !slices.Contains([]Status{
-			StatusPDNG,
-			StatusSCHD,
-		}, p.Status) {
-			return errorutil.Format("%w: payment with status %s cannot be cancelled, only payments with status PDNG or SCHD can be cancelled", ErrCancelNotAllowed, p.Status)
-		}
-
-		if p.Status == StatusSCHD && !timeutil.BrazilDateNow().Before(p.Date) {
-			return errorutil.Format("%w: scheduled payments can only be cancelled until 23:59 (BRT) of the day before the payment date (%s)", ErrCancelNotAllowed, p.Date.String())
-		}
-
-		if err := s.updateStatus(ctx, p, StatusCANC); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (s Service) createConsent(ctx context.Context, c *Consent) error {
@@ -262,23 +294,64 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *D
 
 	if c.PaymentSchedule != nil {
 		today := timeutil.BrazilDateNow()
-		if c.PaymentSchedule.Single != nil && !c.PaymentSchedule.Single.Date.After(today) {
-			return errorutil.Format("%w: single schedule date must be after the current day", ErrInvalidDate)
+		twoYearsLater := today.AddDate(2, 0, 0)
+
+		startDate := today
+		lastPaymentDate := twoYearsLater
+		if single := c.PaymentSchedule.Single; single != nil {
+			startDate = single.Date
+			lastPaymentDate = single.Date
 		}
 
-		if c.PaymentSchedule.Single != nil && c.PaymentSchedule.Single.Date.After(today.AddDate(2, 0, 0)) {
-			return errorutil.Format("%w: single schedule date too far in future", ErrInvalidDate)
+		if daily := c.PaymentSchedule.Daily; daily != nil {
+			startDate = daily.StartDate
+			lastPaymentDate = daily.StartDate.AddDate(0, 0, daily.Quantity-1)
 		}
+
+		if weekly := c.PaymentSchedule.Weekly; weekly != nil {
+			startDate = weekly.StartDate
+			lastPaymentDate = weekly.StartDate.AddDate(0, 0, 7*(weekly.Quantity-1))
+		}
+
+		if monthly := c.PaymentSchedule.Monthly; monthly != nil {
+			startDate = monthly.StartDate
+			lastPaymentDate = monthly.StartDate.AddDate(0, monthly.Quantity-1, 0)
+		}
+
+		if custom := c.PaymentSchedule.Custom; custom != nil {
+			seenDates := map[string]struct{}{}
+			for _, date := range custom.Dates {
+				dateStr := date.String()
+
+				if _, exists := seenDates[dateStr]; exists {
+					return errorutil.Format("%w: custom schedule contains duplicate date: %s", ErrInvalidData, dateStr)
+				}
+				seenDates[dateStr] = struct{}{}
+
+				if date.Before(startDate) {
+					startDate = date
+				}
+				if date.After(lastPaymentDate) {
+					lastPaymentDate = date
+				}
+			}
+		}
+
+		if !startDate.After(today) {
+			return errorutil.Format("%w: schedule must be after the current day", ErrInvalidDate)
+		}
+		if !lastPaymentDate.Before(twoYearsLater) {
+			return errorutil.Format("%w: schedule exceeds 2-year window", ErrInvalidDate)
+		}
+
 	}
 
-	if c.PaymentSchedule != nil && c.PaymentSchedule.Single == nil {
-		if !slices.Contains([]LocalInstrument{
-			LocalInstrumentMANU,
-			LocalInstrumentDICT,
-			LocalInstrumentQRES,
-		}, c.LocalInstrument) {
-			return errorutil.New("only MANU, DICT or QRES are allowed when using schedule other than single")
-		}
+	if c.PaymentSchedule != nil && c.PaymentSchedule.Single == nil && !slices.Contains([]LocalInstrument{
+		LocalInstrumentMANU,
+		LocalInstrumentDICT,
+		LocalInstrumentQRES,
+	}, c.LocalInstrument) {
+		return errorutil.New("only MANU, DICT or QRES are allowed when using schedule other than single")
 	}
 
 	if c.LocalInstrument == LocalInstrumentMANU && c.Proxy != nil {
@@ -311,28 +384,64 @@ func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status Con
 	return s.saveConsent(ctx, c)
 }
 
-// modifyConsent will evaluated the payment consent information and modify it to be compliant.
-func (s Service) modifyConsent(ctx context.Context, c *Consent) error {
-	if c.HasAuthExpired() {
-		slog.DebugContext(ctx, "payment consent awaiting authorization for too long, moving to rejected")
-		return s.rejectConsent(ctx, c, RejectionReasonCodeAuthorizationTimeout, "consent awaiting authorization for too long")
+func (s Service) runConsentPreCreationAutomations(_ context.Context, c *Consent) error {
+	switch c.PaymentAmount {
+	case "10422.00":
+		return ErrInvalidPayment
+	default:
+		return nil
 	}
-
-	if c.IsExpired() {
-		slog.DebugContext(ctx, "payment consent reached expiration, moving to rejected")
-		return s.rejectConsent(ctx, c, RejectionReasonCodeConsumptionTimeout, "payment consent authorization reached expiration")
-	}
-
-	return nil
 }
 
-func (s Service) rejectConsent(ctx context.Context, c *Consent, code RejectionReasonCode, detail string) error {
+func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Consent) error {
+	switch c.Status {
+	case ConsentStatusAwaitingAuthorization:
+		if c.IsExpired() {
+			slog.DebugContext(ctx, "payment consent awaiting authorization for too long, moving to rejected")
+			return s.rejectConsent(ctx, c, ConsentRejectionAuthorizationTimeout, "consent awaiting authorization for too long")
+		}
+
+		switch c.PaymentAmount {
+		case "300.01":
+			return s.rejectConsent(ctx, c, ConsentRejectionInvalidAmount, "forced rejection")
+		case "300.02":
+			return s.rejectConsent(ctx, c, ConsentRejectionNotProvided, "forced rejection")
+		case "300.03":
+			return s.rejectConsent(ctx, c, ConsentRejectionInfrastructureFailure, "forced rejection")
+		case "300.04":
+			return s.rejectConsent(ctx, c, ConsentRejectionConsumptionTimeout, "forced rejection")
+		case "300.05":
+			return s.rejectConsent(ctx, c, ConsentRejectionAccountDoesNotAllowPayment, "forced rejection")
+		case "300.06":
+			return s.rejectConsent(ctx, c, ConsentRejectionInsufficientFunds, "forced rejection")
+		case "300.07":
+			return s.rejectConsent(ctx, c, ConsentRejectionAmountAboveLimit, "forced rejection")
+		case "300.08":
+			return s.rejectConsent(ctx, c, ConsentRejectionInvalidQRCode, "forced rejection")
+		default:
+			return nil
+		}
+
+	case ConsentStatusAuthorized:
+		if c.IsExpired() {
+			slog.DebugContext(ctx, "payment consent reached expiration, moving to rejected")
+			return s.rejectConsent(ctx, c, ConsentRejectionConsumptionTimeout, "payment consent authorization reached expiration")
+		}
+		return nil
+	default:
+		return nil
+	}
+}
+
+func (s Service) rejectConsent(ctx context.Context, c *Consent, code ConsentRejectionReasonCode, detail string) error {
 	if c.Status == ConsentStatusRejected {
 		return ErrConsentAlreadyRejected
 	}
 
-	c.RejectionReasonCode = code
-	c.RejectionReasonDetail = detail
+	c.Rejection = &ConsentRejection{
+		Code:   code,
+		Detail: detail,
+	}
 	return s.updateConsentStatus(ctx, c, ConsentStatusRejected)
 }
 
@@ -412,37 +521,52 @@ func (s Service) validatePayments(_ context.Context, c *Consent, payments []*Pay
 	return nil
 }
 
-func (s Service) modify(ctx context.Context, p *Payment) error {
+func (s Service) runPreCreationAutomations(_ context.Context, p *Payment) error {
+	switch p.Amount {
+	case "20422.01":
+		return ErrInvalidPayment
+	default:
+		return nil
+	}
+}
+
+func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) error {
 	now := timeutil.Now()
 	if now.Before(p.UpdatedAt.Time.Add(5 * time.Second)) {
 		slog.DebugContext(ctx, "payment was updated less than 5 secs ago, skipping transitions", "updated_at", p.UpdatedAt.String())
 		return nil
 	}
 
-	slog.DebugContext(ctx, "evaluating payment transitions", "status", p.Status)
+	slog.DebugContext(ctx, "evaluating payment automations", "status", p.Status, "amount", p.Amount)
+
 	switch p.Status {
 	case StatusRCVD:
+		return s.updateStatus(ctx, p, StatusACCP)
+
+	case StatusACCP:
 		today := timeutil.BrazilDateNow()
 		if p.Date.After(today) {
-			slog.DebugContext(ctx, "moving payment to SCHD")
 			return s.updateStatus(ctx, p, StatusSCHD)
 		}
-		slog.DebugContext(ctx, "moving payment to ACSC")
-		return s.updateStatus(ctx, p, StatusACSC)
+		return s.updateStatus(ctx, p, StatusACPD)
 
 	case StatusSCHD:
 		today := timeutil.BrazilDateNow()
 		if p.Date.After(today) {
 			return nil
 		}
-		slog.DebugContext(ctx, "moving payment to ACPD")
 		return s.updateStatus(ctx, p, StatusACPD)
+
+	case StatusACPD:
+		return s.updateStatus(ctx, p, StatusACSC)
 	}
 
 	return nil
 }
 
 func (s Service) updateStatus(ctx context.Context, p *Payment, status Status) error {
+	slog.DebugContext(ctx, "updating payment status", "current_status", p.Status, "new_status", status)
+
 	p.Status = status
 	p.StatusUpdatedAt = timeutil.DateTimeNow()
 	p.UpdatedAt = timeutil.DateTimeNow()
@@ -451,4 +575,12 @@ func (s Service) updateStatus(ctx context.Context, p *Payment, status Status) er
 
 func (s Service) save(ctx context.Context, p *Payment) error {
 	return s.db.WithContext(ctx).Save(p).Error
+}
+
+func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCode, detail string) error {
+	p.Rejection = &Rejection{
+		Code:   code,
+		Detail: detail,
+	}
+	return s.updateStatus(ctx, p, StatusRJCT)
 }

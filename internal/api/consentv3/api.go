@@ -15,6 +15,7 @@ import (
 	"github.com/luiky/mock-bank/internal/oidc"
 	"github.com/luiky/mock-bank/internal/page"
 	"github.com/luiky/mock-bank/internal/timeutil"
+	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 )
@@ -58,8 +59,11 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		},
 	})
 	wrapper := ServerInterfaceWrapper{
-		Handler:            strictHandler,
-		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware},
+		Handler: strictHandler,
+		HandlerMiddlewares: []MiddlewareFunc{
+			swaggerMiddleware,
+			api.FAPIIDMiddleware(nil),
+		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
@@ -67,28 +71,30 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	var handler http.Handler
 
+	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, consent.Scope)
+	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, consent.ScopeID)
+
 	handler = http.HandlerFunc(wrapper.ConsentsPostConsents)
-	handler = oidc.AuthMiddleware(handler, s.op, consent.Scope)
+	handler = clientCredentialsAuthMiddleware(handler)
 	consentMux.Handle("POST /consents", handler)
 
 	handler = http.HandlerFunc(wrapper.ConsentsDeleteConsentsConsentID)
-	handler = oidc.AuthMiddleware(handler, s.op, consent.Scope)
+	handler = clientCredentialsAuthMiddleware(handler)
 	consentMux.Handle("DELETE /consents/{consentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.ConsentsGetConsentsConsentID)
-	handler = oidc.AuthMiddleware(handler, s.op, consent.Scope)
+	handler = clientCredentialsAuthMiddleware(handler)
 	consentMux.Handle("GET /consents/{consentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.ConsentsPostConsentsConsentIDExtends)
-	handler = oidc.AuthMiddleware(handler, s.op, consent.Scope)
+	handler = authCodeAuthMiddleware(handler)
 	consentMux.Handle("POST /consents/{consentId}/extends", handler)
 
 	handler = http.HandlerFunc(wrapper.ConsentsGetConsentsConsentIDExtensions)
-	handler = oidc.AuthMiddleware(handler, s.op, consent.Scope)
+	handler = clientCredentialsAuthMiddleware(handler)
 	consentMux.Handle("GET /consents/{consentId}/extensions", handler)
 
-	handler = api.FAPIIDHandler(consentMux, nil)
-	mux.Handle("/open-banking/consents/v3/", http.StripPrefix("/open-banking/consents/v3", handler))
+	mux.Handle("/open-banking/consents/v3/", http.StripPrefix("/open-banking/consents/v3", consentMux))
 }
 
 func (s Server) ConsentsPostConsents(ctx context.Context, req ConsentsPostConsentsRequestObject) (ConsentsPostConsentsResponseObject, error) {
@@ -172,7 +178,7 @@ func (s Server) ConsentsGetConsentsConsentID(ctx context.Context, req ConsentsGe
 		Links: api.NewLinks(s.baseURL + "/consents/" + c.URN()),
 		Meta:  api.NewMeta(),
 	}
-	if c.RejectedBy != "" {
+	if c.Rejection != nil {
 		resp.Data.Rejection = &struct {
 			Reason struct {
 				AdditionalInformation *string                                    `json:"additionalInformation,omitempty"`
@@ -180,8 +186,8 @@ func (s Server) ConsentsGetConsentsConsentID(ctx context.Context, req ConsentsGe
 			} `json:"reason"`
 			RejectedBy EnumRejectedBy `json:"rejectedBy"`
 		}{}
-		resp.Data.Rejection.RejectedBy = EnumRejectedBy(c.RejectedBy)
-		resp.Data.Rejection.Reason.Code = ResponseConsentReadDataRejectionReasonCode(c.RejectionReason)
+		resp.Data.Rejection.RejectedBy = EnumRejectedBy(c.Rejection.By)
+		resp.Data.Rejection.Reason.Code = ResponseConsentReadDataRejectionReasonCode(c.Rejection.Reason)
 	}
 	return ConsentsGetConsentsConsentID200JSONResponse{N200ConsentsConsentIDReadJSONResponse(resp)}, nil
 }

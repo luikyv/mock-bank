@@ -162,7 +162,7 @@ func (p paymentPolicy) grantPayment(w http.ResponseWriter, r *http.Request, as *
 	}
 
 	if isConsented != "true" {
-		_ = p.paymentService.RejectConsent(r.Context(), consentID, orgID, payment.RejectionReasonCodeRejectedByUser, "payment consent not granted")
+		_ = p.paymentService.RejectConsent(r.Context(), consentID, orgID, payment.ConsentRejectionRejectedByUser, "payment consent not granted")
 		return goidc.StatusFailure, errors.New("consent not granted")
 	}
 

@@ -18,6 +18,7 @@ import (
 	"github.com/luiky/mock-bank/internal/oidc"
 	"github.com/luiky/mock-bank/internal/payment"
 	"github.com/luiky/mock-bank/internal/timeutil"
+	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 )
@@ -82,34 +83,53 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		Handler: strictHandler,
 		HandlerMiddlewares: []MiddlewareFunc{
 			swaggerMiddleware,
-			jwtutil.Middleware(s.baseURL, s.orgID, s.keystoreHost, s.signer),
+			api.FAPIIDMiddleware(nil),
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
 	}
 
+	jwtMiddleware := jwtutil.Middleware(s.baseURL, s.orgID, s.keystoreHost, s.signer)
+	idempotencyMiddleware := idempotency.Middleware(s.idempotencyService)
+	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, payment.Scope)
+	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, consent.ScopeID)
+
 	var handler http.Handler
 
 	handler = http.HandlerFunc(wrapper.PaymentsPostConsents)
-	handler = oidc.AuthMiddleware(handler, s.op, payment.Scope)
+	handler = jwtMiddleware(handler)
+	handler = clientCredentialsAuthMiddleware(handler)
 	paymentMux.Handle("POST /consents", handler)
 
 	handler = http.HandlerFunc(wrapper.PaymentsGetConsentsConsentID)
-	handler = oidc.AuthMiddleware(handler, s.op, payment.Scope)
+	handler = jwtMiddleware(handler)
+	handler = clientCredentialsAuthMiddleware(handler)
 	paymentMux.Handle("GET /consents/{consentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.PaymentsPostPixPayments)
-	handler = idempotency.Middleware(handler, s.idempotencyService)
-	handler = oidc.AuthMiddleware(handler, s.op, consent.ScopeID)
+	handler = idempotencyMiddleware(handler)
+	handler = jwtMiddleware(handler)
+	handler = authCodeAuthMiddleware(handler)
 	paymentMux.Handle("POST /pix/payments", handler)
 
 	handler = http.HandlerFunc(wrapper.PaymentsGetPixPaymentsPaymentID)
-	handler = oidc.AuthMiddleware(handler, s.op, payment.Scope)
+	handler = jwtMiddleware(handler)
+	handler = clientCredentialsAuthMiddleware(handler)
 	paymentMux.Handle("GET /pix/payments/{paymentId}", handler)
 
-	handler = api.FAPIIDHandler(paymentMux, nil)
-	mux.Handle("/open-banking/payments/v4/", http.StripPrefix("/open-banking/payments/v4", handler))
+	handler = http.HandlerFunc(wrapper.PaymentsPatchPixPaymentsConsentID)
+	handler = jwtMiddleware(handler)
+	handler = idempotencyMiddleware(handler)
+	handler = clientCredentialsAuthMiddleware(handler)
+	paymentMux.Handle("PATCH /pix/payments/consents/{consentId}", handler)
+
+	handler = http.HandlerFunc(wrapper.PaymentsPatchPixPaymentsPaymentID)
+	handler = jwtMiddleware(handler)
+	handler = clientCredentialsAuthMiddleware(handler)
+	paymentMux.Handle("PATCH /pix/payments/{paymentId}", handler)
+
+	mux.Handle("/open-banking/payments/v4/", http.StripPrefix("/open-banking/payments/v4", paymentMux))
 }
 
 func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsentsRequestObject) (PaymentsPostConsentsResponseObject, error) {
@@ -338,10 +358,10 @@ func (s Server) PaymentsGetConsentsConsentID(ctx context.Context, req PaymentsGe
 		}
 	}
 
-	if c.RejectionReasonCode != "" {
+	if c.Rejection != nil {
 		resp.Data.RejectionReason = &ConsentRejectionReason{
-			Code:   EnumConsentRejectionReasonType(c.RejectionReasonCode),
-			Detail: c.RejectionReasonDetail,
+			Code:   EnumConsentRejectionReasonType(c.Rejection.Code),
+			Detail: c.Rejection.Detail,
 		}
 	}
 
@@ -456,8 +476,31 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 	return PaymentsPostPixPayments201JSONResponse{N201PaymentsInitiationPixPaymentCreatedJSONResponse(resp)}, nil
 }
 
-func (s Server) PaymentsPatchPixPaymentsConsentID(ctx context.Context, request PaymentsPatchPixPaymentsConsentIDRequestObject) (PaymentsPatchPixPaymentsConsentIDResponseObject, error) {
-	return nil, nil
+func (s Server) PaymentsPatchPixPaymentsConsentID(ctx context.Context, req PaymentsPatchPixPaymentsConsentIDRequestObject) (PaymentsPatchPixPaymentsConsentIDResponseObject, error) {
+	orgID := ctx.Value(api.CtxKeyOrgID).(string)
+	payments, err := s.service.CancelAll(ctx, req.ConsentID, orgID, payment.Document{
+		Identification: req.Body.Data.Cancellation.CancelledBy.Document.Identification,
+		Rel:            req.Body.Data.Cancellation.CancelledBy.Document.Rel,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	resp := ResponsePatchPixConsent{
+		Links: *api.NewLinks(s.baseURL + "/pix/payments/consents/" + req.ConsentID),
+		Meta:  *api.NewMeta(),
+	}
+	for _, p := range payments {
+		resp.Data = append(resp.Data, struct {
+			PaymentID            string            "json:\"paymentId\""
+			StatusUpdateDateTime timeutil.DateTime "json:\"statusUpdateDateTime\""
+		}{
+			PaymentID:            p.ID.String(),
+			StatusUpdateDateTime: p.StatusUpdatedAt,
+		})
+	}
+
+	return PaymentsPatchPixPaymentsConsentID200JSONResponse{N200PatchPixConsentsJSONResponse(resp)}, nil
 }
 
 func (s Server) PaymentsGetPixPaymentsPaymentID(ctx context.Context, req PaymentsGetPixPaymentsPaymentIDRequestObject) (PaymentsGetPixPaymentsPaymentIDResponseObject, error) {
@@ -506,11 +549,88 @@ func (s Server) PaymentsGetPixPaymentsPaymentID(ctx context.Context, req Payment
 		Meta:  *api.NewMeta(),
 	}
 
+	if p.Rejection != nil {
+		resp.Data.RejectionReason = &RejectionReasonGetPix{
+			Code:   EnumRejectionReasonTypeGetPix(p.Rejection.Code),
+			Detail: p.Rejection.Detail,
+		}
+	}
+
+	if p.Cancellation != nil {
+		cancellation := &PixPaymentCancellation{
+			CancelledAt:   p.Cancellation.At,
+			CancelledFrom: EnumPaymentCancellationFromType(p.Cancellation.From),
+			Reason:        EnumPaymentCancellationReasonType(p.Cancellation.Reason),
+		}
+		cancellation.CancelledBy.Document.Identification = p.Cancellation.By
+		cancellation.CancelledBy.Document.Rel = "CPF"
+		resp.Data.Cancellation = cancellation
+	}
+
 	return PaymentsGetPixPaymentsPaymentID200JSONResponse{N200PaymentsInitiationPixPaymentIDReadJSONResponse(resp)}, nil
 }
 
-func (s Server) PaymentsPatchPixPaymentsPaymentID(ctx context.Context, request PaymentsPatchPixPaymentsPaymentIDRequestObject) (PaymentsPatchPixPaymentsPaymentIDResponseObject, error) {
-	return nil, nil
+func (s Server) PaymentsPatchPixPaymentsPaymentID(ctx context.Context, req PaymentsPatchPixPaymentsPaymentIDRequestObject) (PaymentsPatchPixPaymentsPaymentIDResponseObject, error) {
+	orgID := ctx.Value(api.CtxKeyOrgID).(string)
+	p, err := s.service.Cancel(ctx, string(req.PaymentID), orgID, payment.Document{
+		Identification: req.Body.Data.Cancellation.CancelledBy.Document.Identification,
+		Rel:            req.Body.Data.Cancellation.CancelledBy.Document.Rel,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	branch := account.DefaultBranch
+	resp := ResponsePatchPixPayment{
+		Data: ResponsePatchPixPaymentData{
+			PaymentID:        p.ID.String(),
+			CnpjInitiator:    p.CNPJInitiator,
+			ConsentID:        consent.URN(p.ConsentID),
+			CreationDateTime: p.CreatedAt,
+			CreditorAccount: CreditorAccount{
+				AccountType: EnumAccountPaymentsType(p.CreditorAccountType),
+				Ispb:        p.CreditorAccountISBP,
+				Issuer:      p.CreditorAccountIssuer,
+				Number:      p.CreditorAccountNumber,
+			},
+			EndToEndID:      p.EndToEndID,
+			IbgeTownCode:    p.IBGETownCode,
+			LocalInstrument: EnumLocalInstrument(p.LocalInstrument),
+			Payment: struct {
+				Amount   string "json:\"amount\""
+				Currency string "json:\"currency\""
+			}{
+				Amount:   p.Amount,
+				Currency: p.Currency,
+			},
+			Proxy:                     p.Proxy,
+			RemittanceInformation:     p.RemittanceInformation,
+			Status:                    EnumPaymentStatusType(p.Status),
+			StatusUpdateDateTime:      p.StatusUpdatedAt,
+			TransactionIdentification: p.TransactionIdentification,
+			DebtorAccount: DebtorAccount{
+				AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(p.DebtorAccount.Type)),
+				Ispb:        api.MockBankISPB,
+				Issuer:      &branch,
+				Number:      p.DebtorAccount.Number,
+			},
+		},
+		Links: *api.NewLinks(s.baseURL + "/pix/payments/" + p.ID.String()),
+		Meta:  *api.NewMeta(),
+	}
+
+	if p.Cancellation != nil {
+		cancellation := PatchPixPaymentCancellation{
+			CancelledAt:   p.Cancellation.At,
+			CancelledFrom: EnumPaymentCancellationFromType(p.Cancellation.From),
+			Reason:        EnumPaymentCancellationReasonType(p.Cancellation.Reason),
+		}
+		cancellation.CancelledBy.Document.Identification = p.Cancellation.By
+		cancellation.CancelledBy.Document.Rel = "CPF"
+		resp.Data.Cancellation = cancellation
+	}
+
+	return PaymentsPatchPixPaymentsPaymentID200JSONResponse{N200PatchPixPaymentsJSONResponse(resp)}, nil
 }
 
 func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
@@ -520,6 +640,11 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 	}
 
 	if errors.Is(err, payment.ErrCreditorAndDebtorAccountsAreEqual) {
+		api.WriteError(w, r, api.NewError("DETALHE_PAGAMENTO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, payment.ErrInvalidPayment) {
 		api.WriteError(w, r, api.NewError("DETALHE_PAGAMENTO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
 		return
 	}
@@ -541,6 +666,16 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 
 	if errors.Is(err, payment.ErrCancelNotAllowed) {
 		api.WriteError(w, r, api.NewError("PAGAMENTO_NAO_PERMITE_CANCELAMENTO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, payment.ErrConsentNotAuthorized) {
+		api.WriteError(w, r, api.NewError("CONSENTIMENTO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, payment.ErrInvalidData) {
+		api.WriteError(w, r, api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
 		return
 	}
 

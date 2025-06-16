@@ -31,10 +31,9 @@ type Consent struct {
 	ExpiresAt       *timeutil.DateTime
 	UserID          *uuid.UUID
 	UserCPF         string
-	BusinessCNPJ    string
+	BusinessCNPJ    *string
 	ClientID        string
-	RejectedBy      RejectedBy
-	RejectionReason RejectionReason
+	Rejection       *Rejection
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -273,6 +272,11 @@ var PermissionGroups = []Permissions{
 	PermissionGroupExchangeOperationalData,
 }
 
+type Rejection struct {
+	By     RejectedBy
+	Reason RejectionReason
+}
+
 type RejectedBy string
 
 const (
@@ -296,7 +300,7 @@ type Extension struct {
 	ID                uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	ConsentID         uuid.UUID
 	UserCPF           string
-	BusinessCNPJ      string
+	BusinessCNPJ      *string
 	ExpiresAt         *timeutil.DateTime
 	PreviousExpiresAt *timeutil.DateTime
 	RequestedAt       timeutil.DateTime

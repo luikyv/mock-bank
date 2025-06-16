@@ -51,7 +51,6 @@ actions:
     application/json:
       schema:
         $ref: '#/components/schemas/CreatePaymentConsent'
-
 - target: $.components.responses.201PaymentsConsentsConsentCreated.content.application/jwt
   remove: true
 - target: $.components.responses.201PaymentsConsentsConsentCreated.content
@@ -75,7 +74,6 @@ actions:
     application/json:
       schema:
         $ref: '#/components/schemas/CreatePixPayment'
-
 - target: $.components.responses.201PaymentsInitiationPixPaymentCreated.content.application/jwt
   remove: true
 - target: $.components.responses.201PaymentsInitiationPixPaymentCreated.content
@@ -91,3 +89,33 @@ actions:
     application/json:
       schema:
         $ref: '#/components/schemas/ResponsePixPayment'
+
+- target: $.paths./pix/payments/{paymentId}.patch.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./pix/payments/{paymentId}.patch.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/PatchPixPayment'
+- target: $.components.responses.200PatchPixPayments.content.application/jwt
+  remove: true
+- target: $.components.responses.200PatchPixPayments.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponsePatchPixPayment'
+
+- target: $.paths./pix/payments/consents/{consentId}.patch.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./pix/payments/consents/{consentId}.patch.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/PatchPixPayment'
+- target: $.components.responses.200PatchPixConsents.content.application/jwt
+  remove: true
+- target: $.components.responses.200PatchPixConsents.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponsePatchPixConsent'

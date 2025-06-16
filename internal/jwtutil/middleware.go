@@ -36,7 +36,7 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 
 		jwsBytes, err := io.ReadAll(r.Body)
 		if err != nil {
-			slog.InfoContext(r.Context(), "failed to read request jwt body", slog.String("error", err.Error()))
+			slog.InfoContext(r.Context(), "failed to read request jwt body", "error", err)
 			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to read request body"))
 			return
 		}
@@ -45,7 +45,7 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 		jws := string(jwsBytes)
 		parsedJWT, err := jwt.ParseSigned(jws, []jose.SignatureAlgorithm{goidc.PS256})
 		if err != nil {
-			slog.InfoContext(r.Context(), "invalid jwt", slog.String("error", err.Error()))
+			slog.InfoContext(r.Context(), "invalid jwt", "error", err)
 			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "invalid jwt"))
 			return
 		}
@@ -53,21 +53,21 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 		clientOrgID := r.Context().Value(api.CtxKeyOrgID).(string)
 		resp, err := http.Get(keystoreHost + fmt.Sprintf("/%s/application.jwks", clientOrgID))
 		if err != nil {
-			slog.InfoContext(r.Context(), "failed to fetch jwks", slog.String("error", err.Error()))
+			slog.InfoContext(r.Context(), "failed to fetch jwks", "error", err)
 			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to fetch JWKS"))
 			return
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			slog.InfoContext(r.Context(), "failed to fetch jwks", slog.String("status", resp.Status))
+			slog.InfoContext(r.Context(), "failed to fetch jwks", "status", resp.StatusCode)
 			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to fetch jwks"))
 			return
 		}
 
 		var jwks jose.JSONWebKeySet
 		if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
-			slog.InfoContext(r.Context(), "failed to decode jwks", slog.String("error", err.Error()))
+			slog.InfoContext(r.Context(), "failed to decode jwks", "error", err)
 			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to decode organization jwks"))
 			return
 		}
@@ -75,18 +75,18 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 		var jwtClaims jwt.Claims
 		var claims map[string]any
 		if err := parsedJWT.Claims(jwks, &jwtClaims, &claims); err != nil {
-			slog.InfoContext(r.Context(), "invalid jwt signature", slog.String("error", err.Error()))
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "invalid jwt signature"))
+			slog.InfoContext(r.Context(), "invalid jwt signature", "error", err)
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, "invalid jwt signature"))
 			return
 		}
 
 		if jwtClaims.IssuedAt == nil {
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "iat claim is missing"))
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusForbidden, "iat claim is missing"))
 			return
 		}
 
 		if jwtClaims.ID == "" {
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "jti claim is missing"))
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusForbidden, "jti claim is missing"))
 			return
 		}
 
@@ -95,13 +95,16 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 			AnyAudience: []string{baseURL + r.URL.Path},
 		}); err != nil {
 			slog.InfoContext(r.Context(), "invalid jwt claims", slog.String("error", err.Error()))
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "JWT validation failed"))
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusForbidden, "JWT validation failed"))
 			return
 		}
 
+		// Delete the 'jti' claim to ensure idempotency.
+		delete(claims, "jti")
+
 		jsonBytes, err := json.Marshal(claims)
 		if err != nil {
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to convert claims to json"))
+			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusForbidden, "failed to convert claims to json"))
 			return
 		}
 
