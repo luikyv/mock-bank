@@ -1,9 +1,13 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/google/uuid"
+	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 )
 
 type Options struct {
@@ -28,4 +32,22 @@ func FAPIIDMiddleware(opts *Options) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func SwaggerMiddleware(getSwagger func() (*openapi3.T, error), errCode string) func(http.Handler) http.Handler {
+	spec, err := getSwagger()
+	if err != nil {
+		panic(err)
+	}
+	return netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
+		DoNotValidateServers: true,
+		Options: openapi3filter.Options{
+			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
+				return nil
+			},
+		},
+		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts netmiddleware.ErrorHandlerOpts) {
+			WriteError(w, r, NewError(errCode, http.StatusUnprocessableEntity, err.Error()))
+		},
+	})
 }

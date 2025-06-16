@@ -1,4 +1,4 @@
-//go:generate oapi-codegen -config=../oapi-config.yml -package=consentv3 -o=./api_gen.go ./swagger.yml
+//go:generate oapi-codegen -config=./config.yml -package=consentv3 -o=./api_gen.go ./swagger.yml
 package consentv3
 
 import (
@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/google/uuid"
 
 	"github.com/luiky/mock-bank/internal/api"
@@ -17,7 +16,6 @@ import (
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
-	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 )
 
 type Server struct {
@@ -37,29 +35,16 @@ func NewServer(host string, service consent.Service, op *provider.Provider) Serv
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	consentMux := http.NewServeMux()
 
-	spec, err := GetSwagger()
-	if err != nil {
-		panic(err)
-	}
-	swaggerMiddleware := netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
-		DoNotValidateServers: true,
-		Options: openapi3filter.Options{
-			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
-				return nil
-			},
-		},
-		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts netmiddleware.ErrorHandlerOpts) {
-			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusUnprocessableEntity, err.Error()))
-		},
-	})
+	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, consent.Scope)
+	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, consent.ScopeID)
+	swaggerMiddleware := api.SwaggerMiddleware(GetSwagger, "PARAMETRO_INVALIDO")
 
-	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
-		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeResponseError(w, r, err)
-		},
-	})
 	wrapper := ServerInterfaceWrapper{
-		Handler: strictHandler,
+		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
+			ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+				writeResponseError(w, r, err)
+			},
+		}),
 		HandlerMiddlewares: []MiddlewareFunc{
 			swaggerMiddleware,
 			api.FAPIIDMiddleware(nil),
@@ -70,9 +55,6 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	}
 
 	var handler http.Handler
-
-	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, consent.Scope)
-	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, consent.ScopeID)
 
 	handler = http.HandlerFunc(wrapper.ConsentsPostConsents)
 	handler = clientCredentialsAuthMiddleware(handler)

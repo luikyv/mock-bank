@@ -7,7 +7,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
@@ -20,7 +19,6 @@ import (
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
-	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 )
 
 var _ StrictServerInterface = Server{}
@@ -58,29 +56,18 @@ func NewServer(
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	paymentMux := http.NewServeMux()
 
-	spec, err := GetSwagger()
-	if err != nil {
-		panic(err)
-	}
-	swaggerMiddleware := netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
-		DoNotValidateServers: true,
-		Options: openapi3filter.Options{
-			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
-				return nil
-			},
-		},
-		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts netmiddleware.ErrorHandlerOpts) {
-			api.WriteError(w, r, api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
-		},
-	})
+	jwtMiddleware := jwtutil.Middleware(s.baseURL, s.orgID, s.keystoreHost, s.signer)
+	idempotencyMiddleware := idempotency.Middleware(s.idempotencyService)
+	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, payment.Scope)
+	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, consent.ScopeID)
+	swaggerMiddleware := api.SwaggerMiddleware(GetSwagger, "PARAMETRO_INVALIDO")
 
-	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
-		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeResponseError(w, r, err)
-		},
-	})
 	wrapper := ServerInterfaceWrapper{
-		Handler: strictHandler,
+		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
+			ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+				writeResponseError(w, r, err)
+			},
+		}),
 		HandlerMiddlewares: []MiddlewareFunc{
 			swaggerMiddleware,
 			api.FAPIIDMiddleware(nil),
@@ -89,11 +76,6 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
 	}
-
-	jwtMiddleware := jwtutil.Middleware(s.baseURL, s.orgID, s.keystoreHost, s.signer)
-	idempotencyMiddleware := idempotency.Middleware(s.idempotencyService)
-	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, payment.Scope)
-	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, consent.ScopeID)
 
 	var handler http.Handler
 
@@ -136,25 +118,29 @@ func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsen
 	clientID := ctx.Value(api.CtxKeyClientID).(string)
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
 	c := &payment.Consent{
-		UserCPF:               req.Body.Data.LoggedUser.Document.Identification,
-		ClientID:              clientID,
-		CreditorType:          payment.CreditorType(req.Body.Data.Creditor.PersonType),
-		CreditorCPFCNPJ:       req.Body.Data.Creditor.CpfCnpj,
-		CreditorName:          req.Body.Data.Creditor.Name,
-		CreditorAccountISBP:   req.Body.Data.Payment.Details.CreditorAccount.Ispb,
-		CreditorAccountNumber: req.Body.Data.Payment.Details.CreditorAccount.Number,
-		CreditorAccountType:   payment.AccountType(req.Body.Data.Payment.Details.CreditorAccount.AccountType),
-		CreditorAccountIssuer: req.Body.Data.Payment.Details.CreditorAccount.Issuer,
-		PaymentType:           payment.Type(req.Body.Data.Payment.Type),
-		PaymentCurrency:       req.Body.Data.Payment.Currency,
-		PaymentAmount:         req.Body.Data.Payment.Amount,
-		PaymentSchedule:       req.Body.Data.Payment.Schedule,
-		PaymentDate:           req.Body.Data.Payment.Date,
-		LocalInstrument:       payment.LocalInstrument(req.Body.Data.Payment.Details.LocalInstrument),
-		IBGETownCode:          req.Body.Data.Payment.IbgeTownCode,
-		QRCode:                req.Body.Data.Payment.Details.QrCode,
-		Proxy:                 req.Body.Data.Payment.Details.Proxy,
-		OrgID:                 orgID,
+		UserCPF:  req.Body.Data.LoggedUser.Document.Identification,
+		ClientID: clientID,
+		Creditor: payment.Creditor{
+			Type:    payment.CreditorType(req.Body.Data.Creditor.PersonType),
+			CPFCNPJ: req.Body.Data.Creditor.CpfCnpj,
+			Name:    req.Body.Data.Creditor.Name,
+		},
+		CreditorAccount: payment.CreditorAccount{
+			ISBP:   req.Body.Data.Payment.Details.CreditorAccount.Ispb,
+			Number: req.Body.Data.Payment.Details.CreditorAccount.Number,
+			Type:   payment.AccountType(req.Body.Data.Payment.Details.CreditorAccount.AccountType),
+			Issuer: req.Body.Data.Payment.Details.CreditorAccount.Issuer,
+		},
+		PaymentType:     payment.Type(req.Body.Data.Payment.Type),
+		PaymentCurrency: req.Body.Data.Payment.Currency,
+		PaymentAmount:   req.Body.Data.Payment.Amount,
+		PaymentSchedule: req.Body.Data.Payment.Schedule,
+		PaymentDate:     req.Body.Data.Payment.Date,
+		LocalInstrument: payment.LocalInstrument(req.Body.Data.Payment.Details.LocalInstrument),
+		IBGETownCode:    req.Body.Data.Payment.IbgeTownCode,
+		QRCode:          req.Body.Data.Payment.Details.QrCode,
+		Proxy:           req.Body.Data.Payment.Details.Proxy,
+		OrgID:           orgID,
 	}
 	if req.Body.Data.BusinessEntity != nil {
 		c.BusinessCNPJ = &req.Body.Data.BusinessEntity.Document.Identification
@@ -211,9 +197,9 @@ func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsen
 				},
 			},
 			Creditor: Identification{
-				CpfCnpj:    c.CreditorCPFCNPJ,
-				Name:       c.CreditorName,
-				PersonType: EnumPaymentPersonType(c.CreditorType),
+				CpfCnpj:    c.Creditor.CPFCNPJ,
+				Name:       c.Creditor.Name,
+				PersonType: EnumPaymentPersonType(c.Creditor.Type),
 			},
 			Payment: struct {
 				Amount       string               "json:\"amount\""
@@ -231,10 +217,10 @@ func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsen
 				IbgeTownCode: c.IBGETownCode,
 				Details: Details{
 					CreditorAccount: CreditorAccount{
-						Ispb:        c.CreditorAccountISBP,
-						Number:      c.CreditorAccountNumber,
-						AccountType: EnumAccountPaymentsType(c.CreditorAccountType),
-						Issuer:      c.CreditorAccountIssuer,
+						Ispb:        c.CreditorAccount.ISBP,
+						Number:      c.CreditorAccount.Number,
+						AccountType: EnumAccountPaymentsType(c.CreditorAccount.Type),
+						Issuer:      c.CreditorAccount.Issuer,
 					},
 					LocalInstrument: EnumLocalInstrument(c.LocalInstrument),
 					QrCode:          c.QRCode,
@@ -299,9 +285,9 @@ func (s Server) PaymentsGetConsentsConsentID(ctx context.Context, req PaymentsGe
 			CreationDateTime:     c.CreatedAt,
 			ExpirationDateTime:   c.ExpiresAt,
 			Creditor: Identification{
-				CpfCnpj:    c.CreditorCPFCNPJ,
-				Name:       c.CreditorName,
-				PersonType: EnumPaymentPersonType(c.CreditorType),
+				CpfCnpj:    c.Creditor.CPFCNPJ,
+				Name:       c.Creditor.Name,
+				PersonType: EnumPaymentPersonType(c.Creditor.Type),
 			},
 			LoggedUser: LoggedUser{
 				Document: struct {
@@ -317,10 +303,10 @@ func (s Server) PaymentsGetConsentsConsentID(ctx context.Context, req PaymentsGe
 				Currency: c.PaymentCurrency,
 				Details: Details{
 					CreditorAccount: CreditorAccount{
-						AccountType: EnumAccountPaymentsType(c.CreditorAccountType),
-						Ispb:        c.CreditorAccountISBP,
-						Number:      c.CreditorAccountNumber,
-						Issuer:      c.CreditorAccountIssuer,
+						AccountType: EnumAccountPaymentsType(c.CreditorAccount.Type),
+						Ispb:        c.CreditorAccount.ISBP,
+						Number:      c.CreditorAccount.Number,
+						Issuer:      c.CreditorAccount.Issuer,
 					},
 					LocalInstrument: EnumLocalInstrument(c.LocalInstrument),
 					QrCode:          c.QRCode,
@@ -370,30 +356,33 @@ func (s Server) PaymentsGetConsentsConsentID(ctx context.Context, req PaymentsGe
 
 func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPixPaymentsRequestObject) (PaymentsPostPixPaymentsResponseObject, error) {
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
-	// TODO.
-	// consentID := ctx.Value(api.CtxKeyConsentID).(string)
 	consentID, _ := consent.IDFromScopes(ctx.Value(api.CtxKeyScopes).(string))
 	clientID := ctx.Value(api.CtxKeyClientID).(string)
 	var payments []*payment.Payment
 	for _, reqPayment := range req.Body.Data {
 		p := &payment.Payment{
-			EndToEndID:                reqPayment.EndToEndID,
-			LocalInstrument:           payment.LocalInstrument(reqPayment.LocalInstrument),
-			Amount:                    reqPayment.Payment.Amount,
-			Currency:                  reqPayment.Payment.Currency,
-			CreditorAccountISBP:       reqPayment.CreditorAccount.Ispb,
-			CreditorAccountIssuer:     reqPayment.CreditorAccount.Issuer,
-			CreditorAccountNumber:     reqPayment.CreditorAccount.Number,
-			CreditorAccountType:       payment.AccountType(reqPayment.CreditorAccount.AccountType),
+			EndToEndID:      reqPayment.EndToEndID,
+			LocalInstrument: payment.LocalInstrument(reqPayment.LocalInstrument),
+			Amount:          reqPayment.Payment.Amount,
+			Currency:        reqPayment.Payment.Currency,
+			CreditorAccount: payment.CreditorAccount{
+				ISBP:   reqPayment.CreditorAccount.Ispb,
+				Issuer: reqPayment.CreditorAccount.Issuer,
+				Number: reqPayment.CreditorAccount.Number,
+				Type:   payment.AccountType(reqPayment.CreditorAccount.AccountType),
+			},
 			RemittanceInformation:     reqPayment.RemittanceInformation,
 			QRCode:                    reqPayment.QrCode,
 			Proxy:                     reqPayment.Proxy,
 			CNPJInitiator:             reqPayment.CnpjInitiator,
 			TransactionIdentification: reqPayment.TransactionIdentification,
 			IBGETownCode:              reqPayment.IbgeTownCode,
-			ConsentID:                 uuid.MustParse(consentID),
 			ClientID:                  clientID,
 			OrgID:                     orgID,
+		}
+
+		if consentID != "" {
+			p.ConsentID = uuid.MustParse(consentID)
 		}
 
 		if reqPayment.AuthorisationFlow != nil {
@@ -442,10 +431,10 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 			ConsentID:        &consentID,
 			CreationDateTime: p.CreatedAt,
 			CreditorAccount: CreditorAccount{
-				AccountType: EnumAccountPaymentsType(p.CreditorAccountType),
-				Ispb:        p.CreditorAccountISBP,
-				Issuer:      p.CreditorAccountIssuer,
-				Number:      p.CreditorAccountNumber,
+				AccountType: EnumAccountPaymentsType(p.CreditorAccount.Type),
+				Ispb:        p.CreditorAccount.ISBP,
+				Issuer:      p.CreditorAccount.Issuer,
+				Number:      p.CreditorAccount.Number,
 			},
 			EndToEndID:      p.EndToEndID,
 			IbgeTownCode:    p.IBGETownCode,
@@ -518,10 +507,10 @@ func (s Server) PaymentsGetPixPaymentsPaymentID(ctx context.Context, req Payment
 			ConsentID:        consent.URN(p.ConsentID),
 			CreationDateTime: p.CreatedAt,
 			CreditorAccount: CreditorAccount{
-				AccountType: EnumAccountPaymentsType(p.CreditorAccountType),
-				Ispb:        p.CreditorAccountISBP,
-				Issuer:      p.CreditorAccountIssuer,
-				Number:      p.CreditorAccountNumber,
+				AccountType: EnumAccountPaymentsType(p.CreditorAccount.Type),
+				Ispb:        p.CreditorAccount.ISBP,
+				Issuer:      p.CreditorAccount.Issuer,
+				Number:      p.CreditorAccount.Number,
 			},
 			EndToEndID:      p.EndToEndID,
 			IbgeTownCode:    p.IBGETownCode,
@@ -588,10 +577,10 @@ func (s Server) PaymentsPatchPixPaymentsPaymentID(ctx context.Context, req Payme
 			ConsentID:        consent.URN(p.ConsentID),
 			CreationDateTime: p.CreatedAt,
 			CreditorAccount: CreditorAccount{
-				AccountType: EnumAccountPaymentsType(p.CreditorAccountType),
-				Ispb:        p.CreditorAccountISBP,
-				Issuer:      p.CreditorAccountIssuer,
-				Number:      p.CreditorAccountNumber,
+				AccountType: EnumAccountPaymentsType(p.CreditorAccount.Type),
+				Ispb:        p.CreditorAccount.ISBP,
+				Issuer:      p.CreditorAccount.Issuer,
+				Number:      p.CreditorAccount.Number,
 			},
 			EndToEndID:      p.EndToEndID,
 			IbgeTownCode:    p.IBGETownCode,

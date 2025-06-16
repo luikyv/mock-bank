@@ -1,4 +1,4 @@
-//go:generate oapi-codegen -config=../oapi-config.yml -package=app -o=./api_gen.go ./swagger.yml
+//go:generate oapi-codegen -config=./config.yml -package=app -o=./api_gen.go ./swagger.yml
 package app
 
 import (
@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
@@ -18,7 +17,6 @@ import (
 	"github.com/luiky/mock-bank/internal/session"
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luiky/mock-bank/internal/user"
-	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"github.com/rs/cors"
 	"github.com/unrolled/secure"
 )
@@ -59,22 +57,7 @@ func NewServer(
 
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
-	spec, err := GetSwagger()
-	if err != nil {
-		panic(err)
-	}
-	swaggerMiddleware := netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
-		DoNotValidateServers: true,
-		Options: openapi3filter.Options{
-			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
-				return nil
-			},
-		},
-		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts netmiddleware.ErrorHandlerOpts) {
-			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusUnprocessableEntity, err.Error()))
-		},
-	})
-
+	swaggerMiddleware := api.SwaggerMiddleware(GetSwagger, "PARAMETRO_INVALIDO")
 	secureMiddleware := secure.New(secure.Options{
 		STSSeconds:            31536000,
 		STSIncludeSubdomains:  true,
@@ -84,7 +67,6 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		BrowserXssFilter:      true,
 		ContentSecurityPolicy: "default-src 'self'; script-src 'self'",
 	})
-
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{s.host},
 		AllowCredentials: true,
@@ -98,13 +80,11 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		},
 	})
 
-	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
+	handler := HandlerWithOptions(NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeResponseError(w, r, err)
 		},
-	})
-
-	handler := HandlerWithOptions(strictHandler, StdHTTPServerOptions{
+	}), StdHTTPServerOptions{
 		Middlewares: []MiddlewareFunc{
 			swaggerMiddleware,
 			fapiIDMiddleware,

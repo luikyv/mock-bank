@@ -22,10 +22,7 @@ type Payment struct {
 	LocalInstrument           LocalInstrument
 	Amount                    string
 	Currency                  string
-	CreditorAccountISBP       string
-	CreditorAccountIssuer     *string
-	CreditorAccountNumber     string
-	CreditorAccountType       AccountType
+	CreditorAccount           CreditorAccount `gorm:"serializer:json"`
 	RemittanceInformation     *string
 	QRCode                    *string
 	Proxy                     *string
@@ -113,33 +110,28 @@ const (
 )
 
 type Consent struct {
-	ID                    uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Status                ConsentStatus
-	StatusUpdatedAt       timeutil.DateTime
-	ExpiresAt             timeutil.DateTime
-	UserID                uuid.UUID
-	UserCPF               string
-	BusinessCNPJ          *string
-	ClientID              string
-	CreditorType          CreditorType
-	CreditorCPFCNPJ       string `gorm:"column:creditor_cpf_cnpj"`
-	CreditorName          string
-	CreditorAccountISBP   string
-	CreditorAccountIssuer *string
-	CreditorAccountNumber string
-	CreditorAccountType   AccountType
-	PaymentType           Type
-	PaymentSchedule       *Schedule `gorm:"serializer:json"`
-	PaymentDate           *timeutil.BrazilDate
-	PaymentCurrency       string
-	PaymentAmount         string
-	IBGETownCode          *string
-	LocalInstrument       LocalInstrument
-	QRCode                *string
-	Proxy                 *string
-	DebtorAccountID       *uuid.UUID `gorm:"column:account_id"`
-	DebtorAccount         *account.Account
-	Rejection             *ConsentRejection `gorm:"serializer:json"`
+	ID              uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Status          ConsentStatus
+	StatusUpdatedAt timeutil.DateTime
+	ExpiresAt       timeutil.DateTime
+	UserID          uuid.UUID
+	UserCPF         string
+	BusinessCNPJ    *string
+	ClientID        string
+	Creditor        Creditor        `gorm:"serializer:json"`
+	CreditorAccount CreditorAccount `gorm:"serializer:json"`
+	PaymentType     Type
+	PaymentSchedule *Schedule `gorm:"serializer:json"`
+	PaymentDate     *timeutil.BrazilDate
+	PaymentCurrency string
+	PaymentAmount   string
+	IBGETownCode    *string
+	LocalInstrument LocalInstrument
+	QRCode          *string
+	Proxy           *string
+	DebtorAccountID *uuid.UUID `gorm:"column:account_id"`
+	DebtorAccount   *account.Account
+	Rejection       *ConsentRejection `gorm:"serializer:json"`
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -347,6 +339,19 @@ const (
 type Document struct {
 	Identification string
 	Rel            string
+}
+
+type Creditor struct {
+	Type    CreditorType `json:"type"`
+	CPFCNPJ string       `json:"cpf_cnpj"`
+	Name    string       `json:"name"`
+}
+
+type CreditorAccount struct {
+	ISBP   string      `json:"isbp"`
+	Issuer *string     `json:"issuer,omitempty"`
+	Number string      `json:"number"`
+	Type   AccountType `json:"type"`
 }
 
 func parseWeekday(weekDay DayOfWeek) time.Weekday {

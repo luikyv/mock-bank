@@ -1,11 +1,10 @@
-//go:generate oapi-codegen -config=../oapi-config.yml -package=resourcev3 -o=./api_gen.go ./swagger.yml
+//go:generate oapi-codegen -config=./config.yml -package=resourcev3 -o=./api_gen.go ./swagger.yml
 package resourcev3
 
 import (
 	"context"
 	"net/http"
 
-	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/consent"
 	"github.com/luiky/mock-bank/internal/oidc"
@@ -13,7 +12,6 @@ import (
 	"github.com/luiky/mock-bank/internal/resource"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
-	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 )
 
 var _ StrictServerInterface = Server{}
@@ -37,31 +35,14 @@ func NewServer(host string, service resource.Service, consentService consent.Ser
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	resourceMux := http.NewServeMux()
 
-	spec, err := GetSwagger()
-	if err != nil {
-		panic(err)
-	}
-	swaggerMiddleware := netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
-		DoNotValidateServers: true,
-		Options: openapi3filter.Options{
-			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
-				return nil
-			},
-		},
-		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts netmiddleware.ErrorHandlerOpts) {
-			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusUnprocessableEntity, err.Error()))
-		},
-	})
-
-	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
-		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeResponseError(w, r, err)
-		},
-	})
 	wrapper := ServerInterfaceWrapper{
-		Handler: strictHandler,
+		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
+			ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+				writeResponseError(w, r, err)
+			},
+		}),
 		HandlerMiddlewares: []MiddlewareFunc{
-			swaggerMiddleware,
+			api.SwaggerMiddleware(GetSwagger, "INVALID_REQUEST"),
 			api.FAPIIDMiddleware(nil),
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {

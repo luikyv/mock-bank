@@ -1,4 +1,4 @@
-//go:generate oapi-codegen -config=../oapi-config.yml -package=accountv2 -o=./api_gen.go ./swagger.yml
+//go:generate oapi-codegen -config=./config.yml -package=accountv2 -o=./api_gen.go ./swagger.yml
 package accountv2
 
 import (
@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/consent"
@@ -16,7 +15,6 @@ import (
 	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
-	netmiddleware "github.com/oapi-codegen/nethttp-middleware"
 )
 
 var _ StrictServerInterface = Server{}
@@ -40,29 +38,15 @@ func NewServer(host string, service account.Service, consentService consent.Serv
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	accountMux := http.NewServeMux()
 
-	spec, err := GetSwagger()
-	if err != nil {
-		panic(err)
-	}
-	swaggerMiddleware := netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
-		DoNotValidateServers: true,
-		Options: openapi3filter.Options{
-			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
-				return nil
-			},
-		},
-		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts netmiddleware.ErrorHandlerOpts) {
-			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusUnprocessableEntity, err.Error()))
-		},
-	})
+	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, consent.ScopeID)
+	swaggerMiddleware := api.SwaggerMiddleware(GetSwagger, "PARAMETRO_INVALIDO")
 
-	strictHandler := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
-		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeResponseError(w, r, err, !strings.Contains(r.URL.Path, "/transactions-current"))
-		},
-	})
 	wrapper := ServerInterfaceWrapper{
-		Handler: strictHandler,
+		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
+			ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+				writeResponseError(w, r, err, !strings.Contains(r.URL.Path, "/transactions-current"))
+			},
+		}),
 		HandlerMiddlewares: []MiddlewareFunc{
 			swaggerMiddleware,
 			api.FAPIIDMiddleware(nil),
@@ -71,8 +55,6 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
 	}
-
-	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, consent.ScopeID)
 
 	var handler http.Handler
 

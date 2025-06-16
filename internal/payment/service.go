@@ -280,7 +280,7 @@ func (s Service) createConsent(ctx context.Context, c *Consent) error {
 }
 
 func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *DebtorAccount) error {
-	if debtorAccount != nil && c.CreditorAccountISBP == debtorAccount.ISBP && c.CreditorAccountNumber == debtorAccount.Number {
+	if debtorAccount != nil && c.CreditorAccount.ISBP == debtorAccount.ISBP && c.CreditorAccount.Number == debtorAccount.Number {
 		return ErrCreditorAndDebtorAccountsAreEqual
 	}
 
@@ -370,7 +370,7 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *D
 	if slices.Contains([]AccountType{
 		AccountTypeCACC,
 		AccountTypeSVGS,
-	}, c.CreditorAccountType) && c.CreditorAccountIssuer == nil {
+	}, c.CreditorAccount.Type) && c.CreditorAccount.Issuer == nil {
 		return errorutil.New("creditor account issuer is required for account types CACC or SVGS")
 	}
 
@@ -486,19 +486,19 @@ func (s Service) validatePayments(_ context.Context, c *Consent, payments []*Pay
 			return errorutil.Format("%w: currency does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
 		}
 
-		if p.CreditorAccountISBP != c.CreditorAccountISBP {
+		if p.CreditorAccount.ISBP != c.CreditorAccount.ISBP {
 			return errorutil.Format("%w: creditor account isbp does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
 		}
 
-		if !reflect.DeepEqual(p.CreditorAccountIssuer, c.CreditorAccountIssuer) {
+		if !reflect.DeepEqual(p.CreditorAccount.Issuer, c.CreditorAccount.Issuer) {
 			return errorutil.Format("%w: creditor account issuer does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
 		}
 
-		if p.CreditorAccountNumber != c.CreditorAccountNumber {
+		if p.CreditorAccount.Number != c.CreditorAccount.Number {
 			return errorutil.Format("%w: creditor account number does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
 		}
 
-		if p.CreditorAccountType != c.CreditorAccountType {
+		if p.CreditorAccount.Type != c.CreditorAccount.Type {
 			return errorutil.Format("%w: creditor account type does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
 		}
 

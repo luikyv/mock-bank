@@ -1,0 +1,40 @@
+overlay: 1.0.0
+info:
+  title: Overlay
+  version: 0.0.0
+strict: false
+actions:
+- target: $.components.schemas[*].properties.meta
+  description: Set x-go-type and x-go-type-import for all fields named "meta"
+  update:
+    x-go-type: api.Meta
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/api
+- target: $.components.schemas[*].properties.meta.$ref
+  description: Remove $ref fields from meta properties to ensure the application of the custom x-go-type
+  remove: true
+
+- target: $.components.schemas[*].properties.links
+  description: Set x-go-type and x-go-type-import for all fields named "links"
+  update:
+    x-go-type: api.Links
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/api
+- target: $.components.schemas[*].properties.links.$ref
+  description: Remove $ref fields from links properties to ensure the application of the custom x-go-type
+  remove: true
+
+- target: $..[*][?(@.format == "date")]
+  update:
+    x-go-type: timeutil.BrazilDate
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/timeutil
+
+- target: $..[*][?(@.format == "date-time")]
+  update:
+    x-go-type: timeutil.DateTime
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/timeutil
+
+- target: $.components.responses[*].headers.x-fapi-interaction-id
+  remove: true
