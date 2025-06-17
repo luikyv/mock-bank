@@ -374,7 +374,7 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *A
 		return errorutil.New("creditor account issuer is required for account types CACC or SVGS")
 	}
 
-	if slices.Contains([]AccountType{
+	if debtorAccount != nil && slices.Contains([]AccountType{
 		AccountTypeCACC,
 		AccountTypeSVGS,
 	}, debtorAccount.Type) && debtorAccount.Issuer == nil {

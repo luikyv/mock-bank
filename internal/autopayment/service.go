@@ -4,13 +4,16 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/consent"
 	"github.com/luiky/mock-bank/internal/errorutil"
 	"github.com/luiky/mock-bank/internal/payment"
+	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luiky/mock-bank/internal/user"
 	"gorm.io/gorm"
 )
@@ -66,28 +69,28 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payme
 	return s.createConsent(ctx, c)
 }
 
-// func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
+func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
 
-// 	if c.Status != ConsentStatusAwaitingAuthorization {
-// 		return errorutil.New("consent is not awaiting authorization")
-// 	}
+	if !c.IsAwaitingAuthorization() {
+		return errorutil.New("consent is not awaiting authorization")
+	}
 
-// 	now := timeutil.DateTimeNow()
-// 	c.AuthorizedAt = &now
-// 	return s.updateConsentStatus(ctx, c, ConsentStatusAuthorized)
-// }
+	now := timeutil.DateTimeNow()
+	c.AuthorizedAt = &now
+	return s.updateConsentStatus(ctx, c, ConsentStatusAuthorized)
+}
 
-// func (s Service) UpdateDebtorAccount(ctx context.Context, consentID, accountID, orgID string) error {
-// 	c, err := s.Consent(ctx, consentID, orgID)
-// 	if err != nil {
-// 		return err
-// 	}
+func (s Service) UpdateDebtorAccount(ctx context.Context, consentID, accountID, orgID string) error {
+	c, err := s.Consent(ctx, consentID, orgID)
+	if err != nil {
+		return err
+	}
 
-// 	accID := uuid.MustParse(accountID)
-// 	c.DebtorAccountID = &accID
-// 	c.UpdatedAt = timeutil.DateTimeNow()
-// 	return s.db.WithContext(ctx).Save(c).Error
-// }
+	accID := uuid.MustParse(accountID)
+	c.DebtorAccountID = &accID
+	c.UpdatedAt = timeutil.DateTimeNow()
+	return s.db.WithContext(ctx).Save(c).Error
+}
 
 func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error) {
 	id = strings.TrimPrefix(id, consent.URNPrefix)
@@ -110,14 +113,14 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 	return c, nil
 }
 
-// func (s Service) RejectConsent(ctx context.Context, id, orgID string, code ConsentRejectionReasonCode, detail string) error {
-// 	c, err := s.Consent(ctx, id, orgID)
-// 	if err != nil {
-// 		return err
-// 	}
+func (s Service) RejectConsent(ctx context.Context, id, orgID string, rejection ConsentRejection) error {
+	c, err := s.Consent(ctx, id, orgID)
+	if err != nil {
+		return err
+	}
 
-// 	return s.rejectConsent(ctx, c, code, detail)
-// }
+	return s.rejectConsent(ctx, c, rejection)
+}
 
 // func (s Service) Create(ctx context.Context, p *Payment) error {
 
@@ -264,32 +267,30 @@ func (s Service) createConsent(ctx context.Context, c *Consent) error {
 }
 
 func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *payment.Account) error {
-	for i, creditor := range c.Creditors {
-		switch creditor.Type {
-		case payment.CreditorTypeIndividual:
-			if len(c.Creditors) != 1 {
-				return errorutil.New("only one creditor is allowed when the type is INDIVIDUAL")
-			}
-		case payment.CreditorTypeCompany:
-			baseRoot := c.Creditors[0].CPFCNPJ[:8]
-			if !strings.HasPrefix(creditor.CPFCNPJ, c.Creditors[0].CPFCNPJ[:8]) {
-				return errorutil.Format("creditor at index %d has a different CNPJ root (expected: %s, got: %s)", i, baseRoot, c.Creditors[0].CPFCNPJ[:8])
-			}
-		}
-	}
-
 	if automatic := c.Configuration.Automatic; automatic != nil {
+		if len(c.Creditors) != 1 {
+			return errorutil.Format("%w: only one creditor is allowed for automatic pix", ErrInvalidPayment)
+		}
+
 		if c.Creditors[0].Type == payment.CreditorTypeIndividual {
-			return errorutil.New("creditor of type INDIVIDUAL is not allowed for automatic pix")
+			return errorutil.Format("%w: creditor of type INDIVIDUAL is not allowed for automatic pix", ErrInvalidPayment)
 		}
 
 		if automatic.FixedAmount != nil && automatic.MaximumVariableAmount != nil {
-			return errorutil.New("at most one of fixedAmount and maximumVariableAmount can be informed")
+			return errorutil.Format("%w: at most one of fixedAmount and maximumVariableAmount can be informed", ErrInvalidPayment)
+		}
+
+		if automatic.MaximumVariableAmount != nil && automatic.MinimumVariableAmount != nil {
+			max, _ := strconv.ParseFloat(*automatic.MaximumVariableAmount, 64)
+			min, _ := strconv.ParseFloat(*automatic.MinimumVariableAmount, 64)
+			if min > max {
+				return errorutil.Format("%w: maximumVariableAmount cannot be lower than minimumVariableAmount", ErrInvalidPayment)
+			}
 		}
 
 		if firstPayment := automatic.FirstPayment; firstPayment != nil {
 			if firstPayment.Currency != "BRL" {
-				return errorutil.New("only BRL currency is allowed")
+				return errorutil.Format("%w: only BRL currency is allowed", ErrInvalidDate)
 			}
 
 			if slices.Contains([]payment.AccountType{
@@ -298,10 +299,43 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *p
 			}, firstPayment.CreditorAccount.Type) && firstPayment.CreditorAccount.Issuer == nil {
 				return errorutil.New("first payment creditor account issuer is required for account types CACC or SVGS")
 			}
+
+			today := timeutil.BrazilDateNow()
+			if firstPayment.Date.Before(today) {
+				return errorutil.Format("%w: first payment date cannot be in the past", ErrInvalidDate)
+			}
 		}
 	}
 
-	if slices.Contains([]payment.AccountType{
+	if c.Configuration.Sweeping != nil {
+		if businessCNPJ := c.BusinessCNPJ; businessCNPJ != nil {
+			baseRootCNPJ := (*businessCNPJ)[:8]
+			for _, creditor := range c.Creditors {
+				if creditor.Type != payment.CreditorTypeCompany {
+					return errorutil.Format("%w: sweeping requires all creditors to be companies when the user is business", ErrInvalidPayment)
+				}
+
+				if !strings.HasPrefix(creditor.CPFCNPJ, baseRootCNPJ) {
+					return errorutil.Format("%w: sweeping requires all creditor CNPJs to share the same root as the user's business CNPJ", ErrInvalidPayment)
+				}
+			}
+		} else {
+			if len(c.Creditors) != 1 {
+				return errorutil.Format("%w: sweeping requires exactly one creditor when the user is INDIVIDUAL", ErrInvalidPayment)
+			}
+
+			creditor := c.Creditors[0]
+			if creditor.Type != payment.CreditorTypeIndividual {
+				return errorutil.Format("%w: sweeping requires the creditor to be of type INDIVIDUAL when the user is a person", ErrInvalidPayment)
+			}
+
+			if creditor.CPFCNPJ != c.UserCPF {
+				return errorutil.Format("%w: sweeping requires the creditor's CPF to match the logged user's CPF", ErrInvalidPayment)
+			}
+		}
+	}
+
+	if debtorAccount != nil && slices.Contains([]payment.AccountType{
 		payment.AccountTypeCACC,
 		payment.AccountTypeSVGS,
 	}, debtorAccount.Type) && debtorAccount.Issuer == nil {
@@ -311,12 +345,12 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *p
 	return nil
 }
 
-// func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status ConsentStatus) error {
-// 	c.Status = status
-// 	c.StatusUpdatedAt = timeutil.DateTimeNow()
-// 	c.UpdatedAt = timeutil.DateTimeNow()
-// 	return s.saveConsent(ctx, c)
-// }
+func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status ConsentStatus) error {
+	c.Status = status
+	c.StatusUpdatedAt = timeutil.DateTimeNow()
+	c.UpdatedAt = timeutil.DateTimeNow()
+	return s.saveConsent(ctx, c)
+}
 
 func (s Service) runConsentPreCreationAutomations(_ context.Context, c *Consent) error {
 	return nil
@@ -326,21 +360,18 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 	return nil
 }
 
-// func (s Service) rejectConsent(ctx context.Context, c *Consent, code ConsentRejectionCode, detail string) error {
-// 	if c.Status == ConsentStatusRejected {
-// 		return ErrConsentAlreadyRejected
-// 	}
+func (s Service) rejectConsent(ctx context.Context, c *Consent, rejection ConsentRejection) error {
+	if c.Status == ConsentStatusRejected {
+		return ErrConsentAlreadyRejected
+	}
 
-// 	c.Rejection = &ConsentRejection{
-// 		Code:   code,
-// 		Detail: detail,
-// 	}
-// 	return s.updateConsentStatus(ctx, c, ConsentStatusRejected)
-// }
+	c.Rejection = &rejection
+	return s.updateConsentStatus(ctx, c, ConsentStatusRejected)
+}
 
-// func (s Service) saveConsent(ctx context.Context, c *Consent) error {
-// 	return s.db.WithContext(ctx).Save(c).Error
-// }
+func (s Service) saveConsent(ctx context.Context, c *Consent) error {
+	return s.db.WithContext(ctx).Save(c).Error
+}
 
 // func (s Service) validatePayment(_ context.Context, c *Consent, p *Payment) error {
 

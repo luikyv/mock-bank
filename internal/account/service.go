@@ -21,11 +21,11 @@ func NewService(db *gorm.DB) Service {
 	return Service{db: db}
 }
 
-func (s Service) Authorize(ctx context.Context, accIDs []uuid.UUID, consentID uuid.UUID) error {
+func (s Service) Authorize(ctx context.Context, accIDs []string, consentID, orgID string) error {
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, accID := range accIDs {
 			var acc Account
-			if err := tx.First(&acc, "id = ?", accID).Error; err != nil {
+			if err := tx.First(&acc, "id = ? AND org_id = ?", accID, orgID).Error; err != nil {
 				return fmt.Errorf("account %s not found: %w", accID, err)
 			}
 
@@ -35,8 +35,8 @@ func (s Service) Authorize(ctx context.Context, accIDs []uuid.UUID, consentID uu
 			}
 
 			if err := s.createConsent(ctx, &ConsentAccount{
-				ConsentID: consentID,
-				AccountID: accID,
+				ConsentID: uuid.MustParse(consentID),
+				AccountID: uuid.MustParse(accID),
 				UserID:    acc.UserID,
 				Status:    status,
 				OrgID:     acc.OrgID,

@@ -90,6 +90,10 @@ func (c Consent) URN() string {
 	return consent.URN(c.ID)
 }
 
+func (c Consent) IsAwaitingAuthorization() bool {
+	return c.Status == ConsentStatusAwaitingAuthorization
+}
+
 type ConsentStatus string
 
 const (

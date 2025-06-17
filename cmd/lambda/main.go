@@ -144,7 +144,7 @@ func init() {
 	paymentService := payment.NewService(db, userService, accountService)
 	autoPaymentService := autopayment.NewService(db, userService, accountService)
 
-	op, err := openidProvider(db, opSigner, userService, consentService, accountService, paymentService)
+	op, err := openidProvider(db, opSigner, userService, consentService, accountService, paymentService, autoPaymentService)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -297,6 +297,7 @@ func openidProvider(
 	consentService consent.Service,
 	accountService account.Service,
 	paymentService payment.Service,
+	autoPaymentService autopayment.Service,
 ) (
 	*provider.Provider,
 	error,
@@ -368,10 +369,7 @@ func openidProvider(
 		provider.WithIDTokenSignatureAlgs(goidc.PS256),
 		provider.WithIDTokenEncryption(goidc.RSA_OAEP),
 		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(op, consentService, paymentService)),
-		provider.WithPolicies(
-			oidc.PaymentPolicy(AuthHost, userService, paymentService, accountService),
-			oidc.ConsentPolicy(AuthHost, userService, consentService, accountService),
-		),
+		provider.WithPolicies(oidc.Policies(AuthHost, userService, consentService, accountService, paymentService, autoPaymentService)...),
 		provider.WithNotifyErrorFunc(oidc.LogError),
 		provider.WithDCR(oidc.DCRFunc(oidc.DCRConfig{
 			Scopes:       scopes,

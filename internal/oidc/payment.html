@@ -90,44 +90,10 @@
       <div class="info-label">CPF</div>
       <div class="info-value">{{ .UserCPF }}</div>
     </div>
-    {{ if .DebtorAccount }}
+    {{ if .Consent.DebtorAccount }}
     <div class="info-row">
       <div class="info-label">Debtor Account</div>
-      <div class="info-value">Branch 0001, Number {{ .DebtorAccount.Number }}</div>
-    </div>
-    {{ end }}
-
-    <div class="section-title">To</div>
-    <div class="info-row">
-      <div class="info-label">Name</div>
-      <div class="info-value">{{ .CreditorName }}</div>
-    </div>
-    <div class="info-row">
-      <div class="info-label">CPF/CNPJ</div>
-      <div class="info-value">{{ .CreditorCPFCNPJ }}</div>
-    </div>
-    <div class="info-row">
-      <div class="info-label">Bank ISPB</div>
-      <div class="info-value">{{ .CreditorAccountISBP }}</div>
-    </div>
-    <div class="info-row">
-      <div class="info-label">Branch</div>
-      <div class="info-value">{{ .CreditorAccountIssuer }}</div>
-    </div>
-    <div class="info-row">
-      <div class="info-label">Account Number</div>
-      <div class="info-value">{{ .CreditorAccountNumber }}</div>
-    </div>
-
-    <div class="section-title">Payment Details</div>
-    <div class="info-row">
-      <div class="info-label">Amount</div>
-      <div class="info-value">{{ .PaymentCurrency }} {{ .PaymentAmount }}</div>
-    </div>
-    {{ if .PaymentDate }}
-    <div class="info-row">
-      <div class="info-label">Date</div>
-      <div class="info-value">{{ .PaymentDate.Format "2006-01-02" }}</div>
+      <div class="info-value">Branch 0001, Number {{ .Consent.DebtorAccount.Number }}</div>
     </div>
     {{ end }}
 

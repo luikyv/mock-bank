@@ -4,11 +4,13 @@ package autopaymentv2
 import (
 	"context"
 	"crypto"
+	"errors"
 	"net/http"
 
 	"github.com/luiky/mock-bank/internal/account"
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/autopayment"
+	"github.com/luiky/mock-bank/internal/errorutil"
 	"github.com/luiky/mock-bank/internal/idempotency"
 	"github.com/luiky/mock-bank/internal/jwtutil"
 	"github.com/luiky/mock-bank/internal/oidc"
@@ -414,5 +416,50 @@ func (s Server) AutomaticPaymentsPatchRecurringConsentsConsentID(ctx context.Con
 }
 
 func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, autopayment.ErrInvalidEndToEndID) {
+		api.WriteError(w, r, api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, autopayment.ErrInvalidPayment) {
+		api.WriteError(w, r, api.NewError("DETALHE_PAGAMENTO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, autopayment.ErrPaymentDoesNotMatchConsent) {
+		api.WriteError(w, r, api.NewError("PAGAMENTO_DIVERGENTE_CONSENTIMENTO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, autopayment.ErrInvalidDate) {
+		api.WriteError(w, r, api.NewError("DATA_PAGAMENTO_INVALIDA", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, autopayment.ErrMissingValue) {
+		api.WriteError(w, r, api.NewError("PARAMETRO_NAO_INFORMADO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, autopayment.ErrCancelNotAllowed) {
+		api.WriteError(w, r, api.NewError("PAGAMENTO_NAO_PERMITE_CANCELAMENTO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, autopayment.ErrConsentNotAuthorized) {
+		api.WriteError(w, r, api.NewError("CONSENTIMENTO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, autopayment.ErrInvalidData) {
+		api.WriteError(w, r, api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.As(err, &errorutil.Error{}) {
+		api.WriteError(w, r, api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
 	api.WriteError(w, r, err)
 }
