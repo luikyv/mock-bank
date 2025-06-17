@@ -58,7 +58,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, autopayment.Scope)
 	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, autopayment.ScopeConsentID)
 	swaggerMiddleware, swaggerVersion := api.SwaggerMiddleware(GetSwagger, "PARAMETRO_INVALIDO")
-	xvMiddleware := api.XVMiddleware(swaggerVersion)
+	xvMiddleware := api.VersionMiddleware(swaggerVersion)
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{

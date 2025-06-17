@@ -114,6 +114,7 @@ func (p paymentPolicy) chooseAccount(w http.ResponseWriter, r *http.Request, as 
 		}
 
 		slog.InfoContext(r.Context(), "rendering account page", "accounts", accs)
+		// TODO: Make this a struct.
 		return p.executeTemplate(w, r, "account", map[string]any{
 			"CallbackID": as.CallbackID,
 			"Accounts":   accs,

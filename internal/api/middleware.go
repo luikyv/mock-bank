@@ -53,10 +53,10 @@ func SwaggerMiddleware(getSwagger func() (*openapi3.T, error), errCode string) (
 	}), spec.Info.Version
 }
 
-func XVMiddleware(version string) func(http.Handler) http.Handler {
+func VersionMiddleware(v string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-V", version)
+			w.Header().Set("X-V", v)
 			next.ServeHTTP(w, r)
 		})
 	}
