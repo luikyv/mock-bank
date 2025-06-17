@@ -1,0 +1,80 @@
+overlay: 1.0.0
+info:
+  title: Overlay
+  version: 0.0.0
+actions:
+
+- target: $.components.schemas[*].properties.meta
+  update:
+    x-go-type: api.Meta
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/api
+- target: $.components.schemas[*].properties.meta.$ref
+  remove: true
+
+- target: $.components.schemas[*].properties.links
+  update:
+    x-go-type: api.Links
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/api
+- target: $.components.schemas[*].properties.links.$ref
+  remove: true
+
+- target: $..[*][?(@.format == "date")]
+  update:
+    x-go-type: timeutil.BrazilDate
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/timeutil
+
+- target: $..[*][?(@.format == "date-time")]
+  update:
+    x-go-type: timeutil.DateTime
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/timeutil2
+
+- target: $.components.schemas.RecurringConfiguration
+  update:
+    x-go-type: autopayment.Configuration
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/autopayment
+- target: $.components.schemas.CreateRecurringConsent.properties.data.properties.recurringConfiguration
+  update:
+    x-go-type: autopayment.Configuration
+    x-go-type-import:
+      path: github.com/luiky/mock-bank/internal/autopayment
+
+- target: $.components.parameters.originalRecurringPaymentId
+  update:
+    x-go-name: ParameterOriginalRecurringPaymentId
+
+- target: $.components.responses[*].headers.x-fapi-interaction-id
+  remove: true
+
+- target: $.components.responses[*].headers.x-v
+  remove: true
+
+- target: $.components.parameters.XIdempotencyKey.schema.pattern
+  remove: true
+
+- target: $.paths./recurring-consents.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./recurring-consents.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/CreateRecurringConsent'
+- target: $.components.responses.RecurringConsentsPost.content.application/jwt
+  remove: true
+- target: $.components.responses.RecurringConsentsPost.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponsePostRecurringConsent'
+
+- target: $.components.responses.RecurringConsentsConsentId.content.application/jwt
+  remove: true
+- target: $.components.responses.RecurringConsentsConsentId.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponseRecurringConsent'

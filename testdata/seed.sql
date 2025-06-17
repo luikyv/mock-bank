@@ -12,7 +12,7 @@ INSERT INTO oauth_clients (
     "grant_types": ["authorization_code", "client_credentials", "implicit", "refresh_token"],
     "response_types": ["code id_token"],
     "jwks_uri": "https://keystore.local/00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111/application.jwks",
-    "scope": "openid consents consent resources accounts payments",
+    "scope": "openid consents consent resources accounts payments recurring-payments recurring-consent",
     "id_token_encrypted_response_alg": "RSA-OAEP",
     "id_token_encrypted_response_enc": "A256GCM",
     "token_endpoint_auth_method": "private_key_jwt",

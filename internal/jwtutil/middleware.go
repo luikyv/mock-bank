@@ -99,8 +99,9 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 			return
 		}
 
-		// Delete the 'jti' claim to ensure idempotency.
-		delete(claims, "jti")
+		claims = map[string]any{
+			"data": claims["data"],
+		}
 
 		jsonBytes, err := json.Marshal(claims)
 		if err != nil {

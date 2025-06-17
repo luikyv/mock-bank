@@ -28,10 +28,12 @@ import (
 	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luiky/mock-bank/internal/api/accountv2"
 	"github.com/luiky/mock-bank/internal/api/app"
+	"github.com/luiky/mock-bank/internal/api/autopaymentv2"
 	"github.com/luiky/mock-bank/internal/api/consentv3"
 	oidcapi "github.com/luiky/mock-bank/internal/api/oidc"
 	"github.com/luiky/mock-bank/internal/api/paymentv4"
 	"github.com/luiky/mock-bank/internal/api/resourcev3"
+	"github.com/luiky/mock-bank/internal/autopayment"
 	"github.com/luiky/mock-bank/internal/consent"
 	"github.com/luiky/mock-bank/internal/directory"
 	"github.com/luiky/mock-bank/internal/idempotency"
@@ -140,6 +142,7 @@ func init() {
 	resouceService := resource.NewService(db)
 	accountService := account.NewService(db)
 	paymentService := payment.NewService(db, userService, accountService)
+	autoPaymentService := autopayment.NewService(db, userService, accountService)
 
 	op, err := openidProvider(db, opSigner, userService, consentService, accountService, paymentService)
 	if err != nil {
@@ -155,6 +158,7 @@ func init() {
 	resourcev3.NewServer(APIMTLSHost, resouceService, consentService, op).RegisterRoutes(mux)
 	accountv2.NewServer(APIMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
 	paymentv4.NewServer(APIMTLSHost, paymentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
+	autopaymentv2.NewServer(APIMTLSHost, autoPaymentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 
 	Handler = middleware(mux)
 }
@@ -316,6 +320,8 @@ func openidProvider(
 		// ScopeExchanges,
 		resource.Scope,
 		payment.Scope,
+		autopayment.ScopeConsentID,
+		autopayment.Scope,
 	}
 
 	op, err := provider.New(goidc.ProfileFAPI1, AuthHost, func(_ context.Context) (goidc.JSONWebKeySet, error) {

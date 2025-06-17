@@ -34,11 +34,12 @@ func FAPIIDMiddleware(opts *Options) func(http.Handler) http.Handler {
 	}
 }
 
-func SwaggerMiddleware(getSwagger func() (*openapi3.T, error), errCode string) func(http.Handler) http.Handler {
+func SwaggerMiddleware(getSwagger func() (*openapi3.T, error), errCode string) (middleware func(http.Handler) http.Handler, version string) {
 	spec, err := getSwagger()
 	if err != nil {
 		panic(err)
 	}
+
 	return netmiddleware.OapiRequestValidatorWithOptions(spec, &netmiddleware.Options{
 		DoNotValidateServers: true,
 		Options: openapi3filter.Options{
@@ -49,5 +50,14 @@ func SwaggerMiddleware(getSwagger func() (*openapi3.T, error), errCode string) f
 		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts netmiddleware.ErrorHandlerOpts) {
 			WriteError(w, r, NewError(errCode, http.StatusUnprocessableEntity, err.Error()))
 		},
-	})
+	}), spec.Info.Version
+}
+
+func XVMiddleware(version string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-V", version)
+			next.ServeHTTP(w, r)
+		})
+	}
 }

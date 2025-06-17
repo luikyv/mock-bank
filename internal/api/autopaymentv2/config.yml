@@ -7,4 +7,3 @@ output-options:
   name-normalizer: ToCamelCaseWithInitialisms
   overlay:
     path: ./overlay.yml
-    strict: false

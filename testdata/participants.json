@@ -132,6 +132,32 @@
                                 "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/pix/payments/consents/{consentId}"
                             }
                         ]
+                    },
+                    {
+                        "ApiFamilyType": "payments-recurring-consents",
+                        "ApiVersion": "2.0.0",
+                        "Status": "Active",
+                        "ApiDiscoveryEndpoints": [
+                            {
+                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/recurring-consents"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+                            }
+                        ]
+                    },
+                    {
+                        "ApiFamilyType": "payments-pix-recurring-payments",
+                        "ApiVersion": "2.0.0",
+                        "Status": "Active",
+                        "ApiDiscoveryEndpoints": [
+                            {
+                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/pix/recurring-payments"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}"
+                            }
+                        ]
                     }
                 ]
             }

@@ -32,7 +32,7 @@ func NewService(db *gorm.DB, userService user.Service, accountService account.Se
 	return Service{db: db, userService: userService, accountService: accountService}
 }
 
-func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *DebtorAccount) error {
+func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *Account) error {
 	if err := s.validateConsent(ctx, c, debtorAcc); err != nil {
 		return err
 	}
@@ -279,8 +279,8 @@ func (s Service) createConsent(ctx context.Context, c *Consent) error {
 	return s.db.WithContext(ctx).Create(c).Error
 }
 
-func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *DebtorAccount) error {
-	if debtorAccount != nil && c.CreditorAccount.ISBP == debtorAccount.ISBP && c.CreditorAccount.Number == debtorAccount.Number {
+func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *Account) error {
+	if debtorAccount != nil && c.CreditorAccountISBP == debtorAccount.ISPB && c.CreditorAccountNumber == debtorAccount.Number {
 		return ErrCreditorAndDebtorAccountsAreEqual
 	}
 
@@ -370,8 +370,15 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *D
 	if slices.Contains([]AccountType{
 		AccountTypeCACC,
 		AccountTypeSVGS,
-	}, c.CreditorAccount.Type) && c.CreditorAccount.Issuer == nil {
+	}, c.CreditorAccountType) && c.CreditorAccountIssuer == nil {
 		return errorutil.New("creditor account issuer is required for account types CACC or SVGS")
+	}
+
+	if slices.Contains([]AccountType{
+		AccountTypeCACC,
+		AccountTypeSVGS,
+	}, debtorAccount.Type) && debtorAccount.Issuer == nil {
+		return errorutil.New("debtor account issuer is required for account types CACC or SVGS")
 	}
 
 	return nil
@@ -486,19 +493,19 @@ func (s Service) validatePayments(_ context.Context, c *Consent, payments []*Pay
 			return errorutil.Format("%w: currency does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
 		}
 
-		if p.CreditorAccount.ISBP != c.CreditorAccount.ISBP {
+		if p.CreditorAccountISBP != c.CreditorAccountISBP {
 			return errorutil.Format("%w: creditor account isbp does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
 		}
 
-		if !reflect.DeepEqual(p.CreditorAccount.Issuer, c.CreditorAccount.Issuer) {
+		if !reflect.DeepEqual(p.CreditorAccountIssuer, c.CreditorAccountIssuer) {
 			return errorutil.Format("%w: creditor account issuer does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
 		}
 
-		if p.CreditorAccount.Number != c.CreditorAccount.Number {
+		if p.CreditorAccountNumber != c.CreditorAccountNumber {
 			return errorutil.Format("%w: creditor account number does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
 		}
 
-		if p.CreditorAccount.Type != c.CreditorAccount.Type {
+		if p.CreditorAccountType != c.CreditorAccountType {
 			return errorutil.Format("%w: creditor account type does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
 		}
 

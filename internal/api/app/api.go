@@ -57,7 +57,7 @@ func NewServer(
 
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
-	swaggerMiddleware := api.SwaggerMiddleware(GetSwagger, "PARAMETRO_INVALIDO")
+	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, "PARAMETRO_INVALIDO")
 	secureMiddleware := secure.New(secure.Options{
 		STSSeconds:            31536000,
 		STSIncludeSubdomains:  true,

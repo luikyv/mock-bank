@@ -8,6 +8,9 @@ mock backend: https://matls-api.mockbank.local
 
 ## TODO
 
+- Companies.
+- Remove descriptions.
+- Save orgs.
 - Allow setting the currency.
 - Set up new orgs.
 - What's happening with created_at?
