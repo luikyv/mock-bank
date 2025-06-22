@@ -90,15 +90,31 @@
       <div class="info-label">CPF</div>
       <div class="info-value">{{ .UserCPF }}</div>
     </div>
-    {{ if .Consent.DebtorAccount }}
-    <div class="info-row">
-      <div class="info-label">Debtor Account</div>
-      <div class="info-value">Branch 0001, Number {{ .Consent.DebtorAccount.Number }}</div>
-    </div>
-    {{ end }}
 
     <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
       <input type="hidden" name="consent" value="true" />
+
+      {{ if .Account }}
+      <input type="hidden" name="account" value="{{ .Account.ID }}" />
+      <div class="info-row">
+        <div class="info-label">Account</div>
+        <div class="info-value">Branch 0001, Number {{ .Account.Number }}</div>
+      </div>
+      {{ else }}
+      <div class="info-row">
+        <div class="info-label">Choose Account</div>
+        <div class="info-value">
+          <select name="account" required style="width: 100%; padding: 0.5rem;">
+            {{ range .Accounts }}
+            <option value="{{ .ID }}">
+              Branch 0001, Number {{ .Number }}
+            </option>
+            {{ end }}
+          </select>
+        </div>
+      </div>
+      {{ end }}
+
       <button type="submit" class="consent-button">Consent and Continue</button>
     </form>
 

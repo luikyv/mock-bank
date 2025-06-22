@@ -17,9 +17,7 @@ const (
 	DefaultCompeCode    string = "001"
 	DefaultBranch       string = "0001"
 	DefaultCheckDigit   string = "1"
-	IDLength            int    = 50
 	TransactionIDLength int    = 80
-	numberBytes                = "0123456789"
 	letterBytes                = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 )
 

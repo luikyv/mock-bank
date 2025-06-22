@@ -117,15 +117,6 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 	return c, nil
 }
 
-func (s Service) RejectConsent(ctx context.Context, id, orgID string, code ConsentRejectionReasonCode, detail string) error {
-	c, err := s.Consent(ctx, id, orgID)
-	if err != nil {
-		return err
-	}
-
-	return s.rejectConsent(ctx, c, code, detail)
-}
-
 func (s Service) CreatePayments(ctx context.Context, payments []*Payment) error {
 
 	firstPayment := payments[0]
@@ -404,26 +395,26 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 	case ConsentStatusAwaitingAuthorization:
 		if c.IsExpired() {
 			slog.DebugContext(ctx, "payment consent awaiting authorization for too long, moving to rejected")
-			return s.rejectConsent(ctx, c, ConsentRejectionAuthorizationTimeout, "consent awaiting authorization for too long")
+			return s.RejectConsent(ctx, c, ConsentRejectionAuthorizationTimeout, "consent awaiting authorization for too long")
 		}
 
 		switch c.PaymentAmount {
 		case "300.01":
-			return s.rejectConsent(ctx, c, ConsentRejectionInvalidAmount, "forced rejection")
+			return s.RejectConsent(ctx, c, ConsentRejectionInvalidAmount, "forced rejection")
 		case "300.02":
-			return s.rejectConsent(ctx, c, ConsentRejectionNotProvided, "forced rejection")
+			return s.RejectConsent(ctx, c, ConsentRejectionNotProvided, "forced rejection")
 		case "300.03":
-			return s.rejectConsent(ctx, c, ConsentRejectionInfrastructureFailure, "forced rejection")
+			return s.RejectConsent(ctx, c, ConsentRejectionInfrastructureFailure, "forced rejection")
 		case "300.04":
-			return s.rejectConsent(ctx, c, ConsentRejectionConsumptionTimeout, "forced rejection")
+			return s.RejectConsent(ctx, c, ConsentRejectionConsumptionTimeout, "forced rejection")
 		case "300.05":
-			return s.rejectConsent(ctx, c, ConsentRejectionAccountDoesNotAllowPayment, "forced rejection")
+			return s.RejectConsent(ctx, c, ConsentRejectionAccountDoesNotAllowPayment, "forced rejection")
 		case "300.06":
-			return s.rejectConsent(ctx, c, ConsentRejectionInsufficientFunds, "forced rejection")
+			return s.RejectConsent(ctx, c, ConsentRejectionInsufficientFunds, "forced rejection")
 		case "300.07":
-			return s.rejectConsent(ctx, c, ConsentRejectionAmountAboveLimit, "forced rejection")
+			return s.RejectConsent(ctx, c, ConsentRejectionAmountAboveLimit, "forced rejection")
 		case "300.08":
-			return s.rejectConsent(ctx, c, ConsentRejectionInvalidQRCode, "forced rejection")
+			return s.RejectConsent(ctx, c, ConsentRejectionInvalidQRCode, "forced rejection")
 		default:
 			return nil
 		}
@@ -431,7 +422,7 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 	case ConsentStatusAuthorized:
 		if c.IsExpired() {
 			slog.DebugContext(ctx, "payment consent reached expiration, moving to rejected")
-			return s.rejectConsent(ctx, c, ConsentRejectionConsumptionTimeout, "payment consent authorization reached expiration")
+			return s.RejectConsent(ctx, c, ConsentRejectionConsumptionTimeout, "payment consent authorization reached expiration")
 		}
 		return nil
 	default:
@@ -439,7 +430,7 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 	}
 }
 
-func (s Service) rejectConsent(ctx context.Context, c *Consent, code ConsentRejectionReasonCode, detail string) error {
+func (s Service) RejectConsent(ctx context.Context, c *Consent, code ConsentRejectionReasonCode, detail string) error {
 	if c.Status == ConsentStatusRejected {
 		return ErrConsentAlreadyRejected
 	}

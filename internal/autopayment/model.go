@@ -240,7 +240,7 @@ const (
 	ConsentRejectionAccountDoesNotAllowPayment  ConsentRejectionCode = "CONTA_NAO_PERMITE_PAGAMENTO"
 	ConsentRejectionInsufficientFunds           ConsentRejectionCode = "SALDO_INSUFICIENTE"
 	ConsentRejectionAmountAboveLimit            ConsentRejectionCode = "VALOR_ACIMA_LIMITE"
-	ConsentRejectionInvalidQRCode               ConsentRejectionCode = "AUTENTICACAO_DIVERGENTE"
+	ConsentRejectionAuthenticationMismatch                           = "AUTENTICACAO_DIVERGENTE"
 )
 
 type ConsentRevocation struct {

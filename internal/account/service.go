@@ -21,12 +21,17 @@ func NewService(db *gorm.DB) Service {
 	return Service{db: db}
 }
 
+func (s Service) WithTx(tx *gorm.DB) Service {
+	return NewService(tx)
+}
+
 func (s Service) Authorize(ctx context.Context, accIDs []string, consentID, orgID string) error {
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		txService := s.WithTx(tx)
 		for _, accID := range accIDs {
-			var acc Account
-			if err := tx.First(&acc, "id = ? AND org_id = ?", accID, orgID).Error; err != nil {
-				return fmt.Errorf("account %s not found: %w", accID, err)
+			acc, err := txService.Account(ctx, accID, orgID)
+			if err != nil {
+				return err
 			}
 
 			status := resource.StatusAvailable
@@ -34,7 +39,7 @@ func (s Service) Authorize(ctx context.Context, accIDs []string, consentID, orgI
 				status = resource.StatusPendingAuthorization
 			}
 
-			if err := s.createConsent(ctx, &ConsentAccount{
+			if err := txService.createConsent(ctx, &ConsentAccount{
 				ConsentID: uuid.MustParse(consentID),
 				AccountID: uuid.MustParse(accID),
 				UserID:    acc.UserID,
@@ -110,6 +115,19 @@ func (s Service) AccountByNumber(ctx context.Context, number, orgID string) (*Ac
 	acc := &Account{}
 	if err := s.db.WithContext(ctx).
 		Where("number = ? AND org_id = ?", number, orgID).
+		First(acc).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("could not fetch account: %w", err)
+	}
+	return acc, nil
+}
+
+func (s Service) Account(ctx context.Context, id, orgID string) (*Account, error) {
+	acc := &Account{}
+	if err := s.db.WithContext(ctx).
+		Where("id = ? AND org_id = ?", id, orgID).
 		First(acc).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound

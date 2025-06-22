@@ -1031,6 +1031,11 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
+	if errors.Is(err, autopayment.ErrInvalidEdition) {
+		api.WriteError(w, r, api.NewError("DETALHE_EDICAO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
 	if errors.As(err, &errorutil.Error{}) {
 		api.WriteError(w, r, api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
 		return

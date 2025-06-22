@@ -26,7 +26,7 @@ var (
 type Consent struct {
 	ID                     uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Status                 Status
-	Permissions            []Permission `gorm:"serializer:json"`
+	Permissions            Permissions `gorm:"serializer:json"`
 	StatusUpdatedAt        timeutil.DateTime
 	ExpiresAt              *timeutil.DateTime
 	UserID                 *uuid.UUID

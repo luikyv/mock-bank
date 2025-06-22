@@ -33,7 +33,7 @@ func NewService(db *gorm.DB, userService user.Service, accountService account.Se
 }
 
 func (s Service) WithTx(tx *gorm.DB) Service {
-	return Service{db: tx, userService: s.userService, accountService: s.accountService}
+	return NewService(tx, s.userService, s.accountService)
 }
 
 func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payment.Account) error {
@@ -92,18 +92,6 @@ func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
 	return s.updateConsentStatus(ctx, c, ConsentStatusAuthorized)
 }
 
-func (s Service) UpdateDebtorAccount(ctx context.Context, consentID, accountID, orgID string) error {
-	c, err := s.Consent(ctx, consentID, orgID)
-	if err != nil {
-		return err
-	}
-
-	accID := uuid.MustParse(accountID)
-	c.DebtorAccountID = &accID
-	c.UpdatedAt = timeutil.DateTimeNow()
-	return s.db.WithContext(ctx).Save(c).Error
-}
-
 func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error) {
 	id = strings.TrimPrefix(id, consent.URNPrefix)
 	c := &Consent{}
@@ -125,17 +113,16 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 	return c, nil
 }
 
-func (s Service) RejectConsent(ctx context.Context, id, orgID string, rejection ConsentRejection) (*Consent, error) {
-	c, err := s.Consent(ctx, id, orgID)
-	if err != nil {
-		return nil, err
+func (s Service) RejectConsent(ctx context.Context, c *Consent, rejection ConsentRejection) error {
+	if !slices.Contains([]ConsentStatus{
+		ConsentStatusAwaitingAuthorization,
+		ConsentStatusPartiallyAccepted,
+	}, c.Status) {
+		return ErrCannotRejectConsent
 	}
 
-	if err := s.rejectConsent(ctx, c, rejection); err != nil {
-		return nil, err
-	}
-
-	return c, nil
+	c.Rejection = &rejection
+	return s.updateConsentStatus(ctx, c, ConsentStatusRejected)
 }
 
 func (s Service) RevokeConsent(ctx context.Context, id, orgID string, revocation ConsentRevocation) (*Consent, error) {
@@ -208,17 +195,27 @@ func (s Service) validateConsentEdition(_ context.Context, c *Consent, edition C
 		return errorutil.New("edition is only allowed for automatic pix")
 	}
 
+	if edition.LoggedUser.Identification != c.UserIdentification {
+		return errorutil.Format("%w: logged user identification doesn't match the consent", ErrInvalidEdition)
+	}
+
 	if edition.RiskSignals == nil {
-		return errorutil.New("edition risk signals are required for automatic pix edition")
+		return errorutil.Format("%w: edition risk signals are required for automatic pix edition", ErrInvalidEdition)
 	}
 
 	if len(edition.Creditors) != 1 {
 		return errorutil.New("only one creditor is allowed for automatic pix edition")
 	}
 
-	now := timeutil.DateTimeNow()
-	if edition.ExpiresAt != nil && edition.ExpiresAt.Before(now) {
-		return errorutil.New("edition expiration cannot be in the past")
+	if edition.ExpiresAt != nil && edition.ExpiresAt.Before(timeutil.DateTimeNow()) {
+		return errorutil.Format("%w: edition expiration cannot be in the past", ErrInvalidEdition)
+	}
+
+	if c.Configuration.Automatic.FixedAmount != nil &&
+		edition.RecurringConfiguration != nil &&
+		edition.RecurringConfiguration.Automatic != nil &&
+		edition.RecurringConfiguration.Automatic.MaximumVariableAmount != nil {
+		return errorutil.Format("%w: maximum variable amount is not allowed for fixed amount consents", ErrInvalidEdition)
 	}
 
 	return nil
@@ -474,7 +471,7 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 		now := timeutil.DateTimeNow()
 		if now.After(c.CreatedAt.Add(60 * time.Minute).Time) {
 			slog.DebugContext(ctx, "recurring consent awaiting authorization for too long, moving to rejected")
-			return s.rejectConsent(ctx, c, ConsentRejection{
+			return s.RejectConsent(ctx, c, ConsentRejection{
 				By:     TerminatedByHolder,
 				From:   TerminatedFromHolder,
 				Code:   ConsentRejectionAuthorizationTimeout,
@@ -490,18 +487,6 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 	}
 
 	return nil
-}
-
-func (s Service) rejectConsent(ctx context.Context, c *Consent, rejection ConsentRejection) error {
-	if !slices.Contains([]ConsentStatus{
-		ConsentStatusAwaitingAuthorization,
-		ConsentStatusPartiallyAccepted,
-	}, c.Status) {
-		return ErrCannotRejectConsent
-	}
-
-	c.Rejection = &rejection
-	return s.updateConsentStatus(ctx, c, ConsentStatusRejected)
 }
 
 func (s Service) revokeConsent(ctx context.Context, c *Consent, revocation ConsentRevocation) error {
