@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/luiky/mock-bank/internal/directory"
-	"github.com/luiky/mock-bank/internal/timeutil"
+	"github.com/luikyv/mock-bank/internal/directory"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -31,7 +31,7 @@ func (s Service) CreateSession(ctx context.Context) (session *Session, authURL s
 
 	session = &Session{
 		CodeVerifier: codeVerifier,
-		ExpiresAt:    timeutil.Now().Add(10 * time.Minute),
+		ExpiresAt:    timeutil.DateTimeNow().Add(10 * time.Minute),
 	}
 	if err := s.db.WithContext(ctx).Create(&session).Error; err != nil {
 		return nil, "", fmt.Errorf("could not create session: %w", err)
@@ -52,7 +52,6 @@ func (s Service) AuthorizeSession(ctx context.Context, sessionID, authCode strin
 	}
 
 	session.Username = idTkn.Sub
-	session.CreatedAt = timeutil.Now()
 	session.ExpiresAt = session.CreatedAt.Add(1 * time.Hour)
 	session.CodeVerifier = ""
 	session.Organizations = Organizations{}

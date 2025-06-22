@@ -18,8 +18,7 @@ func New[T any](records []T, pagination Pagination, totalRecords int) Page[T] {
 	return Page[T]{
 		Records:      records,
 		TotalRecords: totalRecords,
-		// Calculate the total number of pages using integer division.
-		// Adding (pagination.Size - 1) ensures correct rounding up for partial pages.
+		// Adding (pagination.Size - 1) ensures a correct rounding up for partial pages.
 		TotalPages: (totalRecords + pagination.Size - 1) / pagination.Size,
 		Pagination: pagination,
 	}

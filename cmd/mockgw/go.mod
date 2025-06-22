@@ -1,4 +1,4 @@
-module github.com/luiky/mock-bank/cmd/mockgw
+module github.com/luikyv/mock-bank/cmd/mockgw
 
 go 1.24.2
 

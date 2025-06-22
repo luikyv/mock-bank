@@ -7,7 +7,18 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	"github.com/luikyv/mock-bank/internal/api/accountv2"
+	"github.com/luikyv/mock-bank/internal/api/app"
+	"github.com/luikyv/mock-bank/internal/api/autopaymentv2"
+	"github.com/luikyv/mock-bank/internal/api/consentv3"
+	oidcapi "github.com/luikyv/mock-bank/internal/api/oidc"
+	"github.com/luikyv/mock-bank/internal/api/paymentv4"
+	"github.com/luikyv/mock-bank/internal/api/resourcev3"
+	"github.com/luikyv/mock-bank/internal/directory"
+	"github.com/luikyv/mock-bank/internal/idempotency"
+	"github.com/luikyv/mock-bank/internal/session"
 	"log"
 	"log/slog"
 	"net/http"
@@ -22,29 +33,19 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	httpadapter "github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
+	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/account"
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/api/accountv2"
-	"github.com/luiky/mock-bank/internal/api/app"
-	"github.com/luiky/mock-bank/internal/api/autopaymentv2"
-	"github.com/luiky/mock-bank/internal/api/consentv3"
-	oidcapi "github.com/luiky/mock-bank/internal/api/oidc"
-	"github.com/luiky/mock-bank/internal/api/paymentv4"
-	"github.com/luiky/mock-bank/internal/api/resourcev3"
-	"github.com/luiky/mock-bank/internal/autopayment"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/directory"
-	"github.com/luiky/mock-bank/internal/idempotency"
-	"github.com/luiky/mock-bank/internal/oidc"
-	"github.com/luiky/mock-bank/internal/payment"
-	"github.com/luiky/mock-bank/internal/resource"
-	"github.com/luiky/mock-bank/internal/session"
-	"github.com/luiky/mock-bank/internal/timeutil"
-	"github.com/luiky/mock-bank/internal/user"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
+	"github.com/luikyv/mock-bank/internal/account"
+	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/autopayment"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/oidc"
+	"github.com/luikyv/mock-bank/internal/payment"
+	"github.com/luikyv/mock-bank/internal/resource"
+	"github.com/luikyv/mock-bank/internal/timeutil"
+	"github.com/luikyv/mock-bank/internal/user"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -89,14 +90,13 @@ var (
 	AWSEndpoint                         = getEnv("AWS_ENDPOINT_URL", "http://localhost:4566")
 )
 
-var Handler http.Handler
+func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-// TODO: Do I need this?
-func init() {
-	ctx := context.Background()
-
-	http.DefaultClient = httpClient()
 	slog.SetDefault(logger())
+	slog.Info("setting up mock bank", "env", Env)
+	http.DefaultClient = httpClient()
 	awsConfig := awsConfig(ctx)
 
 	// Database.
@@ -160,20 +160,36 @@ func init() {
 	paymentv4.NewServer(APIMTLSHost, paymentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 	autopaymentv2.NewServer(APIMTLSHost, autoPaymentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 
-	Handler = middleware(mux)
-}
+	handler := middleware(mux)
 
-func main() {
-	slog.Info("starting mock bank", slog.String("env", string(Env)))
+	slog.Info("starting mock bank")
+
+	go func() {
+		ticker := time.NewTicker(time.Second * 10)
+		for {
+			select {
+			case <-ctx.Done():
+				slog.InfoContext(ctx, "finished polling recurring payments")
+				return
+			case <-ticker.C:
+				slog.InfoContext(ctx, "polling recurring payments")
+				if _, err := autoPaymentService.Payments(ctx, OrgID, nil); err != nil {
+					slog.ErrorContext(ctx, "error polling the recurring payments", "error", err)
+				}
+			}
+		}
+
+	}()
 
 	if !Env.IsAWS() {
-		if err := http.ListenAndServe(":"+Port, Handler); err != nil && err != http.ErrServerClosed {
+		if err := http.ListenAndServe(":"+Port, handler); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
 		}
+
 		return
 	}
 
-	lambdaAdapter := httpadapter.NewV2(Handler)
+	lambdaAdapter := httpadapter.NewV2(handler)
 	lambda.Start(lambdaAdapter.ProxyWithContext)
 }
 
@@ -206,14 +222,14 @@ func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, err
 		secret.SSLMode = "require"
 	}
 
-	dsn := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s connect_timeout=5",
-		secret.Host, secret.Port, secret.Username, secret.Password, secret.DBName, secret.SSLMode,
-	)
+	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s connect_timeout=5",
+		secret.Host, secret.Port, secret.Username, secret.Password, secret.DBName, secret.SSLMode)
 
 	slog.Info("connecting to database")
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		NowFunc: timeutil.Now,
+		NowFunc: func() time.Time {
+			return timeutil.DateTimeNow().Time
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
@@ -339,7 +355,7 @@ func openidProvider(
 		return nil, err
 	}
 
-	opts := []provider.ProviderOption{
+	opts := []provider.Option{
 		provider.WithClientStorage(oidc.NewClientManager(db)),
 		provider.WithAuthnSessionStorage(oidc.NewAuthnSessionManager(db)),
 		provider.WithGrantSessionStorage(oidc.NewGrantSessionManager(db)),
@@ -350,13 +366,13 @@ func openidProvider(
 		provider.WithTokenOptions(oidc.TokenOptionsFunc()),
 		provider.WithAuthorizationCodeGrant(),
 		provider.WithImplicitGrant(),
-		provider.WithRefreshTokenGrant(oidc.ShoudIssueRefreshToken, 600),
+		provider.WithRefreshTokenGrant(oidc.ShouldIssueRefreshTokenFunc(), 600),
 		provider.WithClientCredentialsGrant(),
 		provider.WithTokenAuthnMethods(goidc.ClientAuthnPrivateKeyJWT),
 		provider.WithPrivateKeyJWTSignatureAlgs(goidc.PS256),
 		provider.WithMTLS(AuthMTLSHost, oidc.ClientCert),
 		provider.WithTLSCertTokenBindingRequired(),
-		provider.WithPAR(60),
+		provider.WithPAR(oidc.HandlePARSessionFunc(), 60),
 		provider.WithJAR(goidc.PS256),
 		provider.WithJAREncryption(goidc.RSA_OAEP),
 		provider.WithJARContentEncryptionAlgs(goidc.A256GCM),
@@ -472,7 +488,7 @@ func middleware(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, api.CtxKeyCorrelationID, uuid.NewString())
 		slog.InfoContext(ctx, "request received", "method", r.Method, "path", r.URL.Path, "url", r.URL.String())
 
-		start := timeutil.Now()
+		start := timeutil.DateTimeNow()
 		defer func() {
 			if rec := recover(); rec != nil {
 				slog.Error("panic recovered", "error", rec, "stack", string(debug.Stack()))
@@ -480,7 +496,7 @@ func middleware(next http.Handler) http.Handler {
 			}
 		}()
 		defer func() {
-			slog.InfoContext(ctx, "request completed", slog.Duration("duration", time.Since(start)))
+			slog.InfoContext(ctx, "request completed", slog.Duration("duration", time.Since(start.Time)))
 		}()
 
 		r = r.WithContext(ctx)

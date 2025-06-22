@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/timeutil"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 func URN(id uuid.UUID) string {
@@ -66,11 +66,11 @@ func validateExtension(c *Consent, ext *Extension) error {
 		return ErrCannotExtendConsentNotAuthorized
 	}
 
-	if c.UserCPF != ext.UserCPF {
+	if c.UserIdentification != ext.UserCPF {
 		return ErrExtensionNotAllowed
 	}
 
-	if c.BusinessCNPJ != nil && reflect.DeepEqual(c.BusinessCNPJ, ext.BusinessCNPJ) {
+	if c.BusinessIdentification != nil && reflect.DeepEqual(c.BusinessIdentification, ext.BusinessCNPJ) {
 		return ErrExtensionNotAllowed
 	}
 
@@ -78,7 +78,7 @@ func validateExtension(c *Consent, ext *Extension) error {
 		return nil
 	}
 
-	now := timeutil.Now()
+	now := timeutil.DateTimeNow()
 	if ext.ExpiresAt.Before(now) || ext.ExpiresAt.After(now.AddDate(1, 0, 0)) {
 		return ErrInvalidExpiration
 	}

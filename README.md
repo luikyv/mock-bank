@@ -8,6 +8,8 @@ mock backend: https://matls-api.mockbank.local
 
 ## TODO
 
+- Update swaggers to undo modifications.
+- Improve loops that query the db.
 - Companies.
 - Remove descriptions.
 - Save orgs.

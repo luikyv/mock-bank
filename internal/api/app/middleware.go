@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/session"
+	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/session"
 )
 
 func authSessionMiddleware(service session.Service) func(http.Handler) http.Handler {

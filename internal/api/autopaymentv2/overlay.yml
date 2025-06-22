@@ -8,7 +8,7 @@ actions:
   update:
     x-go-type: api.Meta
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/api
+      path: github.com/luikyv/mock-bank/internal/api
 - target: $.components.schemas[*].properties.meta.$ref
   remove: true
 
@@ -16,32 +16,70 @@ actions:
   update:
     x-go-type: api.Links
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/api
+      path: github.com/luikyv/mock-bank/internal/api
 - target: $.components.schemas[*].properties.links.$ref
   remove: true
+
+- target: $.components.schemas.ResponseRecurringPaymentsPostData.properties.date
+  update:
+    format: "date"
+
+- target: $.components.schemas.ResponseRecurringPaymentsDataRead.properties.date
+  update:
+    format: "date"
+
+- target: $.components.schemas.ResponseRecurringPixData.items.properties.date
+  update:
+    format: "date"
+
+- target: $.components.schemas.ResponseRecurringPaymentsDataPatch.properties.date
+  update:
+    format: "date"
 
 - target: $..[*][?(@.format == "date")]
   update:
     x-go-type: timeutil.BrazilDate
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/timeutil
+      path: github.com/luikyv/mock-bank/internal/timeutil
 
 - target: $..[*][?(@.format == "date-time")]
   update:
     x-go-type: timeutil.DateTime
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/timeutil2
+      path: github.com/luikyv/mock-bank/internal/timeutil
 
 - target: $.components.schemas.RecurringConfiguration
   update:
     x-go-type: autopayment.Configuration
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/autopayment
+      path: github.com/luikyv/mock-bank/internal/autopayment
 - target: $.components.schemas.CreateRecurringConsent.properties.data.properties.recurringConfiguration
   update:
     x-go-type: autopayment.Configuration
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/autopayment
+      path: github.com/luikyv/mock-bank/internal/autopayment
+
+- target: $.components.schemas.RiskSignalsPayments
+  update:
+    x-go-type: map[string]any
+- target: $.components.schemas.RiskSignalsConsents
+  update:
+    x-go-type: map[string]any
+- target: $.components.schemas.RiskSignalsConsentEdition
+  update:
+    x-go-type: map[string]any
+
+- target: $.components.schemas.ConsentRevocation
+  update:
+    required: [revocation]
+- target: $.components.schemas.ConsentRejection
+  update:
+    required: [rejection]
+- target: $.components.schemas.ConsentEdition
+  update:
+    x-go-type: autopayment.ConsentEdition
+    x-go-type-import:
+      path: github.com/luikyv/mock-bank/internal/autopayment
 
 - target: $.components.parameters.originalRecurringPaymentId
   update:
@@ -78,3 +116,64 @@ actions:
     application/json:
       schema:
         $ref: '#/components/schemas/ResponseRecurringConsent'
+
+- target: $.paths./recurring-consents/{recurringConsentId}.patch.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./recurring-consents/{recurringConsentId}.patch.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/PatchRecurringConsent'
+- target: $.components.responses.RecurringConsentsConsentIdPatch.content.application/jwt
+  remove: true
+- target: $.components.responses.RecurringConsentsConsentIdPatch.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponseRecurringConsentPatch'
+
+- target: $.paths./pix/recurring-payments.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./pix/recurring-payments.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/CreateRecurringPixPayment'
+- target: $.components.responses.201RecurringPaymentsIdPost.content.application/jwt
+  remove: true
+- target: $.components.responses.201RecurringPaymentsIdPost.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponseRecurringPaymentsIdPost'
+
+- target: $.components.responses.200RecurringPixPaymentRead.content.application/jwt
+  remove: true
+- target: $.components.responses.200RecurringPixPaymentRead.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponseRecurringPixPayment'
+
+- target: $.components.responses.200RecurringPaymentsIdRead.content.application/jwt
+  remove: true
+- target: $.components.responses.200RecurringPaymentsIdRead.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponseRecurringPaymentsIdRead'
+
+- target: $.paths./pix/recurring-payments/{recurringPaymentId}.patch.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./pix/recurring-payments/{recurringPaymentId}.patch.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/PatchPixPayment'
+- target: $.components.responses.200RecurringPaymentsIdPatch.content.application/jwt
+  remove: true
+- target: $.components.responses.200RecurringPaymentsIdPatch.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponseRecurringPaymentsIdPatch'

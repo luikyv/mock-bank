@@ -5,19 +5,21 @@ import (
 	"context"
 	"crypto"
 	"errors"
-	"net/http"
-
-	"github.com/luiky/mock-bank/internal/account"
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/autopayment"
-	"github.com/luiky/mock-bank/internal/errorutil"
-	"github.com/luiky/mock-bank/internal/idempotency"
-	"github.com/luiky/mock-bank/internal/jwtutil"
-	"github.com/luiky/mock-bank/internal/oidc"
-	"github.com/luiky/mock-bank/internal/payment"
-	"github.com/luiky/mock-bank/internal/timeutil"
+	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
+	"github.com/luikyv/mock-bank/internal/account"
+	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/autopayment"
+	"github.com/luikyv/mock-bank/internal/bank"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/errorutil"
+	"github.com/luikyv/mock-bank/internal/idempotency"
+	"github.com/luikyv/mock-bank/internal/jwtutil"
+	"github.com/luikyv/mock-bank/internal/oidc"
+	"github.com/luikyv/mock-bank/internal/payment"
+	"github.com/luikyv/mock-bank/internal/timeutil"
+	"net/http"
 )
 
 var _ StrictServerInterface = Server{}
@@ -59,8 +61,9 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	idempotencyMiddleware := idempotency.Middleware(s.idempotencyService)
 	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, autopayment.Scope)
 	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, autopayment.ScopeConsentID)
-	swaggerMiddleware, swaggerVersion := api.SwaggerMiddleware(GetSwagger, "PARAMETRO_INVALIDO")
-	xvMiddleware := api.VersionMiddleware(swaggerVersion)
+	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, "PARAMETRO_INVALIDO")
+	// TODO. Use the swagger version.
+	xvMiddleware := api.VersionMiddleware("2.0.0")
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
@@ -71,7 +74,6 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		HandlerMiddlewares: []MiddlewareFunc{
 			xvMiddleware,
 			swaggerMiddleware,
-			api.FAPIIDMiddleware(nil),
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
@@ -81,43 +83,50 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	var handler http.Handler
 
 	handler = http.HandlerFunc(wrapper.AutomaticPaymentsPostRecurringConsents)
+	handler = api.FAPIIDMiddleware(nil)(handler)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
 	autoPaymentMux.Handle("POST /recurring-consents", handler)
 
 	handler = http.HandlerFunc(wrapper.AutomaticPaymentsGetRecurringConsentsConsentID)
+	handler = api.FAPIIDMiddleware(nil)(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
 	autoPaymentMux.Handle("GET /recurring-consents/{recurringConsentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.AutomaticPaymentsPatchRecurringConsentsConsentID)
+	handler = api.FAPIIDMiddleware(nil)(handler)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
 	autoPaymentMux.Handle("PATCH /recurring-consents/{recurringConsentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.AutomaticPaymentsPostPixRecurringPayments)
+	handler = api.FAPIIDMiddleware(nil)(handler)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = authCodeAuthMiddleware(handler)
 	autoPaymentMux.Handle("POST /pix/recurring-payments", handler)
 
 	handler = http.HandlerFunc(wrapper.AutomaticPaymentsGetPixRecurringPaymentsPaymentID)
+	handler = api.FAPIIDMiddleware(nil)(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
 	autoPaymentMux.Handle("GET /pix/recurring-payments/{recurringPaymentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.AutomaticPaymentsGetPixRecurringPayments)
+	handler = api.FAPIIDMiddleware(nil)(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
 	autoPaymentMux.Handle("GET /pix/recurring-payments", handler)
 
-	handler = http.HandlerFunc(wrapper.AutomaticPaymentsPatchRecurringConsentsConsentID)
+	handler = http.HandlerFunc(wrapper.AutomaticPaymentsPatchPixRecurringPaymentsPaymentID)
+	handler = api.FAPIIDMiddleware(nil)(handler)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	autoPaymentMux.Handle("PATCH /pix/payments/recurring-consents/{recurringConsentId}", handler)
+	autoPaymentMux.Handle("PATCH /pix/recurring-payments/{recurringPaymentId}", handler)
 
 	mux.Handle("/open-banking/automatic-payments/v2/", http.StripPrefix("/open-banking/automatic-payments/v2", autoPaymentMux))
 }
@@ -126,15 +135,17 @@ func (s Server) AutomaticPaymentsPostRecurringConsents(ctx context.Context, req 
 	clientID := ctx.Value(api.CtxKeyClientID).(string)
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
 	c := &autopayment.Consent{
-		UserCPF:        req.Body.Data.LoggedUser.Document.Identification,
-		ExpiresAt:      req.Body.Data.ExpirationDateTime,
-		AdditionalInfo: req.Body.Data.AdditionalInformation,
-		Configuration:  req.Body.Data.RecurringConfiguration,
-		ClientID:       clientID,
-		OrgID:          orgID,
+		UserIdentification: req.Body.Data.LoggedUser.Document.Identification,
+		UserRel:            consent.Relation(req.Body.Data.LoggedUser.Document.Rel),
+		ExpiresAt:          req.Body.Data.ExpirationDateTime,
+		AdditionalInfo:     req.Body.Data.AdditionalInformation,
+		Configuration:      req.Body.Data.RecurringConfiguration,
+		ClientID:           clientID,
+		OrgID:              orgID,
 	}
-	if req.Body.Data.BusinessEntity != nil {
-		c.BusinessCNPJ = &req.Body.Data.BusinessEntity.Document.Identification
+	if business := req.Body.Data.BusinessEntity; business != nil {
+		c.BusinessIdentification = &business.Document.Identification
+		c.BusinessIdentification = &business.Document.Rel
 	}
 
 	for _, creditor := range req.Body.Data.Creditors {
@@ -197,8 +208,8 @@ func (s Server) AutomaticPaymentsPostRecurringConsents(ctx context.Context, req 
 					Identification string "json:\"identification\""
 					Rel            string "json:\"rel\""
 				}{
-					Identification: c.UserCPF,
-					Rel:            "CPF",
+					Identification: c.UserIdentification,
+					Rel:            string(c.UserRel),
 				},
 			},
 			RecurringConfiguration: c.Configuration,
@@ -222,14 +233,15 @@ func (s Server) AutomaticPaymentsPostRecurringConsents(ctx context.Context, req 
 		})
 	}
 
-	if c.BusinessCNPJ != nil {
+	if c.BusinessIdentification != nil {
+		rel := *c.BusinessRel
 		resp.Data.BusinessEntity = &BusinessEntity{
 			Document: struct {
 				Identification string "json:\"identification\""
 				Rel            string "json:\"rel\""
 			}{
-				Identification: *c.BusinessCNPJ,
-				Rel:            "CNPJ",
+				Identification: *c.BusinessIdentification,
+				Rel:            string(rel),
 			},
 		}
 	}
@@ -242,7 +254,7 @@ func (s Server) AutomaticPaymentsPostRecurringConsents(ctx context.Context, req 
 			Issuer      *string                 "json:\"issuer,omitempty\""
 			Number      string                  "json:\"number\""
 		}{
-			Ispb:        api.MockBankISPB,
+			Ispb:        bank.ISPB,
 			Issuer:      &branch,
 			Number:      c.DebtorAccount.Number,
 			AccountType: EnumAccountTypeConsents(payment.ConvertAccountType(c.DebtorAccount.Type)),
@@ -299,6 +311,7 @@ func (s Server) AutomaticPaymentsGetRecurringConsentsConsentID(ctx context.Conte
 			AuthorisedAtDateTime:   c.AuthorizedAt,
 			CreationDateTime:       c.CreatedAt,
 			ExpirationDateTime:     c.ExpiresAt,
+			RiskSignals:            c.RiskSignals,
 			Status:                 EnumAuthorisationStatusType(c.Status),
 			StatusUpdateDateTime:   c.StatusUpdatedAt,
 			UpdatedAtDateTime:      &c.UpdatedAt,
@@ -308,8 +321,8 @@ func (s Server) AutomaticPaymentsGetRecurringConsentsConsentID(ctx context.Conte
 					Identification string "json:\"identification\""
 					Rel            string "json:\"rel\""
 				}{
-					Identification: c.UserCPF,
-					Rel:            "CPF",
+					Identification: c.UserIdentification,
+					Rel:            string(c.UserRel),
 				},
 			},
 		},
@@ -329,20 +342,22 @@ func (s Server) AutomaticPaymentsGetRecurringConsentsConsentID(ctx context.Conte
 		})
 	}
 
-	if c.BusinessCNPJ != nil {
+	if c.BusinessIdentification != nil {
+		rel := *c.BusinessRel
 		resp.Data.BusinessEntity = &BusinessEntity{
 			Document: struct {
 				Identification string "json:\"identification\""
 				Rel            string "json:\"rel\""
 			}{
-				Identification: *c.BusinessCNPJ,
-				Rel:            "CNPJ",
+				Identification: *c.BusinessIdentification,
+				Rel:            string(rel),
 			},
 		}
 	}
 
 	if c.DebtorAccount != nil {
 		branch := account.DefaultBranch
+		ibgeTownCode := bank.IBGETownCode
 		resp.Data.DebtorAccount = &struct {
 			AccountType  EnumAccountTypeConsents "json:\"accountType\""
 			IbgeTownCode *string                 "json:\"ibgeTownCode,omitempty\""
@@ -350,10 +365,11 @@ func (s Server) AutomaticPaymentsGetRecurringConsentsConsentID(ctx context.Conte
 			Issuer       *string                 "json:\"issuer,omitempty\""
 			Number       string                  "json:\"number\""
 		}{
-			Ispb:        api.MockBankISPB,
-			Issuer:      &branch,
-			Number:      c.DebtorAccount.Number,
-			AccountType: EnumAccountTypeConsents(payment.ConvertAccountType(c.DebtorAccount.Type)),
+			Ispb:         bank.ISPB,
+			IbgeTownCode: &ibgeTownCode,
+			Issuer:       &branch,
+			Number:       c.DebtorAccount.Number,
+			AccountType:  EnumAccountTypeConsents(payment.ConvertAccountType(c.DebtorAccount.Type)),
 		}
 	}
 
@@ -395,24 +411,583 @@ func (s Server) AutomaticPaymentsGetRecurringConsentsConsentID(ctx context.Conte
 	return AutomaticPaymentsGetRecurringConsentsConsentID200JSONResponse{RecurringConsentsConsentIDJSONResponse(resp)}, nil
 }
 
-func (s Server) AutomaticPaymentsGetPixRecurringPayments(ctx context.Context, req AutomaticPaymentsGetPixRecurringPaymentsRequestObject) (AutomaticPaymentsGetPixRecurringPaymentsResponseObject, error) {
-	return nil, nil
+func (s Server) AutomaticPaymentsPatchRecurringConsentsConsentID(ctx context.Context, req AutomaticPaymentsPatchRecurringConsentsConsentIDRequestObject) (AutomaticPaymentsPatchRecurringConsentsConsentIDResponseObject, error) {
+	orgID := ctx.Value(api.CtxKeyOrgID).(string)
+
+	var c *autopayment.Consent
+	var err error
+	if action, _ := req.Body.Data.AsConsentRejection(); action.Status != nil && *action.Status == ConsentRejectionStatusREJECTED {
+		c, err = s.service.RejectConsent(ctx, req.RecurringConsentID, orgID, autopayment.ConsentRejection{
+			By:     autopayment.TerminatedBy(action.Rejection.RejectedBy),
+			From:   autopayment.TerminatedFrom(action.Rejection.RejectedFrom),
+			Code:   autopayment.ConsentRejectionCode(action.Rejection.Reason.Code),
+			Detail: action.Rejection.Reason.Detail,
+		})
+	} else if action, _ := req.Body.Data.AsConsentRevocation(); action.Status != nil && *action.Status == REVOKED {
+		c, err = s.service.RevokeConsent(ctx, req.RecurringConsentID, orgID, autopayment.ConsentRevocation{
+			By:     autopayment.TerminatedBy(action.Revocation.RevokedBy),
+			From:   autopayment.TerminatedFrom(action.Revocation.RevokedFrom),
+			Code:   autopayment.ConsentRevocationCode(action.Revocation.Reason.Code),
+			Detail: action.Revocation.Reason.Detail,
+		})
+	} else {
+		action, _ := req.Body.Data.AsConsentEdition()
+		c, err = s.service.EditConsent(ctx, req.RecurringConsentID, orgID, action)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	resp := ResponseRecurringConsentPatch{
+		Data: struct {
+			AdditionalInformation *string              "json:\"additionalInformation,omitempty\""
+			ApprovalDueDate       *timeutil.BrazilDate "json:\"approvalDueDate,omitempty\""
+			AuthorisedAtDateTime  *timeutil.DateTime   "json:\"authorisedAtDateTime,omitempty\""
+			BusinessEntity        *BusinessEntity      "json:\"businessEntity,omitempty\""
+			CreationDateTime      timeutil.DateTime    "json:\"creationDateTime\""
+			Creditors             Creditors            "json:\"creditors\""
+			DebtorAccount         *struct {
+				AccountType EnumAccountTypeConsents "json:\"accountType\""
+				Ispb        string                  "json:\"ispb\""
+				Issuer      *string                 "json:\"issuer,omitempty\""
+				Number      string                  "json:\"number\""
+			} "json:\"debtorAccount,omitempty\""
+			ExpirationDateTime     *timeutil.DateTime     "json:\"expirationDateTime,omitempty\""
+			LoggedUser             *LoggedUser            "json:\"loggedUser,omitempty\""
+			RecurringConfiguration RecurringConfiguration "json:\"recurringConfiguration\""
+			RecurringConsentID     string                 "json:\"recurringConsentId\""
+			Rejection              *struct {
+				Reason       *ConsentRejectionReason                                "json:\"reason,omitempty\""
+				RejectedAt   timeutil.DateTime                                      "json:\"rejectedAt\""
+				RejectedBy   ResponseRecurringConsentPatchDataRejectionRejectedBy   "json:\"rejectedBy\""
+				RejectedFrom ResponseRecurringConsentPatchDataRejectionRejectedFrom "json:\"rejectedFrom\""
+			} "json:\"rejection,omitempty\""
+			Revocation *struct {
+				Reason *struct {
+					Code   ResponseRecurringConsentPatchDataRevocationReasonCode "json:\"code\""
+					Detail string                                                "json:\"detail\""
+				} "json:\"reason,omitempty\""
+				RevokedAt   timeutil.DateTime                                      "json:\"revokedAt\""
+				RevokedBy   ResponseRecurringConsentPatchDataRevocationRevokedBy   "json:\"revokedBy\""
+				RevokedFrom ResponseRecurringConsentPatchDataRevocationRevokedFrom "json:\"revokedFrom\""
+			} "json:\"revocation,omitempty\""
+			RiskSignals          *RiskSignalsConsents        "json:\"riskSignals,omitempty\""
+			Status               EnumAuthorisationStatusType "json:\"status\""
+			StatusUpdateDateTime timeutil.DateTime           "json:\"statusUpdateDateTime\""
+			UpdatedAtDateTime    *timeutil.DateTime          "json:\"updatedAtDateTime,omitempty\""
+		}{
+			AdditionalInformation: c.AdditionalInfo,
+			ApprovalDueDate:       c.ApprovalDueAt,
+			AuthorisedAtDateTime:  c.AuthorizedAt,
+			CreationDateTime:      c.CreatedAt,
+			ExpirationDateTime:    c.ExpiresAt,
+			LoggedUser: &LoggedUser{
+				Document: struct {
+					Identification string "json:\"identification\""
+					Rel            string "json:\"rel\""
+				}{
+					Identification: c.UserIdentification,
+					Rel:            string(c.UserRel),
+				},
+			},
+			RecurringConfiguration: c.Configuration,
+			RecurringConsentID:     c.URN(),
+			Status:                 EnumAuthorisationStatusType(c.Status),
+			StatusUpdateDateTime:   c.StatusUpdatedAt,
+			UpdatedAtDateTime:      &c.UpdatedAt,
+		},
+		Meta:  *api.NewMeta(),
+		Links: *api.NewLinks(s.baseURL + "/recurring-consents/" + c.URN()),
+	}
+
+	for _, creditor := range c.Creditors {
+		resp.Data.Creditors = append(resp.Data.Creditors, struct {
+			CpfCnpj    string                "json:\"cpfCnpj\""
+			Name       string                "json:\"name\""
+			PersonType EnumPaymentPersonType "json:\"personType\""
+		}{
+			CpfCnpj:    creditor.CPFCNPJ,
+			Name:       creditor.Name,
+			PersonType: EnumPaymentPersonType(creditor.Type),
+		})
+	}
+
+	if c.BusinessIdentification != nil {
+		rel := *c.BusinessRel
+		resp.Data.BusinessEntity = &BusinessEntity{
+			Document: struct {
+				Identification string "json:\"identification\""
+				Rel            string "json:\"rel\""
+			}{
+				Identification: *c.BusinessIdentification,
+				Rel:            string(rel),
+			},
+		}
+	}
+
+	if c.DebtorAccount != nil {
+		branch := account.DefaultBranch
+		resp.Data.DebtorAccount = &struct {
+			AccountType EnumAccountTypeConsents "json:\"accountType\""
+			Ispb        string                  "json:\"ispb\""
+			Issuer      *string                 "json:\"issuer,omitempty\""
+			Number      string                  "json:\"number\""
+		}{
+			Ispb:        bank.ISPB,
+			Issuer:      &branch,
+			Number:      c.DebtorAccount.Number,
+			AccountType: EnumAccountTypeConsents(payment.ConvertAccountType(c.DebtorAccount.Type)),
+		}
+	}
+
+	if c.Rejection != nil {
+		resp.Data.Rejection = &struct {
+			Reason       *ConsentRejectionReason                                "json:\"reason,omitempty\""
+			RejectedAt   timeutil.DateTime                                      "json:\"rejectedAt\""
+			RejectedBy   ResponseRecurringConsentPatchDataRejectionRejectedBy   "json:\"rejectedBy\""
+			RejectedFrom ResponseRecurringConsentPatchDataRejectionRejectedFrom "json:\"rejectedFrom\""
+		}{
+			Reason: &ConsentRejectionReason{
+				Code:   ConsentRejectionReasonCode(c.Rejection.Code),
+				Detail: c.Rejection.Detail,
+			},
+			RejectedAt:   c.StatusUpdatedAt,
+			RejectedBy:   ResponseRecurringConsentPatchDataRejectionRejectedBy(c.Rejection.By),
+			RejectedFrom: ResponseRecurringConsentPatchDataRejectionRejectedFrom(c.Rejection.From),
+		}
+	}
+
+	if c.Revocation != nil {
+		resp.Data.Revocation = &struct {
+			Reason *struct {
+				Code   ResponseRecurringConsentPatchDataRevocationReasonCode "json:\"code\""
+				Detail string                                                "json:\"detail\""
+			} "json:\"reason,omitempty\""
+			RevokedAt   timeutil.DateTime                                      "json:\"revokedAt\""
+			RevokedBy   ResponseRecurringConsentPatchDataRevocationRevokedBy   "json:\"revokedBy\""
+			RevokedFrom ResponseRecurringConsentPatchDataRevocationRevokedFrom "json:\"revokedFrom\""
+		}{
+			Reason: &struct {
+				Code   ResponseRecurringConsentPatchDataRevocationReasonCode "json:\"code\""
+				Detail string                                                "json:\"detail\""
+			}{
+				Code:   ResponseRecurringConsentPatchDataRevocationReasonCode(c.Revocation.Code),
+				Detail: c.Revocation.Detail,
+			},
+			RevokedAt:   c.StatusUpdatedAt,
+			RevokedBy:   ResponseRecurringConsentPatchDataRevocationRevokedBy(c.Revocation.By),
+			RevokedFrom: ResponseRecurringConsentPatchDataRevocationRevokedFrom(c.Revocation.From),
+		}
+	}
+
+	return AutomaticPaymentsPatchRecurringConsentsConsentID200JSONResponse{RecurringConsentsConsentIDPatchJSONResponse(resp)}, nil
 }
 
 func (s Server) AutomaticPaymentsPostPixRecurringPayments(ctx context.Context, req AutomaticPaymentsPostPixRecurringPaymentsRequestObject) (AutomaticPaymentsPostPixRecurringPaymentsResponseObject, error) {
-	return nil, nil
+	clientID := ctx.Value(api.CtxKeyClientID).(string)
+	orgID := ctx.Value(api.CtxKeyOrgID).(string)
+	scopes := ctx.Value(api.CtxKeyScopes).(string)
+	consentID, _ := autopayment.ConsentIDFromScopes(scopes)
+	p := &autopayment.Payment{
+		EndToEndID:                req.Body.Data.EndToEndID,
+		Date:                      req.Body.Data.Date,
+		Amount:                    req.Body.Data.Payment.Amount,
+		Currency:                  req.Body.Data.Payment.Currency,
+		CreditorAccountISBP:       req.Body.Data.CreditorAccount.Ispb,
+		CreditorAccountIssuer:     req.Body.Data.CreditorAccount.Issuer,
+		CreditorAccountNumber:     req.Body.Data.CreditorAccount.Number,
+		CreditorAccountType:       payment.AccountType(req.Body.Data.CreditorAccount.AccountType),
+		RemittanceInformation:     req.Body.Data.RemittanceInformation,
+		CNPJInitiator:             req.Body.Data.CnpjInitiator,
+		IBGETownCode:              req.Body.Data.IbgeTownCode,
+		LocalInstrument:           payment.LocalInstrument(req.Body.Data.LocalInstrument),
+		Proxy:                     req.Body.Data.Proxy,
+		TransactionIdentification: req.Body.Data.TransactionIdentification,
+		DocumentIdentification:    req.Body.Data.Document.Identification,
+		DocumentRel:               consent.Relation(req.Body.Data.Document.Rel),
+		Reference:                 req.Body.Data.PaymentReference,
+		RiskSignals:               req.Body.Data.RiskSignals,
+		ConsentID:                 uuid.MustParse(consentID),
+		ClientID:                  clientID,
+		OrgID:                     orgID,
+	}
+
+	if req.Body.Data.AuthorisationFlow != nil {
+		authFlow := payment.AuthorisationFlow(*req.Body.Data.AuthorisationFlow)
+		p.AuthorisationFlow = &authFlow
+	}
+
+	if req.Body.Data.OriginalRecurringPaymentID != nil {
+		originalID, err := uuid.Parse(*req.Body.Data.OriginalRecurringPaymentID)
+		if err != nil {
+			return nil, errorutil.New("invalid original recurring payment id")
+		}
+		p.OriginalID = &originalID
+	}
+
+	if err := s.service.Create(ctx, p); err != nil {
+		return nil, err
+	}
+
+	consentID = consent.URN(p.ConsentID)
+	resp := ResponseRecurringPaymentsIDPost{
+		Data: ResponseRecurringPaymentsPostData{
+			CnpjInitiator:    p.CNPJInitiator,
+			CreationDateTime: p.CreatedAt,
+			CreditorAccount: CreditorAccountPostPixPaymentsResponse{
+				Ispb:        p.CreditorAccountISBP,
+				Issuer:      p.CreditorAccountIssuer,
+				Number:      p.CreditorAccountNumber,
+				AccountType: EnumAccountTypePayments(payment.ConvertAccountType(p.DebtorAccount.Type)),
+			},
+			Date: p.Date,
+			Document: struct {
+				Identification string                                       `json:"identification"`
+				Rel            ResponseRecurringPaymentsPostDataDocumentRel `json:"rel"`
+			}{
+				Identification: p.DocumentIdentification,
+				Rel:            ResponseRecurringPaymentsPostDataDocumentRel(p.DocumentRel),
+			},
+			EndToEndID:      p.EndToEndID,
+			LocalInstrument: ResponseRecurringPaymentsPostDataLocalInstrument(p.LocalInstrument),
+			Payment: PaymentPix{
+				Amount:   p.Amount,
+				Currency: p.Currency,
+			},
+			PaymentReference:          p.Reference,
+			Proxy:                     p.Proxy,
+			RecurringConsentID:        &consentID,
+			RecurringPaymentID:        p.ID.String(),
+			RemittanceInformation:     p.RemittanceInformation,
+			Status:                    EnumPaymentStatusType(p.Status),
+			StatusUpdateDateTime:      p.StatusUpdatedAt,
+			TransactionIdentification: p.TransactionIdentification,
+		},
+		Meta:  *api.NewMeta(),
+		Links: *api.NewLinks(s.baseURL + "/pix/recurring-payments/" + p.ID.String()),
+	}
+
+	if p.DebtorAccount != nil {
+		branch := account.DefaultBranch
+		resp.Data.DebtorAccount = &DebtorAccount{
+			AccountType: EnumAccountTypeConsents(payment.ConvertAccountType(p.DebtorAccount.Type)),
+			Issuer:      &branch,
+			Ispb:        bank.ISPB,
+			Number:      p.DebtorAccount.Number,
+		}
+	}
+
+	if p.AuthorisationFlow != nil {
+		authFlow := ResponseRecurringPaymentsPostDataAuthorisationFlow(*p.AuthorisationFlow)
+		resp.Data.AuthorisationFlow = &authFlow
+	}
+
+	if p.OriginalID != nil {
+		originalID := p.OriginalID.String()
+		resp.Data.OriginalRecurringPaymentID = &originalID
+	}
+
+	if rejection := p.Rejection; rejection != nil {
+		resp.Data.RejectionReason = &RejectionReason{
+			Code:   EnumRejectionReasonCode(rejection.Code),
+			Detail: rejection.Detail,
+		}
+	}
+
+	if cancellation := p.Cancellation; cancellation != nil {
+		resp.Data.Cancellation = &PixPaymentCancellation{
+			CancelledAt: p.StatusUpdatedAt,
+			CancelledBy: struct {
+				Document struct {
+					Identification string                                       "json:\"identification\""
+					Rel            PixPaymentCancellationCancelledByDocumentRel "json:\"rel\""
+				} "json:\"document\""
+			}{
+				Document: struct {
+					Identification string                                       "json:\"identification\""
+					Rel            PixPaymentCancellationCancelledByDocumentRel "json:\"rel\""
+				}{
+					Identification: cancellation.By,
+					Rel:            "CPF",
+				},
+			},
+			CancelledFrom: EnumPaymentCancellationFromType(cancellation.From),
+			Reason:        EnumPaymentCancellationReasonType(cancellation.Reason),
+		}
+	}
+
+	return AutomaticPaymentsPostPixRecurringPayments201JSONResponse{N201RecurringPaymentsIDPostJSONResponse(resp)}, nil
 }
 
 func (s Server) AutomaticPaymentsGetPixRecurringPaymentsPaymentID(ctx context.Context, req AutomaticPaymentsGetPixRecurringPaymentsPaymentIDRequestObject) (AutomaticPaymentsGetPixRecurringPaymentsPaymentIDResponseObject, error) {
-	return nil, nil
+	orgID := ctx.Value(api.CtxKeyOrgID).(string)
+	p, err := s.service.Payment(ctx, req.RecurringPaymentID, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	consentID := consent.URN(p.ConsentID)
+	resp := ResponseRecurringPaymentsIDRead{
+		Data: ResponseRecurringPaymentsDataRead{
+			CnpjInitiator:    p.CNPJInitiator,
+			CreationDateTime: p.CreatedAt,
+			CreditorAccount: &CreditorAccount{
+				Ispb:        p.CreditorAccountISBP,
+				Issuer:      p.CreditorAccountIssuer,
+				Number:      p.CreditorAccountNumber,
+				AccountType: EnumAccountTypePayments(payment.ConvertAccountType(p.DebtorAccount.Type)),
+			},
+			Date: p.Date,
+			Document: struct {
+				Identification string                                       `json:"identification"`
+				Rel            ResponseRecurringPaymentsDataReadDocumentRel `json:"rel"`
+			}{
+				Identification: p.DocumentIdentification,
+				Rel:            ResponseRecurringPaymentsDataReadDocumentRel(p.DocumentRel),
+			},
+			EndToEndID:      p.EndToEndID,
+			LocalInstrument: ResponseRecurringPaymentsDataReadLocalInstrument(p.LocalInstrument),
+			Payment: PaymentPix{
+				Amount:   p.Amount,
+				Currency: p.Currency,
+			},
+			PaymentReference:          p.Reference,
+			Proxy:                     p.Proxy,
+			RecurringConsentID:        &consentID,
+			RecurringPaymentID:        p.ID.String(),
+			RemittanceInformation:     p.RemittanceInformation,
+			Status:                    EnumPaymentStatusType(p.Status),
+			StatusUpdateDateTime:      p.StatusUpdatedAt,
+			TransactionIdentification: p.TransactionIdentification,
+		},
+		Meta:  *api.NewMeta(),
+		Links: *api.NewLinks(s.baseURL + "/pix/recurring-payments/" + p.ID.String()),
+	}
+
+	if p.DebtorAccount != nil {
+		branch := account.DefaultBranch
+		resp.Data.DebtorAccount = &DebtorAccount{
+			AccountType: EnumAccountTypeConsents(payment.ConvertAccountType(p.DebtorAccount.Type)),
+			Issuer:      &branch,
+			Ispb:        bank.ISPB,
+			Number:      p.DebtorAccount.Number,
+		}
+	}
+
+	if p.AuthorisationFlow != nil {
+		authFlow := ResponseRecurringPaymentsDataReadAuthorisationFlow(*p.AuthorisationFlow)
+		resp.Data.AuthorisationFlow = &authFlow
+	}
+
+	if p.OriginalID != nil {
+		originalID := p.OriginalID.String()
+		resp.Data.OriginalRecurringPaymentID = &originalID
+	}
+
+	if rejection := p.Rejection; rejection != nil {
+		resp.Data.RejectionReason = &RejectionReason{
+			Code:   EnumRejectionReasonCode(rejection.Code),
+			Detail: rejection.Detail,
+		}
+	}
+
+	if cancellation := p.Cancellation; cancellation != nil {
+		resp.Data.Cancellation = &PixPaymentCancellation{
+			CancelledAt: p.StatusUpdatedAt,
+			CancelledBy: struct {
+				Document struct {
+					Identification string                                       "json:\"identification\""
+					Rel            PixPaymentCancellationCancelledByDocumentRel "json:\"rel\""
+				} "json:\"document\""
+			}{
+				Document: struct {
+					Identification string                                       "json:\"identification\""
+					Rel            PixPaymentCancellationCancelledByDocumentRel "json:\"rel\""
+				}{
+					Identification: cancellation.By,
+					Rel:            "CPF",
+				},
+			},
+			CancelledFrom: EnumPaymentCancellationFromType(cancellation.From),
+			Reason:        EnumPaymentCancellationReasonType(cancellation.Reason),
+		}
+	}
+
+	return AutomaticPaymentsGetPixRecurringPaymentsPaymentID200JSONResponse{N200RecurringPaymentsIDReadJSONResponse(resp)}, nil
+}
+
+func (s Server) AutomaticPaymentsGetPixRecurringPayments(ctx context.Context, req AutomaticPaymentsGetPixRecurringPaymentsRequestObject) (AutomaticPaymentsGetPixRecurringPaymentsResponseObject, error) {
+	orgID := ctx.Value(api.CtxKeyOrgID).(string)
+	filter := autopayment.Filter{ConsentID: req.Params.RecurringConsentID}
+	payments, err := s.service.Payments(ctx, orgID, &filter)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := ResponseRecurringPixPayment{
+		Meta:  *api.NewMeta(),
+		Links: *api.NewLinks(s.baseURL + "/pix/recurring-payments" + filter.URLQuery()),
+	}
+	for _, p := range payments {
+		consentID := consent.URN(p.ConsentID)
+		data := struct {
+			CreationDateTime timeutil.DateTime   "json:\"creationDateTime\""
+			Date             timeutil.BrazilDate "json:\"date\""
+			Document         struct {
+				Identification string                              "json:\"identification\""
+				Rel            ResponseRecurringPixDataDocumentRel "json:\"rel\""
+			} "json:\"document\""
+			EndToEndID                 EndToEndID                  "json:\"endToEndId\""
+			OriginalRecurringPaymentID *OriginalRecurringPaymentID "json:\"originalRecurringPaymentId,omitempty\""
+			Payment                    PaymentPix                  "json:\"payment\""
+			PaymentReference           *string                     "json:\"paymentReference,omitempty\""
+			RecurringConsentID         *string                     "json:\"recurringConsentId,omitempty\""
+			RecurringPaymentID         string                      "json:\"recurringPaymentId\""
+			RejectionReason            *RejectionReasonGet         "json:\"rejectionReason,omitempty\""
+			RemittanceInformation      *string                     "json:\"remittanceInformation,omitempty\""
+			Status                     EnumPaymentStatusType       "json:\"status\""
+			StatusUpdateDateTime       timeutil.DateTime           "json:\"statusUpdateDateTime\""
+			TransactionIdentification  *string                     "json:\"transactionIdentification,omitempty\""
+		}{
+			CreationDateTime: p.CreatedAt,
+			Date:             p.Date,
+			Document: struct {
+				Identification string                              "json:\"identification\""
+				Rel            ResponseRecurringPixDataDocumentRel "json:\"rel\""
+			}{
+				Identification: p.DocumentIdentification,
+				Rel:            ResponseRecurringPixDataDocumentRel(p.DocumentRel),
+			},
+			EndToEndID: p.EndToEndID,
+			Payment: PaymentPix{
+				Amount:   p.Amount,
+				Currency: p.Currency,
+			},
+			PaymentReference:          p.Reference,
+			RecurringConsentID:        &consentID,
+			RecurringPaymentID:        p.ID.String(),
+			RemittanceInformation:     p.RemittanceInformation,
+			Status:                    EnumPaymentStatusType(p.Status),
+			StatusUpdateDateTime:      p.StatusUpdatedAt,
+			TransactionIdentification: p.TransactionIdentification,
+		}
+
+		if p.OriginalID != nil {
+			originalID := p.OriginalID.String()
+			data.OriginalRecurringPaymentID = &originalID
+		}
+
+		if rejection := p.Rejection; rejection != nil {
+			data.RejectionReason = &RejectionReasonGet{
+				Code:   EnumRejectionReasonCodeGet(rejection.Code),
+				Detail: rejection.Detail,
+			}
+		}
+
+		resp.Data = append(resp.Data, data)
+	}
+
+	return AutomaticPaymentsGetPixRecurringPayments200JSONResponse{N200RecurringPixPaymentReadJSONResponse(resp)}, nil
 }
 
 func (s Server) AutomaticPaymentsPatchPixRecurringPaymentsPaymentID(ctx context.Context, req AutomaticPaymentsPatchPixRecurringPaymentsPaymentIDRequestObject) (AutomaticPaymentsPatchPixRecurringPaymentsPaymentIDResponseObject, error) {
-	return nil, nil
-}
+	orgID := ctx.Value(api.CtxKeyOrgID).(string)
+	p, err := s.service.Cancel(ctx, req.RecurringPaymentID, orgID, consent.Document{
+		Identification: req.Body.Data.Cancellation.CancelledBy.Document.Identification,
+		Rel:            consent.Relation(req.Body.Data.Cancellation.CancelledBy.Document.Rel),
+	})
+	if err != nil {
+		return nil, err
+	}
 
-func (s Server) AutomaticPaymentsPatchRecurringConsentsConsentID(ctx context.Context, req AutomaticPaymentsPatchRecurringConsentsConsentIDRequestObject) (AutomaticPaymentsPatchRecurringConsentsConsentIDResponseObject, error) {
-	return nil, nil
+	consentID := consent.URN(p.ConsentID)
+	resp := ResponseRecurringPaymentsIDPatch{
+		Data: ResponseRecurringPaymentsDataPatch{
+			CnpjInitiator:    p.CNPJInitiator,
+			CreationDateTime: p.CreatedAt,
+			CreditorAccount: &CreditorAccount{
+				Ispb:        p.CreditorAccountISBP,
+				Issuer:      p.CreditorAccountIssuer,
+				Number:      p.CreditorAccountNumber,
+				AccountType: EnumAccountTypePayments(payment.ConvertAccountType(p.DebtorAccount.Type)),
+			},
+			Date: p.Date,
+			Document: struct {
+				Identification string                                        "json:\"identification\""
+				Rel            ResponseRecurringPaymentsDataPatchDocumentRel "json:\"rel\""
+			}{
+				Identification: p.DocumentIdentification,
+				Rel:            ResponseRecurringPaymentsDataPatchDocumentRel(p.DocumentRel),
+			},
+			EndToEndID:      p.EndToEndID,
+			LocalInstrument: ResponseRecurringPaymentsDataPatchLocalInstrument(p.LocalInstrument),
+			Payment: PaymentPix{
+				Amount:   p.Amount,
+				Currency: p.Currency,
+			},
+			PaymentReference:          p.Reference,
+			Proxy:                     p.Proxy,
+			RecurringConsentID:        &consentID,
+			RecurringPaymentID:        p.ID.String(),
+			RemittanceInformation:     p.RemittanceInformation,
+			Status:                    EnumPaymentStatusType(p.Status),
+			StatusUpdateDateTime:      p.StatusUpdatedAt,
+			TransactionIdentification: p.TransactionIdentification,
+		},
+		Meta:  *api.NewMeta(),
+		Links: *api.NewLinks(s.baseURL + "/pix/recurring-payments/" + p.ID.String()),
+	}
+
+	if p.DebtorAccount != nil {
+		branch := account.DefaultBranch
+		resp.Data.DebtorAccount = &DebtorAccount{
+			AccountType: EnumAccountTypeConsents(payment.ConvertAccountType(p.DebtorAccount.Type)),
+			Issuer:      &branch,
+			Ispb:        bank.ISPB,
+			Number:      p.DebtorAccount.Number,
+		}
+	}
+
+	if p.AuthorisationFlow != nil {
+		authFlow := ResponseRecurringPaymentsDataPatchAuthorisationFlow(*p.AuthorisationFlow)
+		resp.Data.AuthorisationFlow = &authFlow
+	}
+
+	if p.OriginalID != nil {
+		originalID := p.OriginalID.String()
+		resp.Data.OriginalRecurringPaymentID = &originalID
+	}
+
+	if rejection := p.Rejection; rejection != nil {
+		resp.Data.RejectionReason = &RejectionReason{
+			Code:   EnumRejectionReasonCode(rejection.Code),
+			Detail: rejection.Detail,
+		}
+	}
+
+	if cancellation := p.Cancellation; cancellation != nil {
+		resp.Data.Cancellation = &PixPaymentCancellation{
+			CancelledAt: p.StatusUpdatedAt,
+			CancelledBy: struct {
+				Document struct {
+					Identification string                                       "json:\"identification\""
+					Rel            PixPaymentCancellationCancelledByDocumentRel "json:\"rel\""
+				} "json:\"document\""
+			}{
+				Document: struct {
+					Identification string                                       "json:\"identification\""
+					Rel            PixPaymentCancellationCancelledByDocumentRel "json:\"rel\""
+				}{
+					Identification: cancellation.By,
+					Rel:            "CPF",
+				},
+			},
+			CancelledFrom: EnumPaymentCancellationFromType(cancellation.From),
+			Reason:        EnumPaymentCancellationReasonType(cancellation.Reason),
+		}
+	}
+
+	return AutomaticPaymentsPatchPixRecurringPaymentsPaymentID200JSONResponse{N200RecurringPaymentsIDPatchJSONResponse(resp)}, nil
 }
 
 func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {

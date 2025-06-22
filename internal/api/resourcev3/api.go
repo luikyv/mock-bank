@@ -5,13 +5,13 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/oidc"
-	"github.com/luiky/mock-bank/internal/page"
-	"github.com/luiky/mock-bank/internal/resource"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
+	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/oidc"
+	"github.com/luikyv/mock-bank/internal/page"
+	"github.com/luikyv/mock-bank/internal/resource"
 )
 
 var _ StrictServerInterface = Server{}

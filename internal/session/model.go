@@ -4,10 +4,9 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/timeutil"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 type Session struct {
@@ -16,12 +15,12 @@ type Session struct {
 	Organizations Organizations `gorm:"type:jsonb"`
 	CodeVerifier  string
 
-	CreatedAt time.Time
-	ExpiresAt time.Time
+	CreatedAt timeutil.DateTime
+	ExpiresAt timeutil.DateTime
 }
 
 func (s Session) IsExpired() bool {
-	return s.ExpiresAt.Before(timeutil.Now())
+	return s.ExpiresAt.Before(timeutil.DateTimeNow())
 }
 
 type Organizations map[string]struct {

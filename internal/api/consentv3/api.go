@@ -8,14 +8,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/errorutil"
-	"github.com/luiky/mock-bank/internal/oidc"
-	"github.com/luiky/mock-bank/internal/page"
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
+	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/errorutil"
+	"github.com/luikyv/mock-bank/internal/oidc"
+	"github.com/luikyv/mock-bank/internal/page"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 type Server struct {
@@ -85,13 +85,21 @@ func (s Server) ConsentsPostConsents(ctx context.Context, req ConsentsPostConsen
 		perms = append(perms, consent.Permission(p))
 	}
 	c := &consent.Consent{
-		Status:      consent.StatusAwaitingAuthorization,
-		UserCPF:     req.Body.Data.LoggedUser.Document.Identification,
-		Permissions: perms,
-		ExpiresAt:   req.Body.Data.ExpirationDateTime,
-		ClientID:    ctx.Value(api.CtxKeyClientID).(string),
-		OrgID:       ctx.Value(api.CtxKeyOrgID).(string),
+		Status:             consent.StatusAwaitingAuthorization,
+		UserIdentification: req.Body.Data.LoggedUser.Document.Identification,
+		UserRel:            consent.Relation(req.Body.Data.LoggedUser.Document.Rel),
+		Permissions:        perms,
+		ExpiresAt:          req.Body.Data.ExpirationDateTime,
+		ClientID:           ctx.Value(api.CtxKeyClientID).(string),
+		OrgID:              ctx.Value(api.CtxKeyOrgID).(string),
 	}
+
+	if business := req.Body.Data.BusinessEntity; business != nil {
+		rel := consent.Relation(business.Document.Rel)
+		c.BusinessIdentification = &business.Document.Identification
+		c.BusinessRel = &rel
+	}
+
 	if err := s.service.Create(ctx, c); err != nil {
 		return nil, err
 	}
@@ -160,6 +168,7 @@ func (s Server) ConsentsGetConsentsConsentID(ctx context.Context, req ConsentsGe
 		Links: api.NewLinks(s.baseURL + "/consents/" + c.URN()),
 		Meta:  api.NewMeta(),
 	}
+
 	if c.Rejection != nil {
 		resp.Data.Rejection = &struct {
 			Reason struct {

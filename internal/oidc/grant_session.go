@@ -2,12 +2,9 @@ package oidc
 
 import (
 	"context"
-	"fmt"
-	"time"
 
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
-	"gorm.io/datatypes"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -25,10 +22,10 @@ func (m GrantSessionManager) Save(ctx context.Context, gs *goidc.GrantSession) e
 		TokenID:        gs.TokenID,
 		RefreshTokenID: gs.RefreshTokenID,
 		AuthCode:       gs.AuthCode,
-		ExpiresAt:      parseTimestamp(gs.ExpiresAtTimestamp),
-		Data:           marshalJSON(gs),
-		UpdatedAt:      timeutil.Now(),
-		OrgID:          gs.AdditionalTokenClaims["org_id"].(string),
+		ExpiresAt:      timeutil.ParseTimestamp(gs.ExpiresAtTimestamp),
+		Data:           *gs,
+		UpdatedAt:      timeutil.DateTimeNow(),
+		OrgID:          gs.AdditionalTokenClaims[OrgIDKey].(string),
 	}
 	return m.db.WithContext(ctx).Save(grant).Error
 }
@@ -46,7 +43,7 @@ func (m GrantSessionManager) Delete(ctx context.Context, id string) error {
 }
 
 func (m GrantSessionManager) DeleteByAuthCode(ctx context.Context, code string) error {
-	return m.db.WithContext(ctx).Where("auth_code = ?", code).Delete(&Client{}).Error
+	return m.db.WithContext(ctx).Where("auth_code = ?", code).Delete(&Grant{}).Error
 }
 
 func (m GrantSessionManager) grant(ctx context.Context, tx *gorm.DB) (*goidc.GrantSession, error) {
@@ -55,12 +52,7 @@ func (m GrantSessionManager) grant(ctx context.Context, tx *gorm.DB) (*goidc.Gra
 	if err := tx.WithContext(ctx).First(&grant).Error; err != nil {
 		return nil, err
 	}
-
-	var oidcGrant goidc.GrantSession
-	if err := unmarshalJSON(grant.Data, &oidcGrant); err != nil {
-		return nil, fmt.Errorf("could not load the grant session: %w", err)
-	}
-	return &oidcGrant, nil
+	return &grant.Data, nil
 }
 
 type Grant struct {
@@ -68,12 +60,12 @@ type Grant struct {
 	TokenID        string
 	RefreshTokenID string
 	AuthCode       string
-	ExpiresAt      time.Time
-	Data           datatypes.JSON
+	ExpiresAt      timeutil.DateTime
+	Data           goidc.GrantSession `gorm:"serializer:json"`
 
 	OrgID     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt timeutil.DateTime
+	UpdatedAt timeutil.DateTime
 }
 
 func (Grant) TableName() string {

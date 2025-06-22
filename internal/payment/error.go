@@ -1,6 +1,6 @@
 package payment
 
-import "github.com/luiky/mock-bank/internal/errorutil"
+import "github.com/luikyv/mock-bank/internal/errorutil"
 
 var (
 	ErrUserNotFound                      = errorutil.New("user not found")

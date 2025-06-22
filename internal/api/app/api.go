@@ -9,14 +9,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/account"
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/page"
-	"github.com/luiky/mock-bank/internal/resource"
-	"github.com/luiky/mock-bank/internal/session"
-	"github.com/luiky/mock-bank/internal/timeutil"
-	"github.com/luiky/mock-bank/internal/user"
+	"github.com/luikyv/mock-bank/internal/account"
+	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/page"
+	"github.com/luikyv/mock-bank/internal/resource"
+	"github.com/luikyv/mock-bank/internal/session"
+	"github.com/luikyv/mock-bank/internal/timeutil"
+	"github.com/luikyv/mock-bank/internal/user"
 	"github.com/rs/cors"
 	"github.com/unrolled/secure"
 )
@@ -132,7 +132,7 @@ func (s Server) GetDirectoryAuthURL(ctx context.Context, request GetDirectoryAut
 			Name:     cookieSessionId,
 			Value:    session.ID.String(),
 			Path:     "/api",
-			Expires:  timeutil.Now().Add(sessionValidity),
+			Expires:  timeutil.DateTimeNow().Add(sessionValidity).Time,
 			HttpOnly: true,
 			Secure:   true,
 			Domain:   strings.TrimPrefix(s.host, "https://"),

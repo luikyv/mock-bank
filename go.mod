@@ -1,4 +1,4 @@
-module github.com/luiky/mock-bank
+module github.com/luikyv/mock-bank
 
 go 1.23.0
 

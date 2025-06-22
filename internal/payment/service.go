@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/account"
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/errorutil"
-	"github.com/luiky/mock-bank/internal/timeutil"
-	"github.com/luiky/mock-bank/internal/user"
+	"github.com/luikyv/mock-bank/internal/account"
+	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/errorutil"
+	"github.com/luikyv/mock-bank/internal/timeutil"
+	"github.com/luikyv/mock-bank/internal/user"
 	"gorm.io/gorm"
 )
 
@@ -40,7 +40,7 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *Accou
 	c.Status = ConsentStatusAwaitingAuthorization
 	c.ExpiresAt = timeutil.DateTimeNow().Add(5 * time.Minute)
 
-	u, err := s.userService.UserByCPF(ctx, c.UserCPF, c.OrgID)
+	u, err := s.userService.UserByCPF(ctx, c.UserIdentification, c.OrgID)
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			return ErrUserNotFound
@@ -175,7 +175,7 @@ func (s Service) Payment(ctx context.Context, id, orgID string) (*Payment, error
 		return nil, err
 	}
 
-	if ctx.Value(api.CtxKeyClientID) != nil && ctx.Value(api.CtxKeyClientID) != p.ClientID {
+	if clientID := ctx.Value(api.CtxKeyClientID); clientID != nil && clientID != p.ClientID {
 		return nil, ErrClientNotAllowed
 	}
 
@@ -186,7 +186,7 @@ func (s Service) Payment(ctx context.Context, id, orgID string) (*Payment, error
 	return p, nil
 }
 
-func (s Service) Cancel(ctx context.Context, id, orgID string, doc Document) (*Payment, error) {
+func (s Service) Cancel(ctx context.Context, id, orgID string, doc consent.Document) (*Payment, error) {
 	p, err := s.Payment(ctx, id, orgID)
 	if err != nil {
 		return nil, err
@@ -197,32 +197,32 @@ func (s Service) Cancel(ctx context.Context, id, orgID string, doc Document) (*P
 		return nil, err
 	}
 
-	if doc.Rel != "CPF" {
+	if doc.Rel != consent.RelationCPF {
 		return nil, errorutil.Format("%w: invalid rel", ErrCancelNotAllowed)
 	}
 
-	if c.UserCPF != doc.Identification {
+	if c.UserIdentification != doc.Identification {
 		return nil, errorutil.Format("%w: invalid identification", ErrCancelNotAllowed)
 	}
 
-	if err := s.cancel(ctx, p, CancelledFromInitiator, c.UserCPF); err != nil {
+	if err := s.cancel(ctx, p, CancelledFromInitiator, c.UserIdentification); err != nil {
 		return nil, err
 	}
 
 	return p, nil
 }
 
-func (s Service) CancelAll(ctx context.Context, consentID, orgID string, doc Document) ([]*Payment, error) {
+func (s Service) CancelAll(ctx context.Context, consentID, orgID string, doc consent.Document) ([]*Payment, error) {
 	c, err := s.Consent(ctx, consentID, orgID)
 	if err != nil {
 		return nil, err
 	}
 
-	if doc.Rel != "CPF" {
+	if doc.Rel != consent.RelationCPF {
 		return nil, errorutil.Format("%w: invalid rel", ErrCancelNotAllowed)
 	}
 
-	if c.UserCPF != doc.Identification {
+	if c.UserIdentification != doc.Identification {
 		return nil, errorutil.Format("%w: invalid identification", ErrCancelNotAllowed)
 	}
 
@@ -236,7 +236,7 @@ func (s Service) CancelAll(ctx context.Context, consentID, orgID string, doc Doc
 	var cancelled []*Payment
 	var cancelErrs error
 	for _, p := range payments {
-		if err := s.cancel(ctx, p, CancelledFromInitiator, c.UserCPF); err != nil {
+		if err := s.cancel(ctx, p, CancelledFromInitiator, c.UserIdentification); err != nil {
 			if !errors.Is(err, ErrCancelNotAllowed) {
 				return nil, err
 			}
@@ -387,7 +387,6 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *A
 func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status ConsentStatus) error {
 	c.Status = status
 	c.StatusUpdatedAt = timeutil.DateTimeNow()
-	c.UpdatedAt = timeutil.DateTimeNow()
 	return s.saveConsent(ctx, c)
 }
 
@@ -453,6 +452,7 @@ func (s Service) rejectConsent(ctx context.Context, c *Consent, code ConsentReje
 }
 
 func (s Service) saveConsent(ctx context.Context, c *Consent) error {
+	c.UpdatedAt = timeutil.DateTimeNow()
 	return s.db.WithContext(ctx).Save(c).Error
 }
 
@@ -538,8 +538,8 @@ func (s Service) runPreCreationAutomations(_ context.Context, p *Payment) error 
 }
 
 func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) error {
-	now := timeutil.Now()
-	if now.Before(p.UpdatedAt.Time.Add(5 * time.Second)) {
+	now := timeutil.DateTimeNow()
+	if now.Before(p.UpdatedAt.Add(5 * time.Second)) {
 		slog.DebugContext(ctx, "payment was updated less than 5 secs ago, skipping transitions", "updated_at", p.UpdatedAt.String())
 		return nil
 	}

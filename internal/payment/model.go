@@ -4,10 +4,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/account"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/mock-bank/internal/account"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 var (
@@ -112,33 +112,35 @@ const (
 )
 
 type Consent struct {
-	ID                    uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Status                ConsentStatus
-	StatusUpdatedAt       timeutil.DateTime
-	ExpiresAt             timeutil.DateTime
-	UserID                uuid.UUID
-	UserCPF               string
-	BusinessCNPJ          *string
-	ClientID              string
-	CreditorType          CreditorType
-	CreditorCPFCNPJ       string `gorm:"column:creditor_cpf_cnpj"`
-	CreditorName          string
-	CreditorAccountISBP   string
-	CreditorAccountIssuer *string
-	CreditorAccountNumber string
-	CreditorAccountType   AccountType
-	PaymentType           Type
-	PaymentSchedule       *Schedule `gorm:"serializer:json"`
-	PaymentDate           *timeutil.BrazilDate
-	PaymentCurrency       string
-	PaymentAmount         string
-	IBGETownCode          *string
-	LocalInstrument       LocalInstrument
-	QRCode                *string
-	Proxy                 *string
-	DebtorAccountID       *uuid.UUID `gorm:"column:account_id"`
-	DebtorAccount         *account.Account
-	Rejection             *ConsentRejection `gorm:"serializer:json"`
+	ID                     uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Status                 ConsentStatus
+	StatusUpdatedAt        timeutil.DateTime
+	ExpiresAt              timeutil.DateTime
+	UserID                 uuid.UUID
+	UserIdentification     string
+	UserRel                consent.Relation
+	BusinessIdentification *string
+	BusinessRel            *consent.Relation
+	ClientID               string
+	CreditorType           CreditorType
+	CreditorCPFCNPJ        string `gorm:"column:creditor_cpf_cnpj"`
+	CreditorName           string
+	CreditorAccountISBP    string
+	CreditorAccountIssuer  *string
+	CreditorAccountNumber  string
+	CreditorAccountType    AccountType
+	PaymentType            Type
+	PaymentSchedule        *Schedule `gorm:"serializer:json"`
+	PaymentDate            *timeutil.BrazilDate
+	PaymentCurrency        string
+	PaymentAmount          string
+	IBGETownCode           *string
+	LocalInstrument        LocalInstrument
+	QRCode                 *string
+	Proxy                  *string
+	DebtorAccountID        *uuid.UUID `gorm:"column:account_id"`
+	DebtorAccount          *account.Account
+	Rejection              *ConsentRejection `gorm:"serializer:json"`
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -214,7 +216,7 @@ func (c Consent) IsAuthorized() bool {
 }
 
 func (c Consent) IsExpired() bool {
-	return timeutil.Now().After(c.ExpiresAt.Time)
+	return timeutil.DateTimeNow().After(c.ExpiresAt.Time)
 }
 
 type ConsentStatus string
@@ -341,18 +343,6 @@ const (
 	AuthorisationFlowHybridFlow AuthorisationFlow = "HYBRID_FLOW"
 	AuthorisationFlowCIBAFlow   AuthorisationFlow = "CIBA_FLOW"
 	AuthorisationFlowFIDOFlow   AuthorisationFlow = "FIDO_FLOW"
-)
-
-type Document struct {
-	Identification string   `json:"identification"`
-	Rel            Relation `json:"rel"`
-}
-
-type Relation string
-
-const (
-	RelationCPF  Relation = "CPF"
-	RelationCNPJ Relation = "CNPJ"
 )
 
 func parseWeekday(weekDay DayOfWeek) time.Weekday {

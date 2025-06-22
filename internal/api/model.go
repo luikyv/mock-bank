@@ -4,15 +4,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/luiky/mock-bank/internal/page"
-	"github.com/luiky/mock-bank/internal/timeutil"
-)
-
-const (
-	MockBankBrand   string = "MockBank"
-	MockBankCNPJ    string = "00000000000000"
-	MockBankISPB    string = "00000000"
-	DefaultCurrency string = "BRL"
+	"github.com/luikyv/mock-bank/internal/page"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 type ContextKey string

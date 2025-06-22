@@ -5,20 +5,21 @@ import (
 	"context"
 	"crypto"
 	"errors"
+	"github.com/luikyv/mock-bank/internal/bank"
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/account"
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/errorutil"
-	"github.com/luiky/mock-bank/internal/idempotency"
-	"github.com/luiky/mock-bank/internal/jwtutil"
-	"github.com/luiky/mock-bank/internal/oidc"
-	"github.com/luiky/mock-bank/internal/payment"
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
+	"github.com/luikyv/mock-bank/internal/account"
+	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/errorutil"
+	"github.com/luikyv/mock-bank/internal/idempotency"
+	"github.com/luikyv/mock-bank/internal/jwtutil"
+	"github.com/luikyv/mock-bank/internal/oidc"
+	"github.com/luikyv/mock-bank/internal/payment"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 var _ StrictServerInterface = Server{}
@@ -118,7 +119,8 @@ func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsen
 	clientID := ctx.Value(api.CtxKeyClientID).(string)
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
 	c := &payment.Consent{
-		UserCPF:               req.Body.Data.LoggedUser.Document.Identification,
+		UserIdentification:    req.Body.Data.LoggedUser.Document.Identification,
+		UserRel:               consent.Relation(req.Body.Data.LoggedUser.Document.Rel),
 		ClientID:              clientID,
 		CreditorType:          payment.CreditorType(req.Body.Data.Creditor.PersonType),
 		CreditorCPFCNPJ:       req.Body.Data.Creditor.CpfCnpj,
@@ -138,8 +140,10 @@ func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsen
 		Proxy:                 req.Body.Data.Payment.Details.Proxy,
 		OrgID:                 orgID,
 	}
-	if req.Body.Data.BusinessEntity != nil {
-		c.BusinessCNPJ = &req.Body.Data.BusinessEntity.Document.Identification
+	if business := req.Body.Data.BusinessEntity; business != nil {
+		rel := consent.Relation(business.Document.Rel)
+		c.BusinessIdentification = &business.Document.Identification
+		c.BusinessRel = &rel
 	}
 
 	var debtorAccount *payment.Account
@@ -187,8 +191,8 @@ func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsen
 					Identification string "json:\"identification\""
 					Rel            string "json:\"rel\""
 				}{
-					Identification: c.UserCPF,
-					Rel:            "CPF",
+					Identification: c.UserIdentification,
+					Rel:            string(c.UserRel),
 				},
 			},
 			Creditor: Identification{
@@ -228,14 +232,15 @@ func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsen
 		Links: *api.NewLinks(s.baseURL + "/consents/" + c.URN()),
 	}
 
-	if c.BusinessCNPJ != nil {
+	if c.BusinessIdentification != nil {
+		rel := *c.BusinessRel
 		resp.Data.BusinessEntity = &BusinessEntity{
 			Document: struct {
 				Identification string "json:\"identification\""
 				Rel            string "json:\"rel\""
 			}{
-				Identification: *c.BusinessCNPJ,
-				Rel:            "CNPJ",
+				Identification: *c.BusinessIdentification,
+				Rel:            string(rel),
 			},
 		}
 	}
@@ -243,7 +248,7 @@ func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsen
 	if c.DebtorAccount != nil {
 		branch := account.DefaultBranch
 		resp.Data.DebtorAccount = &ConsentsDebtorAccount{
-			Ispb:        api.MockBankISPB,
+			Ispb:        bank.ISPB,
 			Issuer:      &branch,
 			Number:      c.DebtorAccount.Number,
 			AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(c.DebtorAccount.Type)),
@@ -289,8 +294,8 @@ func (s Server) PaymentsGetConsentsConsentID(ctx context.Context, req PaymentsGe
 					Identification string "json:\"identification\""
 					Rel            string "json:\"rel\""
 				}{
-					Identification: c.UserCPF,
-					Rel:            "CPF",
+					Identification: c.UserIdentification,
+					Rel:            string(c.UserRel),
 				},
 			},
 			Payment: PaymentConsent{
@@ -317,14 +322,14 @@ func (s Server) PaymentsGetConsentsConsentID(ctx context.Context, req PaymentsGe
 		Links: *api.NewLinks(s.baseURL + "/consents/" + c.URN()),
 	}
 
-	if c.BusinessCNPJ != nil {
+	if c.BusinessIdentification != nil {
 		resp.Data.BusinessEntity = &BusinessEntity{
 			Document: struct {
 				Identification string "json:\"identification\""
 				Rel            string "json:\"rel\""
 			}{
-				Identification: *c.BusinessCNPJ,
-				Rel:            "CNPJ",
+				Identification: *c.BusinessIdentification,
+				Rel:            string(*c.BusinessRel),
 			},
 		}
 	}
@@ -332,7 +337,7 @@ func (s Server) PaymentsGetConsentsConsentID(ctx context.Context, req PaymentsGe
 	if c.DebtorAccount != nil {
 		branch := account.DefaultBranch
 		resp.Data.DebtorAccount = &ConsentsDebtorAccount{
-			Ispb:        api.MockBankISPB,
+			Ispb:        bank.ISPB,
 			Issuer:      &branch,
 			Number:      c.DebtorAccount.Number,
 			AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(c.DebtorAccount.Type)),
@@ -446,7 +451,7 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 			TransactionIdentification: p.TransactionIdentification,
 			DebtorAccount: DebtorAccount{
 				AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(p.DebtorAccount.Type)),
-				Ispb:        api.MockBankISPB,
+				Ispb:        bank.ISPB,
 				Issuer:      &branch,
 				Number:      p.DebtorAccount.Number,
 			},
@@ -460,9 +465,9 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 
 func (s Server) PaymentsPatchPixPaymentsConsentID(ctx context.Context, req PaymentsPatchPixPaymentsConsentIDRequestObject) (PaymentsPatchPixPaymentsConsentIDResponseObject, error) {
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
-	payments, err := s.service.CancelAll(ctx, req.ConsentID, orgID, payment.Document{
+	payments, err := s.service.CancelAll(ctx, req.ConsentID, orgID, consent.Document{
 		Identification: req.Body.Data.Cancellation.CancelledBy.Document.Identification,
-		Rel:            payment.Relation(req.Body.Data.Cancellation.CancelledBy.Document.Rel),
+		Rel:            consent.Relation(req.Body.Data.Cancellation.CancelledBy.Document.Rel),
 	})
 	if err != nil {
 		return nil, err
@@ -522,7 +527,7 @@ func (s Server) PaymentsGetPixPaymentsPaymentID(ctx context.Context, req Payment
 			TransactionIdentification: p.TransactionIdentification,
 			DebtorAccount: DebtorAccount{
 				AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(p.DebtorAccount.Type)),
-				Ispb:        api.MockBankISPB,
+				Ispb:        bank.ISPB,
 				Issuer:      &branch,
 				Number:      p.DebtorAccount.Number,
 			},
@@ -554,9 +559,9 @@ func (s Server) PaymentsGetPixPaymentsPaymentID(ctx context.Context, req Payment
 
 func (s Server) PaymentsPatchPixPaymentsPaymentID(ctx context.Context, req PaymentsPatchPixPaymentsPaymentIDRequestObject) (PaymentsPatchPixPaymentsPaymentIDResponseObject, error) {
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
-	p, err := s.service.Cancel(ctx, string(req.PaymentID), orgID, payment.Document{
+	p, err := s.service.Cancel(ctx, string(req.PaymentID), orgID, consent.Document{
 		Identification: req.Body.Data.Cancellation.CancelledBy.Document.Identification,
-		Rel:            payment.Relation(req.Body.Data.Cancellation.CancelledBy.Document.Rel),
+		Rel:            consent.Relation(req.Body.Data.Cancellation.CancelledBy.Document.Rel),
 	})
 	if err != nil {
 		return nil, err
@@ -592,7 +597,7 @@ func (s Server) PaymentsPatchPixPaymentsPaymentID(ctx context.Context, req Payme
 			TransactionIdentification: p.TransactionIdentification,
 			DebtorAccount: DebtorAccount{
 				AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(p.DebtorAccount.Type)),
-				Ispb:        api.MockBankISPB,
+				Ispb:        bank.ISPB,
 				Issuer:      &branch,
 				Number:      p.DebtorAccount.Number,
 			},

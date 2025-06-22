@@ -20,9 +20,9 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/jwtutil"
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/mock-bank/internal/jwtutil"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 var (
@@ -30,11 +30,11 @@ var (
 
 	directoryWellKnownMu            sync.Mutex
 	directoryWellKnownCache         *directoryWellKnown
-	directoryWellKnownLastFetchedAt time.Time
+	directoryWellKnownLastFetchedAt timeutil.DateTime
 
 	directoryJWKSMu            sync.Mutex
 	directoryJWKSCache         *goidc.JSONWebKeySet
-	directoryJWKSLastFetchedAt time.Time
+	directoryJWKSLastFetchedAt timeutil.DateTime
 )
 
 type Service struct {
@@ -245,7 +245,7 @@ func (ds Service) wellKnown() (directoryWellKnown, error) {
 	directoryWellKnownMu.Lock()
 	defer directoryWellKnownMu.Unlock()
 
-	if directoryWellKnownCache != nil && timeutil.Now().Before(directoryWellKnownLastFetchedAt.Add(cacheTime)) {
+	if directoryWellKnownCache != nil && timeutil.DateTimeNow().Before(directoryWellKnownLastFetchedAt.Add(cacheTime)) {
 		return *directoryWellKnownCache, nil
 	}
 
@@ -266,7 +266,7 @@ func (ds Service) wellKnown() (directoryWellKnown, error) {
 	}
 
 	directoryWellKnownCache = &config
-	directoryWellKnownLastFetchedAt = timeutil.Now()
+	directoryWellKnownLastFetchedAt = timeutil.DateTimeNow()
 	return config, nil
 }
 
@@ -275,7 +275,7 @@ func (ds Service) jwks() (goidc.JSONWebKeySet, error) {
 	directoryJWKSMu.Lock()
 	defer directoryJWKSMu.Unlock()
 
-	if directoryJWKSCache != nil && timeutil.Now().Before(directoryJWKSLastFetchedAt.Add(cacheTime)) {
+	if directoryJWKSCache != nil && timeutil.DateTimeNow().Before(directoryJWKSLastFetchedAt.Add(cacheTime)) {
 		return *directoryJWKSCache, nil
 	}
 
@@ -300,7 +300,7 @@ func (ds Service) jwks() (goidc.JSONWebKeySet, error) {
 	}
 
 	directoryJWKSCache = &jwks
-	directoryJWKSLastFetchedAt = timeutil.Now()
+	directoryJWKSLastFetchedAt = timeutil.DateTimeNow()
 	return jwks, nil
 }
 

@@ -2,13 +2,10 @@ package oidc
 
 import (
 	"context"
-	"fmt"
-	"time"
 
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -23,9 +20,9 @@ func NewClientManager(db *gorm.DB) ClientManager {
 func (cm ClientManager) Save(ctx context.Context, oidcClient *goidc.Client) error {
 	client := &Client{
 		ID:        oidcClient.ID,
-		Data:      marshalJSON(oidcClient),
-		UpdatedAt: timeutil.Now(),
-		OrgID:     oidcClient.CustomAttribute("org_id").(string),
+		Data:      *oidcClient,
+		UpdatedAt: timeutil.DateTimeNow(),
+		OrgID:     oidcClient.CustomAttribute(OrgIDKey).(string),
 	}
 	return cm.db.WithContext(ctx).Save(client).Error
 }
@@ -36,11 +33,7 @@ func (cm ClientManager) Client(ctx context.Context, id string) (*goidc.Client, e
 		return nil, err
 	}
 
-	var oidcClient goidc.Client
-	if err := unmarshalJSON(client.Data, &oidcClient); err != nil {
-		return nil, fmt.Errorf("could not load the client: %w", err)
-	}
-	return &oidcClient, nil
+	return &client.Data, nil
 }
 
 func (cm ClientManager) Delete(ctx context.Context, id string) error {
@@ -48,12 +41,12 @@ func (cm ClientManager) Delete(ctx context.Context, id string) error {
 }
 
 type Client struct {
-	ID   string `gorm:"primaryKey"`
-	Data datatypes.JSON
+	ID   string       `gorm:"primaryKey"`
+	Data goidc.Client `gorm:"serializer:json"`
 
 	OrgID     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt timeutil.DateTime
+	UpdatedAt timeutil.DateTime
 }
 
 func (Client) TableName() string {

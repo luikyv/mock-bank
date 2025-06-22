@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/errorutil"
-	"github.com/luiky/mock-bank/internal/page"
-	"github.com/luiky/mock-bank/internal/timeutil"
-	"github.com/luiky/mock-bank/internal/user"
+	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/errorutil"
+	"github.com/luikyv/mock-bank/internal/page"
+	"github.com/luikyv/mock-bank/internal/timeutil"
+	"github.com/luikyv/mock-bank/internal/user"
 	"gorm.io/gorm"
 )
 
@@ -104,7 +104,7 @@ func (s Service) Create(ctx context.Context, c *Consent) error {
 		return err
 	}
 
-	if user, err := s.userService.UserByCPF(ctx, c.UserCPF, c.OrgID); err == nil {
+	if user, err := s.userService.UserByCPF(ctx, c.UserIdentification, c.OrgID); err == nil {
 		c.UserID = &user.ID
 	}
 
@@ -154,7 +154,7 @@ func (s Service) validate(_ context.Context, c *Consent) error {
 		return err
 	}
 
-	now := timeutil.Now()
+	now := timeutil.DateTimeNow()
 	if c.ExpiresAt != nil && (c.ExpiresAt.After(now.AddDate(1, 0, 0)) || c.ExpiresAt.Before(now)) {
 		return ErrInvalidExpiration
 	}

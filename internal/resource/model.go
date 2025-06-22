@@ -1,8 +1,8 @@
 package resource
 
 import (
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 var (

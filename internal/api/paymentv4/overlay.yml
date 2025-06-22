@@ -8,7 +8,7 @@ actions:
   update:
     x-go-type: api.Meta
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/api
+      path: github.com/luikyv/mock-bank/internal/api
 - target: $.components.schemas[*].properties.meta.$ref
   remove: true
 
@@ -16,7 +16,7 @@ actions:
   update:
     x-go-type: api.Links
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/api
+      path: github.com/luikyv/mock-bank/internal/api
 - target: $.components.schemas[*].properties.links.$ref
   remove: true
 
@@ -24,19 +24,19 @@ actions:
   update:
     x-go-type: timeutil.BrazilDate
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/timeutil
+      path: github.com/luikyv/mock-bank/internal/timeutil
 
 - target: $..[*][?(@.format == "date-time")]
   update:
     x-go-type: timeutil.DateTime
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/timeutil2
+      path: github.com/luikyv/mock-bank/internal/timeutil2
 
 - target: $.components.schemas.Schedule
   update:
     x-go-type: payment.Schedule
     x-go-type-import:
-      path: github.com/luiky/mock-bank/internal/payment
+      path: github.com/luikyv/mock-bank/internal/payment
 
 - target: $.components.responses[*].headers.x-fapi-interaction-id
   remove: true

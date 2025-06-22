@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/page"
+	"github.com/luikyv/mock-bank/internal/page"
 	"gorm.io/gorm"
 )
 

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 const (
@@ -24,16 +24,18 @@ var (
 )
 
 type Consent struct {
-	ID              uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Status          Status
-	Permissions     []Permission `gorm:"serializer:json"`
-	StatusUpdatedAt timeutil.DateTime
-	ExpiresAt       *timeutil.DateTime
-	UserID          *uuid.UUID
-	UserCPF         string
-	BusinessCNPJ    *string
-	ClientID        string
-	Rejection       *Rejection
+	ID                     uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Status                 Status
+	Permissions            []Permission `gorm:"serializer:json"`
+	StatusUpdatedAt        timeutil.DateTime
+	ExpiresAt              *timeutil.DateTime
+	UserID                 *uuid.UUID
+	UserIdentification     string
+	UserRel                Relation
+	BusinessIdentification *string
+	BusinessRel            *Relation
+	ClientID               string
+	Rejection              *Rejection
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -47,7 +49,7 @@ func (c Consent) URN() string {
 // HasAuthExpired returns true if the status is [StatusAwaitingAuthorization] and
 // the max time awaiting authorization has elapsed.
 func (c Consent) HasAuthExpired() bool {
-	now := timeutil.Now()
+	now := timeutil.DateTimeNow()
 	return c.IsAwaitingAuthorization() &&
 		now.After(c.CreatedAt.Add(time.Second*maxTimeAwaitingAuthorizationSecs).Time)
 }
@@ -58,7 +60,7 @@ func (c Consent) IsExpired() bool {
 	if c.ExpiresAt == nil {
 		return false
 	}
-	now := timeutil.Now()
+	now := timeutil.DateTimeNow()
 	return c.Status == StatusAuthorized && now.After(c.ExpiresAt.Time)
 }
 
@@ -311,3 +313,15 @@ type Extension struct {
 func (Extension) TableName() string {
 	return "consent_extensions"
 }
+
+type Document struct {
+	Identification string   `json:"identification"`
+	Rel            Relation `json:"rel"`
+}
+
+type Relation string
+
+const (
+	RelationCPF  Relation = "CPF"
+	RelationCNPJ Relation = "CNPJ"
+)

@@ -2,13 +2,14 @@ package autopayment
 
 import (
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/account"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/payment"
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/mock-bank/internal/account"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/payment"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 var (
@@ -39,15 +40,15 @@ type Payment struct {
 	Proxy                     *string
 	TransactionIdentification *string
 	DocumentIdentification    string
-	DocumentRel               payment.Relation
+	DocumentRel               consent.Relation
 	OriginalID                *uuid.UUID
 	Reference                 *string
+	RiskSignals               *map[string]any `gorm:"serializer:json"`
 	ClientID                  string
 	DebtorAccountID           *uuid.UUID `gorm:"column:account_id"`
 	DebtorAccount             *account.Account
-	// TODO: Should I flatten these fields?
-	Rejection    *Rejection            `gorm:"serializer:json"`
-	Cancellation *payment.Cancellation `gorm:"serializer:json"`
+	Rejection                 *Rejection            `gorm:"serializer:json"`
+	Cancellation              *payment.Cancellation `gorm:"serializer:json"`
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -59,23 +60,26 @@ func (Payment) TableName() string {
 }
 
 type Consent struct {
-	ID              uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Status          ConsentStatus
-	StatusUpdatedAt timeutil.DateTime
-	AuthorizedAt    *timeutil.DateTime
-	ApprovalDueAt   *timeutil.BrazilDate
-	ExpiresAt       *timeutil.DateTime
-	UserID          uuid.UUID
-	UserCPF         string
-	BusinessCNPJ    *string
-	Creditors       []Creditor `gorm:"serializer:json"`
-	AdditionalInfo  *string
-	Configuration   Configuration `gorm:"serializer:json"`
-	DebtorAccountID *uuid.UUID    `gorm:"column:account_id"`
-	DebtorAccount   *account.Account
-	Rejection       *ConsentRejection  `gorm:"serializer:json"`
-	Revocation      *ConsentRevocation `gorm:"serializer:json"`
-	ClientID        string
+	ID                     uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Status                 ConsentStatus
+	StatusUpdatedAt        timeutil.DateTime
+	AuthorizedAt           *timeutil.DateTime
+	ApprovalDueAt          *timeutil.BrazilDate
+	ExpiresAt              *timeutil.DateTime
+	UserID                 uuid.UUID
+	UserIdentification     string
+	UserRel                consent.Relation
+	BusinessIdentification *string
+	BusinessRel            *consent.Relation
+	Creditors              []Creditor `gorm:"serializer:json"`
+	AdditionalInfo         *string
+	Configuration          Configuration   `gorm:"serializer:json"`
+	RiskSignals            *map[string]any `gorm:"serializer:json"`
+	DebtorAccountID        *uuid.UUID      `gorm:"column:account_id"`
+	DebtorAccount          *account.Account
+	Rejection              *ConsentRejection  `gorm:"serializer:json"`
+	Revocation             *ConsentRevocation `gorm:"serializer:json"`
+	ClientID               string
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -92,6 +96,13 @@ func (c Consent) URN() string {
 
 func (c Consent) IsAwaitingAuthorization() bool {
 	return c.Status == ConsentStatusAwaitingAuthorization
+}
+
+// HasAuthExpired returns true if the status is [ConsentStatusAwaitingAuthorization] and
+// the max time awaiting authorization has elapsed.
+func (c Consent) HasAuthExpired() bool {
+	now := timeutil.DateTimeNow()
+	return c.IsAwaitingAuthorization() && now.After(c.CreatedAt.Add(60*time.Minute).Time)
 }
 
 type ConsentStatus string
@@ -113,7 +124,7 @@ type Configuration struct {
 		Interval              Interval `json:"interval"`
 		ContractDebtor        struct {
 			Name     string           `json:"name"`
-			Document payment.Document `json:"document"`
+			Document consent.Document `json:"document"`
 		} `json:"contractDebtor,omitempty"`
 		FirstPayment *struct {
 			Type                  payment.Type        `json:"type"`
@@ -196,6 +207,21 @@ const (
 	RejectionInvalidPaymentDetail           RejectionReasonCode = "DETALHE_PAGAMENTO_INVALIDO"
 )
 
+type ConsentEdition struct {
+	RiskSignals *map[string]any `json:"riskSignals,omitempty"`
+	Creditors   []struct {
+		Name string `json:"name"`
+	} `json:"creditors"`
+	ExpiresAt              *timeutil.DateTime `json:"expirationDateTime,omitempty"`
+	RecurringConfiguration *struct {
+		Automatic *struct {
+			MaximumVariableAmount *string `json:"maximumVariableAmount,omitempty"`
+		} `json:"automatic,omitempty"`
+	} `json:"recurringConfiguration,omitempty"`
+	LoggedUser     *consent.Document `json:"loggedUser,omitempty"`
+	BusinessEntity *consent.Document `json:"businessEntity,omitempty"`
+}
+
 type ConsentRejection struct {
 	By     TerminatedBy         `json:"by"`
 	From   TerminatedFrom       `json:"from"`
@@ -251,4 +277,19 @@ type Creditor struct {
 	Type    payment.CreditorType `json:"type"`
 	CPFCNPJ string               `json:"cpf_cnpj"`
 	Name    string               `json:"name"`
+}
+
+type Filter struct {
+	ConsentID string
+}
+
+// URLQuery returns a URL query string with the filter parameters.
+// If parameters are present, the returned string includes a '?' prefix.
+// Returns an empty string if no parameters are set.
+func (f Filter) URLQuery() string {
+	if f.ConsentID == "" {
+		return ""
+	}
+	return "?recurringConsentId=" + f.ConsentID
+
 }

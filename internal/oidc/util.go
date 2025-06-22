@@ -17,12 +17,11 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/payment"
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
-	"gorm.io/datatypes"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/payment"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 const (
@@ -31,10 +30,10 @@ const (
 )
 
 var (
-	ssJWKcacheTime      = 1 * time.Hour
+	ssJWKCacheTime      = 1 * time.Hour
 	ssJWKSMu            sync.Mutex
 	ssJWKSCache         *goidc.JSONWebKeySet
-	ssJWKSLastFetchedAt time.Time
+	ssJWKSLastFetchedAt timeutil.DateTime
 )
 
 func TokenOptionsFunc() goidc.TokenOptionsFunc {
@@ -79,8 +78,8 @@ func HandleGrantFunc(op *provider.Provider, consentService consent.Service, paym
 			return fmt.Errorf("could not get client for verifying grant: %w", err)
 		}
 
-		orgID := client.CustomAttribute("org_id").(string)
-		gi.AdditionalTokenClaims["org_id"] = orgID
+		orgID := client.CustomAttribute(OrgIDKey).(string)
+		gi.AdditionalTokenClaims[OrgIDKey] = orgID
 
 		consentID, _ := consent.IDFromScopes(gi.ActiveScopes)
 
@@ -96,9 +95,18 @@ func HandleGrantFunc(op *provider.Provider, consentService consent.Service, paym
 	}
 }
 
-func ShoudIssueRefreshToken(client *goidc.Client, grantInfo goidc.GrantInfo) bool {
-	return slices.Contains(client.GrantTypes, goidc.GrantRefreshToken) &&
-		(grantInfo.GrantType == goidc.GrantAuthorizationCode || grantInfo.GrantType == goidc.GrantRefreshToken)
+func HandlePARSessionFunc() goidc.HandleSessionFunc {
+	return func(r *http.Request, as *goidc.AuthnSession, c *goidc.Client) error {
+		as.StoreParameter(OrgIDKey, c.CustomAttribute(OrgIDKey))
+		return nil
+	}
+}
+
+func ShouldIssueRefreshTokenFunc() goidc.ShouldIssueRefreshTokenFunc {
+	return func(client *goidc.Client, grantInfo goidc.GrantInfo) bool {
+		return slices.Contains(client.GrantTypes, goidc.GrantRefreshToken) &&
+			(grantInfo.GrantType == goidc.GrantAuthorizationCode || grantInfo.GrantType == goidc.GrantRefreshToken)
+	}
 }
 
 func ClientCert(r *http.Request) (*x509.Certificate, error) {
@@ -169,7 +177,7 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 			return goidc.WrapError(goidc.ErrorCodeInvalidClientMetadata, "invalid software statement signature", err)
 		}
 
-		if claims.IssuedAt == nil || timeutil.Now().After(claims.IssuedAt.Time().Add(5*time.Minute)) {
+		if claims.IssuedAt == nil || timeutil.DateTimeNow().After(claims.IssuedAt.Time().Add(5*time.Minute)) {
 			return goidc.NewError(goidc.ErrorCodeInvalidClientMetadata, "invalid software statement iat claim")
 		}
 
@@ -191,11 +199,11 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 			return goidc.NewError(goidc.ErrorCodeInvalidClientMetadata, "invalid software statement, no regulatory roles defined")
 		}
 
-		if c.CustomAttribute("software_id") != nil && c.CustomAttribute("software_id") != ss.SoftwareID {
+		if sID := c.CustomAttribute("software_id"); sID != nil && sID != ss.SoftwareID {
 			return goidc.NewError(goidc.ErrorCodeInvalidClientMetadata, "software id mismatch")
 		}
 
-		if c.CustomAttribute("org_id") != nil && c.CustomAttribute("org_id") != ss.OrgID {
+		if orgID := c.CustomAttribute(OrgIDKey); orgID != nil && orgID != ss.OrgID {
 			return goidc.NewError(goidc.ErrorCodeInvalidClientMetadata, "organization id mismatch")
 		}
 
@@ -218,7 +226,7 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 		}
 
 		c.CustomAttributes = map[string]any{
-			"org_id":      ss.OrgID,
+			OrgIDKey:      ss.OrgID,
 			"software_id": ss.SoftwareID,
 		}
 		return nil
@@ -238,7 +246,7 @@ func fetchSoftwareStatementJWKS(keystoreHost string) (goidc.JSONWebKeySet, error
 	ssJWKSMu.Lock()
 	defer ssJWKSMu.Unlock()
 
-	if ssJWKSCache != nil && timeutil.Now().Before(ssJWKSLastFetchedAt.Add(ssJWKcacheTime)) {
+	if ssJWKSCache != nil && timeutil.DateTimeNow().Before(ssJWKSLastFetchedAt.Add(ssJWKCacheTime)) {
 		return *ssJWKSCache, nil
 	}
 
@@ -258,26 +266,6 @@ func fetchSoftwareStatementJWKS(keystoreHost string) (goidc.JSONWebKeySet, error
 	}
 
 	ssJWKSCache = &jwks
-	ssJWKSLastFetchedAt = timeutil.Now()
+	ssJWKSLastFetchedAt = timeutil.DateTimeNow()
 	return jwks, nil
-}
-
-func parseTimestamp(timestamp int) time.Time {
-	return time.Unix(int64(timestamp), 0).UTC()
-}
-
-func marshalJSON(v any) datatypes.JSON {
-	bytes, err := json.Marshal(v)
-	if err != nil {
-		panic("failed to marshal json: " + err.Error())
-	}
-	return datatypes.JSON(bytes)
-}
-
-func unmarshalJSON(data datatypes.JSON, v any) error {
-	if len(data) == 0 {
-		return errors.New("data is empty")
-	}
-
-	return json.Unmarshal(data, v)
 }

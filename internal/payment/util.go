@@ -3,7 +3,7 @@ package payment
 import (
 	"time"
 
-	"github.com/luiky/mock-bank/internal/timeutil"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 // ParseEndToEndDate extracts and parses the datetime (yyyyMMddHHmm) from an end to end ID.

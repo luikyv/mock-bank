@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/luiky/mock-bank/internal/resource"
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/mock-bank/internal/resource"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 	"gorm.io/gorm"
 )
 

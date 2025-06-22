@@ -74,8 +74,12 @@ func (d DateTime) Add(duration time.Duration) DateTime {
 	}
 }
 
+func (d DateTime) Before(t DateTime) bool {
+	return d.Time.Before(t.Time)
+}
+
 func DateTimeNow() DateTime {
-	return NewDateTime(Now())
+	return NewDateTime(now())
 }
 
 func NewDateTime(t time.Time) DateTime {
@@ -149,7 +153,7 @@ func (d BrazilDate) Value() (driver.Value, error) {
 }
 
 func BrazilDateNow() BrazilDate {
-	return NewBrazilDate(Now())
+	return NewBrazilDate(now())
 }
 
 func NewBrazilDate(t time.Time) BrazilDate {
@@ -160,11 +164,15 @@ func NewBrazilDate(t time.Time) BrazilDate {
 }
 
 // Now returns the current time in UTC.
-func Now() time.Time {
+func now() time.Time {
 	return time.Now().UTC()
 }
 
 // Timestamp returns the current Unix timestamp in seconds (UTC).
 func Timestamp() int {
-	return int(Now().Unix())
+	return int(now().Unix())
+}
+
+func ParseTimestamp(ts int) DateTime {
+	return NewDateTime(time.Unix(int64(ts), 0))
 }

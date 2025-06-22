@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/api"
 )
 
 func PermissionMiddleware(consentService Service, permissions ...Permission) func(http.Handler) http.Handler {

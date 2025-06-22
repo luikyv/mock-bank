@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/luiky/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/api"
 )
 
 const headerIdempotencyID = "X-Idempotency-Key"
@@ -36,13 +36,8 @@ func Middleware(service Service) func(http.Handler) http.Handler {
 			rec, err := service.Response(r.Context(), idempotencyID)
 			if err == nil {
 				// Validate if the current request body matches the stored one.
-				if base64.RawStdEncoding.EncodeToString(bodyBytes) != rec.Request {
-					slog.DebugContext(r.Context(),
-						"mismatched idempotent request payload",
-						"id", rec.ID,
-						"got", base64.RawStdEncoding.EncodeToString(bodyBytes),
-						"expected", rec.Request,
-					)
+				if body := base64.RawStdEncoding.EncodeToString(bodyBytes); body != rec.Request {
+					slog.DebugContext(r.Context(), "mismatched idempotent request payload", "id", rec.ID, "got", body, "expected", rec.Request)
 					api.WriteError(w, r, api.NewError("ERRO_IDEMPOTENCIA", http.StatusUnprocessableEntity, "request payload does not match previous idempotent request"))
 					return
 				}
@@ -73,7 +68,7 @@ func Middleware(service Service) func(http.Handler) http.Handler {
 				StatusCode: recorder.StatusCode,
 			})
 			if err != nil {
-				slog.ErrorContext(r.Context(), "failed to store idempotent response", slog.Any("err", err))
+				slog.ErrorContext(r.Context(), "failed to store idempotent response", "error", err)
 			}
 		})
 	}

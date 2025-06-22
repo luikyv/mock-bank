@@ -4,17 +4,18 @@ package accountv2
 import (
 	"context"
 	"errors"
+	"github.com/luikyv/mock-bank/internal/bank"
 	"net/http"
 	"strings"
 
-	"github.com/luiky/mock-bank/internal/account"
-	"github.com/luiky/mock-bank/internal/api"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/oidc"
-	"github.com/luiky/mock-bank/internal/page"
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
+	"github.com/luikyv/mock-bank/internal/account"
+	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/oidc"
+	"github.com/luikyv/mock-bank/internal/page"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 var _ StrictServerInterface = Server{}
@@ -111,9 +112,9 @@ func (s Server) AccountsGetAccounts(ctx context.Context, req AccountsGetAccounts
 		resp.Data = append(resp.Data, AccountData{
 			AccountID:   acc.ID.String(),
 			BranchCode:  &defaultBranch,
-			BrandName:   api.MockBankBrand,
+			BrandName:   bank.Brand,
 			CheckDigit:  account.DefaultCheckDigit,
-			CompanyCnpj: api.MockBankCNPJ,
+			CompanyCnpj: bank.CNPJ,
 			CompeCode:   account.DefaultCompeCode,
 			Number:      acc.Number,
 			Type:        EnumAccountType(acc.Type),
@@ -138,7 +139,7 @@ func (s Server) AccountsGetAccountsAccountID(ctx context.Context, req AccountsGe
 			BranchCode: &defaultBranch,
 			CheckDigit: account.DefaultCheckDigit,
 			CompeCode:  account.DefaultCompeCode,
-			Currency:   api.DefaultCurrency,
+			Currency:   bank.Currency,
 			Number:     acc.Number,
 			Subtype:    EnumAccountSubType(acc.SubType),
 			Type:       EnumAccountType(acc.Type),
@@ -162,15 +163,15 @@ func (s Server) AccountsGetAccountsAccountIDBalances(ctx context.Context, req Ac
 		Data: AccountBalancesData{
 			AutomaticallyInvestedAmount: AccountBalancesDataAutomaticallyInvestedAmount{
 				Amount:   acc.AvailableAmount,
-				Currency: api.DefaultCurrency,
+				Currency: bank.Currency,
 			},
 			AvailableAmount: AccountBalancesDataAvailableAmount{
 				Amount:   acc.AvailableAmount,
-				Currency: api.DefaultCurrency,
+				Currency: bank.Currency,
 			},
 			BlockedAmount: AccountBalancesDataBlockedAmount{
 				Amount:   acc.BlockedAmount,
-				Currency: api.DefaultCurrency,
+				Currency: bank.Currency,
 			},
 			UpdateDateTime: acc.UpdatedAt,
 		},
@@ -196,19 +197,19 @@ func (s Server) AccountsGetAccountsAccountIDOverdraftLimits(ctx context.Context,
 	if acc.OverdraftLimitContracted != "" {
 		resp.Data.OverdraftContractedLimit = &AccountOverdraftLimitsDataOverdraftContractedLimit{
 			Amount:   acc.OverdraftLimitContracted,
-			Currency: api.DefaultCurrency,
+			Currency: bank.Currency,
 		}
 	}
 	if acc.OverdraftLimitUsed != "" {
 		resp.Data.OverdraftUsedLimit = &AccountOverdraftLimitsDataOverdraftUsedLimit{
 			Amount:   acc.OverdraftLimitUsed,
-			Currency: api.DefaultCurrency,
+			Currency: bank.Currency,
 		}
 	}
 	if acc.OverdraftLimitUnarranged != "" {
 		resp.Data.UnarrangedOverdraftAmount = &AccountOverdraftLimitsDataUnarrangedOverdraftAmount{
 			Amount:   acc.OverdraftLimitUnarranged,
-			Currency: api.DefaultCurrency,
+			Currency: bank.Currency,
 		}
 	}
 
@@ -246,7 +247,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 			// PartiePersonType:               "",
 			TransactionAmount: AccountTransactionsDataAmount{
 				Amount:   tx.Amount,
-				Currency: api.DefaultCurrency,
+				Currency: bank.Currency,
 			},
 			TransactionDateTime: tx.CreatedAt.Format(timeutil.DateTimeMillisFormat),
 			TransactionID:       tx.ID,
@@ -288,7 +289,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 			// PartiePersonType:               "",
 			TransactionAmount: AccountTransactionsDataAmount{
 				Amount:   tx.Amount,
-				Currency: api.DefaultCurrency,
+				Currency: bank.Currency,
 			},
 			TransactionDateTime: tx.CreatedAt.Format(timeutil.DateTimeMillisFormat),
 			TransactionID:       tx.ID,

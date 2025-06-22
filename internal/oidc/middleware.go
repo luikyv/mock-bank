@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luiky/mock-bank/internal/api"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
+	"github.com/luikyv/mock-bank/internal/api"
 )
 
 func AuthMiddleware(op *provider.Provider, scopes ...goidc.Scope) func(http.Handler) http.Handler {
@@ -30,7 +30,7 @@ func AuthMiddleware(op *provider.Provider, scopes ...goidc.Scope) func(http.Hand
 			ctx = context.WithValue(ctx, api.CtxKeyClientID, tokenInfo.ClientID)
 			ctx = context.WithValue(ctx, api.CtxKeySubject, tokenInfo.Subject)
 			ctx = context.WithValue(ctx, api.CtxKeyScopes, tokenInfo.Scopes)
-			ctx = context.WithValue(ctx, api.CtxKeyOrgID, tokenInfo.AdditionalTokenClaims["org_id"])
+			ctx = context.WithValue(ctx, api.CtxKeyOrgID, tokenInfo.AdditionalTokenClaims[OrgIDKey])
 			r = r.WithContext(ctx)
 
 			tokenScopes := strings.Split(tokenInfo.Scopes, " ")

@@ -5,8 +5,10 @@ CREATE TABLE consents (
     status_updated_at TIMESTAMPTZ DEFAULT now(),
     expires_at TIMESTAMPTZ,
     user_id UUID REFERENCES mock_users(id),
-    user_cpf TEXT NOT NULL,
-    business_cnpj TEXT,
+    user_identification TEXT NOT NULL,
+	user_rel TEXT NOT NULL,
+	business_dentification TEXT,
+	business_rel TEXT,
     client_id TEXT NOT NULL REFERENCES oauth_clients(id),
     rejection JSONB,
 

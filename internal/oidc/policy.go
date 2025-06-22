@@ -11,17 +11,18 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luiky/mock-bank/internal/account"
-	"github.com/luiky/mock-bank/internal/autopayment"
-	"github.com/luiky/mock-bank/internal/consent"
-	"github.com/luiky/mock-bank/internal/payment"
-	"github.com/luiky/mock-bank/internal/timeutil"
-	"github.com/luiky/mock-bank/internal/user"
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/mock-bank/internal/account"
+	"github.com/luikyv/mock-bank/internal/autopayment"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/payment"
+	"github.com/luikyv/mock-bank/internal/timeutil"
+	"github.com/luikyv/mock-bank/internal/user"
 	"github.com/unrolled/secure"
 )
 
 // TODO: Validate that the resources (accounts, ...) sent belong to the user.
+// TODO: For auto payments: Mesmo se enviado pela ITP, o usuário pagador pode alterar durante a autorização do consentimento.
 
 func Policies(
 	baseURL string,
@@ -31,13 +32,14 @@ func Policies(
 	paymentService payment.Service,
 	autoPaymentService autopayment.Service,
 ) []goidc.AuthnPolicy {
+	// TODO: I don't need to split these.
 	loginTemplate := template.Must(template.ParseFS(templates, "login.html"))
 	consentTemplate := template.Must(template.ParseFS(templates, "consent.html"))
 	accountTemplate := template.Must(template.ParseFS(templates, "account.html"))
 	paymentTemplate := template.Must(template.ParseFS(templates, "payment.html"))
 	return []goidc.AuthnPolicy{
 		goidc.NewPolicyWithSteps(
-			"auto_payments",
+			"auto_payment",
 			func(r *http.Request, c *goidc.Client, as *goidc.AuthnSession) bool {
 				consentID, ok := autopayment.ConsentIDFromScopes(as.Scopes)
 				if !ok {
@@ -45,7 +47,7 @@ func Policies(
 				}
 
 				as.StoreParameter(paramConsentID, consentID)
-				as.StoreParameter(paramOrgID, c.CustomAttribute(ClientAttrOrgID))
+				as.StoreParameter(OrgIDKey, c.CustomAttribute(OrgIDKey))
 				return true
 			},
 			goidc.NewAuthnStep("setup", setUpAutoPaymentStep(autoPaymentService, userService)),
@@ -55,7 +57,7 @@ func Policies(
 			goidc.NewAuthnStep("finish", grantAuthzStep()),
 		),
 		goidc.NewPolicyWithSteps(
-			"payments",
+			"payment",
 			func(r *http.Request, c *goidc.Client, as *goidc.AuthnSession) bool {
 				if !strings.Contains(as.Scopes, payment.Scope.ID) {
 					return false
@@ -67,7 +69,7 @@ func Policies(
 				}
 
 				as.StoreParameter(paramConsentID, consentID)
-				as.StoreParameter(paramOrgID, c.CustomAttribute(ClientAttrOrgID))
+				as.StoreParameter(OrgIDKey, c.CustomAttribute(OrgIDKey))
 				return true
 			},
 			goidc.NewAuthnStep("setup", setUpPaymentStep(paymentService, userService)),
@@ -77,7 +79,7 @@ func Policies(
 			goidc.NewAuthnStep("finish", grantAuthzStep()),
 		),
 		goidc.NewPolicyWithSteps(
-			"consents",
+			"consent",
 			func(r *http.Request, c *goidc.Client, as *goidc.AuthnSession) bool {
 				consentID, ok := consent.IDFromScopes(as.Scopes)
 				if !ok {
@@ -85,7 +87,7 @@ func Policies(
 				}
 
 				as.StoreParameter(paramConsentID, consentID)
-				as.StoreParameter(paramOrgID, c.CustomAttribute(ClientAttrOrgID))
+				as.StoreParameter(OrgIDKey, c.CustomAttribute(OrgIDKey))
 				return true
 			},
 			goidc.NewAuthnStep("setup", setUpConsentStep(consentService, userService)),
@@ -105,7 +107,6 @@ const (
 	paramCPF              = "cpf"
 	paramCNPJ             = "cnpj"
 	paramUserID           = "user_id"
-	paramOrgID            = "org_id"
 	paramPaymentConsentID = "payment_consent_id"
 	paramAccountID        = "account_id"
 
@@ -129,13 +130,13 @@ func loginStep(baseURL string, tmpl *template.Template, userService user.Service
 	return func(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
 		slog.InfoContext(r.Context(), "login step")
 
-		orgID := as.StoredParameter(paramOrgID).(string)
+		orgID := as.StoredParameter(OrgIDKey).(string)
 		_ = r.ParseForm()
 
 		isLogin := r.PostFormValue(formParamLogin)
 		if isLogin == "" {
 			slog.InfoContext(r.Context(), "rendering login page")
-			return executeTemplate(tmpl, w, Page{
+			return renderPage(tmpl, w, Page{
 				BaseURL:    baseURL,
 				CallbackID: as.CallbackID,
 				Nonce:      secure.CSPNonce(r.Context()),
@@ -149,7 +150,7 @@ func loginStep(baseURL string, tmpl *template.Template, userService user.Service
 		username := r.PostFormValue(formParamUsername)
 		u, err := userService.UserByUsername(r.Context(), username, orgID)
 		if err != nil {
-			return executeTemplate(tmpl, w, Page{
+			return renderPage(tmpl, w, Page{
 				BaseURL:    baseURL,
 				CallbackID: as.CallbackID,
 				Nonce:      secure.CSPNonce(r.Context()),
@@ -158,7 +159,7 @@ func loginStep(baseURL string, tmpl *template.Template, userService user.Service
 		}
 
 		if u.CPF != as.StoredParameter(paramCPF) {
-			return executeTemplate(tmpl, w, Page{
+			return renderPage(tmpl, w, Page{
 				BaseURL:    baseURL,
 				CallbackID: as.CallbackID,
 				Nonce:      secure.CSPNonce(r.Context()),
@@ -168,7 +169,7 @@ func loginStep(baseURL string, tmpl *template.Template, userService user.Service
 
 		password := r.PostFormValue(formParamPassword)
 		if u.CPF != as.StoredParameter(paramCPF) || password != correctPassword {
-			return executeTemplate(tmpl, w, Page{
+			return renderPage(tmpl, w, Page{
 				BaseURL:    baseURL,
 				CallbackID: as.CallbackID,
 				Nonce:      secure.CSPNonce(r.Context()),
@@ -183,7 +184,7 @@ func loginStep(baseURL string, tmpl *template.Template, userService user.Service
 
 func setUpConsentStep(consentService consent.Service, userService user.Service) goidc.AuthnFunc {
 	return func(_ http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
-		orgID := as.StoredParameter(paramOrgID).(string)
+		orgID := as.StoredParameter(OrgIDKey).(string)
 		consentID := as.StoredParameter(paramConsentID).(string)
 
 		consent, err := consentService.Consent(r.Context(), consentID, orgID)
@@ -195,15 +196,15 @@ func setUpConsentStep(consentService consent.Service, userService user.Service) 
 			return goidc.StatusFailure, errors.New("consent is not awaiting authorization")
 		}
 
-		_, err = userService.UserByCPF(r.Context(), consent.UserCPF, orgID)
+		_, err = userService.UserByCPF(r.Context(), consent.UserIdentification, orgID)
 		if err != nil {
 			return goidc.StatusFailure, errors.New("the consent was created for an user that does not exist")
 		}
 
 		as.StoreParameter(paramPermissions, consent.Permissions)
-		as.StoreParameter(paramCPF, consent.UserCPF)
-		if consent.BusinessCNPJ != nil {
-			as.StoreParameter(paramCNPJ, *consent.BusinessCNPJ)
+		as.StoreParameter(paramCPF, consent.UserIdentification)
+		if consent.BusinessIdentification != nil {
+			as.StoreParameter(paramCNPJ, *consent.BusinessIdentification)
 		}
 		return goidc.StatusSuccess, nil
 	}
@@ -233,7 +234,7 @@ func grantConsentStep(baseURL string, tmpl *template.Template, consentService co
 
 		if permissions.HasAccountPermissions() {
 			userID := as.StoredParameter(paramUserID).(string)
-			orgID := as.StoredParameter(paramOrgID).(string)
+			orgID := as.StoredParameter(OrgIDKey).(string)
 			accs, err := accountService.AllAccounts(r.Context(), userID, orgID)
 			slog.InfoContext(r.Context(), "rendering consent page with accounts", "accounts", accs)
 			if err != nil {
@@ -246,7 +247,7 @@ func grantConsentStep(baseURL string, tmpl *template.Template, consentService co
 		if cnpj := as.StoredParameter(paramCNPJ); cnpj != nil {
 			page.BusinessCNPJ = cnpj.(string)
 		}
-		return executeTemplate(tmpl, w, page)
+		return renderPage(tmpl, w, page)
 	}
 
 	return func(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
@@ -258,7 +259,7 @@ func grantConsentStep(baseURL string, tmpl *template.Template, consentService co
 			return renderConsentPage(w, r, as)
 		}
 
-		orgID := as.StoredParameter(paramOrgID).(string)
+		orgID := as.StoredParameter(OrgIDKey).(string)
 		consentID := as.StoredParameter(paramConsentID).(string)
 
 		if isConsented != "true" {
@@ -288,7 +289,7 @@ func grantConsentStep(baseURL string, tmpl *template.Template, consentService co
 
 func setUpPaymentStep(paymentService payment.Service, userService user.Service) goidc.AuthnFunc {
 	return func(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
-		orgID := as.StoredParameter(paramOrgID).(string)
+		orgID := as.StoredParameter(OrgIDKey).(string)
 
 		consentID, ok := consent.IDFromScopes(as.Scopes)
 		if !ok {
@@ -306,16 +307,16 @@ func setUpPaymentStep(paymentService payment.Service, userService user.Service) 
 			return goidc.StatusFailure, errors.New("payment consent is not awaiting authorization")
 		}
 
-		_, err = userService.UserByCPF(r.Context(), c.UserCPF, orgID)
+		_, err = userService.UserByCPF(r.Context(), c.UserIdentification, orgID)
 		if err != nil {
 			slog.InfoContext(r.Context(), "could not fetch user", "error", err)
 			return goidc.StatusFailure, errors.New("the consent was created for an user that does not exist")
 		}
 
 		as.StoreParameter(paramPaymentConsentID, consentID)
-		as.StoreParameter(paramCPF, c.UserCPF)
-		if c.BusinessCNPJ != nil {
-			as.StoreParameter(paramCNPJ, *c.BusinessCNPJ)
+		as.StoreParameter(paramCPF, c.UserIdentification)
+		if c.BusinessIdentification != nil {
+			as.StoreParameter(paramCNPJ, *c.BusinessIdentification)
 		}
 		if c.DebtorAccountID != nil {
 			as.StoreParameter(paramAccountID, *c.DebtorAccountID)
@@ -326,7 +327,7 @@ func setUpPaymentStep(paymentService payment.Service, userService user.Service) 
 
 func setUpAutoPaymentStep(paymentService autopayment.Service, userService user.Service) goidc.AuthnFunc {
 	return func(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
-		orgID := as.StoredParameter(paramOrgID).(string)
+		orgID := as.StoredParameter(OrgIDKey).(string)
 
 		consentID, ok := autopayment.ConsentIDFromScopes(as.Scopes)
 		if !ok {
@@ -344,16 +345,16 @@ func setUpAutoPaymentStep(paymentService autopayment.Service, userService user.S
 			return goidc.StatusFailure, errors.New("recurring payment consent is not awaiting authorization")
 		}
 
-		_, err = userService.UserByCPF(r.Context(), c.UserCPF, orgID)
+		_, err = userService.UserByCPF(r.Context(), c.UserIdentification, orgID)
 		if err != nil {
 			slog.InfoContext(r.Context(), "could not fetch user", "error", err)
 			return goidc.StatusFailure, errors.New("the consent was created for an user that does not exist")
 		}
 
 		as.StoreParameter(paramPaymentConsentID, consentID)
-		as.StoreParameter(paramCPF, c.UserCPF)
-		if c.BusinessCNPJ != nil {
-			as.StoreParameter(paramCNPJ, *c.BusinessCNPJ)
+		as.StoreParameter(paramCPF, c.UserIdentification)
+		if c.BusinessIdentification != nil {
+			as.StoreParameter(paramCNPJ, *c.BusinessIdentification)
 		}
 		if c.DebtorAccountID != nil {
 			as.StoreParameter(paramAccountID, *c.DebtorAccountID)
@@ -384,7 +385,7 @@ func choosePaymentAccountStep(
 			return goidc.StatusSuccess, nil
 		}
 
-		orgID := as.StoredParameter(paramOrgID).(string)
+		orgID := as.StoredParameter(OrgIDKey).(string)
 		consentID := as.StoredParameter(paramPaymentConsentID).(string)
 
 		_ = r.ParseForm()
@@ -407,7 +408,7 @@ func choosePaymentAccountStep(
 			if cnpj := as.StoredParameter(paramCNPJ); cnpj != nil {
 				page.BusinessCNPJ = cnpj.(string)
 			}
-			return executeTemplate(tmpl, w, page)
+			return renderPage(tmpl, w, page)
 		}
 
 		if err := paymentService.UpdateDebtorAccount(r.Context(), consentID, accountID, orgID); err != nil {
@@ -429,7 +430,7 @@ func grantPaymentStep(baseURL string, tmpl *template.Template, paymentService pa
 	}
 
 	return func(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
-		orgID := as.StoredParameter(paramOrgID).(string)
+		orgID := as.StoredParameter(OrgIDKey).(string)
 		consentID := as.StoredParameter(paramPaymentConsentID).(string)
 		c, err := paymentService.Consent(r.Context(), consentID, orgID)
 		if err != nil {
@@ -453,7 +454,7 @@ func grantPaymentStep(baseURL string, tmpl *template.Template, paymentService pa
 				page.BusinessCNPJ = cnpj.(string)
 			}
 
-			return executeTemplate(tmpl, w, page)
+			return renderPage(tmpl, w, page)
 		}
 
 		if isConsented != "true" {
@@ -480,7 +481,7 @@ func grantAutoPaymentStep(baseURL string, tmpl *template.Template, paymentServic
 	}
 
 	return func(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
-		orgID := as.StoredParameter(paramOrgID).(string)
+		orgID := as.StoredParameter(OrgIDKey).(string)
 		consentID := as.StoredParameter(paramPaymentConsentID).(string)
 		c, err := paymentService.Consent(r.Context(), consentID, orgID)
 		if err != nil {
@@ -504,11 +505,11 @@ func grantAutoPaymentStep(baseURL string, tmpl *template.Template, paymentServic
 				page.BusinessCNPJ = cnpj.(string)
 			}
 
-			return executeTemplate(tmpl, w, page)
+			return renderPage(tmpl, w, page)
 		}
 
 		if isConsented != "true" {
-			_ = paymentService.RejectConsent(r.Context(), consentID, orgID, autopayment.ConsentRejection{
+			_, _ = paymentService.RejectConsent(r.Context(), consentID, orgID, autopayment.ConsentRejection{
 				From:   autopayment.TerminatedFromHolder,
 				By:     autopayment.TerminatedByUser,
 				Code:   autopayment.ConsentRejectionRejectedByUser,
@@ -548,7 +549,7 @@ func grantAuthzStep() goidc.AuthnFunc {
 	}
 }
 
-func executeTemplate(tmpl *template.Template, w http.ResponseWriter, data any) (goidc.AuthnStatus, error) {
+func renderPage(tmpl *template.Template, w http.ResponseWriter, data any) (goidc.AuthnStatus, error) {
 	w.WriteHeader(http.StatusOK)
 	err := tmpl.Execute(w, data)
 	if err != nil {

@@ -3,12 +3,9 @@ package oidc
 import (
 	"context"
 	"errors"
-	"fmt"
-	"time"
 
-	"github.com/luiky/mock-bank/internal/timeutil"
 	"github.com/luikyv/go-oidc/pkg/goidc"
-	"gorm.io/datatypes"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -26,13 +23,10 @@ func (m AuthnSessionManager) Save(ctx context.Context, as *goidc.AuthnSession) e
 		CallbackID:      as.CallbackID,
 		AuthCode:        as.AuthCode,
 		PushedAuthReqID: as.PushedAuthReqID,
-		ExpiresAt:       parseTimestamp(as.ExpiresAtTimestamp),
-		Data:            marshalJSON(as),
-		UpdatedAt:       timeutil.Now(),
-	}
-	// TODO: Find a way to get the org id during par.
-	if orgID := as.StoredParameter("org_id"); orgID != nil {
-		session.OrgID = orgID.(string)
+		ExpiresAt:       timeutil.ParseTimestamp(as.ExpiresAtTimestamp),
+		Data:            *as,
+		UpdatedAt:       timeutil.DateTimeNow(),
+		OrgID:           as.StoredParameter(OrgIDKey).(string),
 	}
 
 	return m.db.WithContext(ctx).Save(session).Error
@@ -55,7 +49,7 @@ func (m AuthnSessionManager) SessionByCIBAAuthID(ctx context.Context, id string)
 }
 
 func (m AuthnSessionManager) Delete(ctx context.Context, id string) error {
-	return m.db.WithContext(ctx).Where("id = ?", id).Delete(&Client{}).Error
+	return m.db.WithContext(ctx).Where("id = ?", id).Delete(&Session{}).Error
 }
 
 func (m AuthnSessionManager) session(ctx context.Context, tx *gorm.DB) (*goidc.AuthnSession, error) {
@@ -65,11 +59,7 @@ func (m AuthnSessionManager) session(ctx context.Context, tx *gorm.DB) (*goidc.A
 		return nil, err
 	}
 
-	var oidcSession goidc.AuthnSession
-	if err := unmarshalJSON(as.Data, &oidcSession); err != nil {
-		return nil, fmt.Errorf("could not load the authn session: %w", err)
-	}
-	return &oidcSession, nil
+	return &as.Data, nil
 }
 
 type Session struct {
@@ -77,12 +67,12 @@ type Session struct {
 	CallbackID      string
 	AuthCode        string
 	PushedAuthReqID string
-	ExpiresAt       time.Time
-	Data            datatypes.JSON
+	ExpiresAt       timeutil.DateTime
+	Data            goidc.AuthnSession `gorm:"serializer:json"`
 
 	OrgID     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt timeutil.DateTime
+	UpdatedAt timeutil.DateTime
 }
 
 func (Session) TableName() string {
