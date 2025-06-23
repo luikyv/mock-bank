@@ -29,7 +29,7 @@ func NewService(db *gorm.DB, userService user.Service) Service {
 
 func (s Service) Authorize(ctx context.Context, c *Consent) error {
 
-	if !c.IsAwaitingAuthorization() {
+	if c.Status != StatusAwaitingAuthorization {
 		return errorutil.New("consent is not in the awaiting authorization status")
 	}
 
@@ -92,7 +92,7 @@ func (s Service) Delete(ctx context.Context, id, orgID string) error {
 
 	rejectedBy := RejectedByUser
 	rejectionReason := RejectionReasonCustomerManuallyRejected
-	if c.IsAuthorized() {
+	if c.Status == StatusAuthorized {
 		rejectionReason = RejectionReasonCustomerManuallyRevoked
 	}
 

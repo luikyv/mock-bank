@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/luikyv/mock-bank/internal/autopayment"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -30,7 +31,7 @@ const (
 )
 
 var (
-	ssJWKCacheTime      = 1 * time.Hour
+	ssJWKSCacheTime     = 1 * time.Hour
 	ssJWKSMu            sync.Mutex
 	ssJWKSCache         *goidc.JSONWebKeySet
 	ssJWKSLastFetchedAt timeutil.DateTime
@@ -38,18 +39,36 @@ var (
 
 func TokenOptionsFunc() goidc.TokenOptionsFunc {
 	return func(gi goidc.GrantInfo, c *goidc.Client) goidc.TokenOptions {
-		return goidc.NewJWTTokenOptions(goidc.PS256, 300)
+		return goidc.NewJWTTokenOptions(goidc.PS256, 900)
 	}
 }
 
-func HandleGrantFunc(op *provider.Provider, consentService consent.Service, paymentService payment.Service) goidc.HandleGrantFunc {
+func HandleGrantFunc(
+	op *provider.Provider,
+	consentService consent.Service,
+	paymentService payment.Service,
+	autoPaymentService autopayment.Service,
+) goidc.HandleGrantFunc {
+	verifyRecurringPaymentConsent := func(ctx context.Context, id, orgID string) error {
+		c, err := autoPaymentService.Consent(ctx, id, orgID)
+		if err != nil {
+			return fmt.Errorf("could not fetch payment consent for verifying grant: %w", err)
+		}
+
+		if c.Status != autopayment.ConsentStatusAuthorized {
+			return goidc.NewError(goidc.ErrorCodeInvalidGrant, "payment consent is not authorized")
+		}
+
+		return nil
+	}
+
 	verifyPaymentConsent := func(ctx context.Context, id, orgID string) error {
 		c, err := paymentService.Consent(ctx, id, orgID)
 		if err != nil {
 			return fmt.Errorf("could not fetch payment consent for verifying grant: %w", err)
 		}
 
-		if !c.IsAuthorized() {
+		if c.Status != payment.ConsentStatusAuthorized {
 			return goidc.NewError(goidc.ErrorCodeInvalidGrant, "payment consent is not authorized")
 		}
 
@@ -62,7 +81,7 @@ func HandleGrantFunc(op *provider.Provider, consentService consent.Service, paym
 			return fmt.Errorf("could not fetch consent for verifying grant: %w", err)
 		}
 
-		if !c.IsAuthorized() {
+		if c.Status != consent.StatusAuthorized {
 			return goidc.NewError(goidc.ErrorCodeInvalidGrant, "consent is not authorized")
 		}
 
@@ -81,13 +100,14 @@ func HandleGrantFunc(op *provider.Provider, consentService consent.Service, paym
 		orgID := client.CustomAttribute(OrgIDKey).(string)
 		gi.AdditionalTokenClaims[OrgIDKey] = orgID
 
-		consentID, _ := consent.IDFromScopes(gi.ActiveScopes)
-
-		if strings.Contains(gi.ActiveScopes, payment.Scope.ID) && consentID != "" {
-			return verifyPaymentConsent(r.Context(), consentID, orgID)
+		if recurringConsentID, _ := autopayment.ConsentIDFromScopes(gi.ActiveScopes); recurringConsentID != "" {
+			return verifyRecurringPaymentConsent(r.Context(), recurringConsentID, orgID)
 		}
 
-		if consentID != "" {
+		if consentID, _ := consent.IDFromScopes(gi.ActiveScopes); consentID != "" {
+			if strings.Contains(gi.ActiveScopes, payment.Scope.ID) {
+				return verifyPaymentConsent(r.Context(), consentID, orgID)
+			}
 			return verifyConsent(r.Context(), consentID, orgID)
 		}
 
@@ -246,7 +266,7 @@ func fetchSoftwareStatementJWKS(keystoreHost string) (goidc.JSONWebKeySet, error
 	ssJWKSMu.Lock()
 	defer ssJWKSMu.Unlock()
 
-	if ssJWKSCache != nil && timeutil.DateTimeNow().Before(ssJWKSLastFetchedAt.Add(ssJWKCacheTime)) {
+	if ssJWKSCache != nil && timeutil.DateTimeNow().Before(ssJWKSLastFetchedAt.Add(ssJWKSCacheTime)) {
 		return *ssJWKSCache, nil
 	}
 

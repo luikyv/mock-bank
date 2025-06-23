@@ -147,7 +147,7 @@ type Consent struct {
 	UpdatedAt timeutil.DateTime
 }
 
-func (c *Consent) PaymentDates() []timeutil.BrazilDate {
+func (c Consent) PaymentDates() []timeutil.BrazilDate {
 	if c.PaymentDate != nil {
 		return []timeutil.BrazilDate{*c.PaymentDate}
 	}
@@ -205,14 +205,6 @@ func (Consent) TableName() string {
 
 func (c Consent) URN() string {
 	return consent.URN(c.ID)
-}
-
-func (c Consent) IsAwaitingAuthorization() bool {
-	return c.Status == ConsentStatusAwaitingAuthorization
-}
-
-func (c Consent) IsAuthorized() bool {
-	return c.Status == ConsentStatusAuthorized
 }
 
 func (c Consent) IsExpired() bool {

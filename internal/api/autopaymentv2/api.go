@@ -20,6 +20,7 @@ import (
 	"github.com/luikyv/mock-bank/internal/payment"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 	"net/http"
+	"strings"
 )
 
 var _ StrictServerInterface = Server{}
@@ -61,7 +62,12 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	idempotencyMiddleware := idempotency.Middleware(s.idempotencyService)
 	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, autopayment.Scope)
 	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, autopayment.ScopeConsentID)
-	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, "PARAMETRO_INVALIDO")
+	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string {
+		if strings.Contains(err.Error(), "is missing") {
+			return "PARAMETRO_NAO_INFORMADO"
+		}
+		return "PARAMETRO_INVALIDO"
+	})
 	// TODO. Use the swagger version.
 	xvMiddleware := api.VersionMiddleware("2.0.0")
 
@@ -417,7 +423,7 @@ func (s Server) AutomaticPaymentsPatchRecurringConsentsConsentID(ctx context.Con
 	var c *autopayment.Consent
 	var err error
 	if action, _ := req.Body.Data.AsConsentRejection(); action.Status != nil && *action.Status == ConsentRejectionStatusREJECTED {
-		c, err = s.service.RejectConsent(ctx, req.RecurringConsentID, orgID, autopayment.ConsentRejection{
+		c, err = s.service.RejectConsentByID(ctx, req.RecurringConsentID, orgID, autopayment.ConsentRejection{
 			By:     autopayment.TerminatedBy(action.Rejection.RejectedBy),
 			From:   autopayment.TerminatedFrom(action.Rejection.RejectedFrom),
 			Code:   autopayment.ConsentRejectionCode(action.Rejection.Reason.Code),
@@ -1033,6 +1039,11 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 
 	if errors.Is(err, autopayment.ErrInvalidEdition) {
 		api.WriteError(w, r, api.NewError("DETALHE_EDICAO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, autopayment.ErrFieldNotAllowed) {
+		api.WriteError(w, r, api.NewError("CAMPO_NAO_PERMITIDO", http.StatusUnprocessableEntity, err.Error()))
 		return
 	}
 

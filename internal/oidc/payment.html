@@ -115,6 +115,13 @@
       </div>
       {{ end }}
 
+      {{ if .OverdraftLimitIsEnabled }}
+      <div class="info-row" style="align-items: center;">
+        <label class="info-label" for="useOverdraft">Use overdraft limit?</label>
+        <input type="checkbox" id="useOverdraft" name="use_overdraft_limit" value="true" />
+      </div>
+      {{ end }}
+
       <button type="submit" class="consent-button">Consent and Continue</button>
     </form>
 

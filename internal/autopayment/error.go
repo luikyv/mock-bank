@@ -19,4 +19,5 @@ var (
 	ErrRejectionNotAllowed        = errorutil.New("invalid status for rejection")
 	ErrInvalidPayment             = errorutil.New("invalid payment")
 	ErrInvalidEdition             = errorutil.New("cannot edit the consent")
+	ErrFieldNotAllowed            = errorutil.New("field not allowed")
 )

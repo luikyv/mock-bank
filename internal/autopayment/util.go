@@ -16,9 +16,7 @@ func ConsentIDFromScopes(scopes string) (string, bool) {
 	return "", false
 }
 
-// compareAmounts compares two string representations of float values.
-func compareAmounts(low, high string) bool {
-	lowF, _ := strconv.ParseFloat(low, 64)
-	highF, _ := strconv.ParseFloat(high, 64)
-	return lowF <= highF
+func convertAmount(v string) float64 {
+	f, _ := strconv.ParseFloat(v, 64)
+	return f
 }

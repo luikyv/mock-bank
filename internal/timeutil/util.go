@@ -152,6 +152,39 @@ func (d BrazilDate) Value() (driver.Value, error) {
 	return t, nil
 }
 
+func (d BrazilDate) StartOfWeek() BrazilDate {
+	weekDay := int(d.Weekday())
+	if weekDay == 0 {
+		weekDay = 7
+	}
+	return d.AddDate(0, 0, -weekDay+1)
+}
+
+func (d BrazilDate) EndOfWeek() BrazilDate {
+	weekDay := int(d.Weekday())
+	if weekDay == 0 {
+		weekDay = 7
+	}
+	return d.AddDate(0, 0, 7-weekDay)
+}
+
+func (d BrazilDate) StartOfMonth() BrazilDate {
+	return NewBrazilDate(time.Date(d.Year(), d.Month(), 1, 0, 0, 0, 0, d.Location()))
+}
+
+func (d BrazilDate) EndOfMonth() BrazilDate {
+	firstOfNextMonth := time.Date(d.Year(), d.Month()+1, 1, 0, 0, 0, 0, d.Location())
+	return NewBrazilDate(firstOfNextMonth.AddDate(0, 0, -1))
+}
+
+func (d BrazilDate) StartOfYear() BrazilDate {
+	return NewBrazilDate(time.Date(d.Year(), 1, 1, 0, 0, 0, 0, d.Location()))
+}
+
+func (d BrazilDate) EndOfYear() BrazilDate {
+	return NewBrazilDate(time.Date(d.Year(), 12, 31, 0, 0, 0, 0, d.Location()))
+}
+
 func BrazilDateNow() BrazilDate {
 	return NewBrazilDate(now())
 }

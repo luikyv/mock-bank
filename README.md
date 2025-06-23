@@ -7,7 +7,7 @@ mock op mTLS: https://matls-auth.mockbank.local
 mock backend: https://matls-api.mockbank.local
 
 ## TODO
-
+- Validate auto pix dates.
 - Update swaggers to undo modifications.
 - Improve loops that query the db.
 - Companies.

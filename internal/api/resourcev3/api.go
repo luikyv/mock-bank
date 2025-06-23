@@ -35,7 +35,7 @@ func NewServer(host string, service resource.Service, consentService consent.Ser
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	resourceMux := http.NewServeMux()
 
-	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, "INVALID_REQUEST")
+	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string { return "INVALID_REQUEST" })
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{

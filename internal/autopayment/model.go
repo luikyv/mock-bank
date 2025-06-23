@@ -1,15 +1,13 @@
 package autopayment
 
 import (
-	"strings"
-	"time"
-
 	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/payment"
 	"github.com/luikyv/mock-bank/internal/timeutil"
+	"strings"
 )
 
 var (
@@ -92,17 +90,6 @@ func (Consent) TableName() string {
 
 func (c Consent) URN() string {
 	return consent.URN(c.ID)
-}
-
-func (c Consent) IsAwaitingAuthorization() bool {
-	return c.Status == ConsentStatusAwaitingAuthorization
-}
-
-// HasAuthExpired returns true if the status is [ConsentStatusAwaitingAuthorization] and
-// the max time awaiting authorization has elapsed.
-func (c Consent) HasAuthExpired() bool {
-	now := timeutil.DateTimeNow()
-	return c.IsAwaitingAuthorization() && now.After(c.CreatedAt.Add(60*time.Minute).Time)
 }
 
 type ConsentStatus string
@@ -281,15 +268,32 @@ type Creditor struct {
 
 type Filter struct {
 	ConsentID string
+	Statuses  []payment.Status
+	From      *timeutil.BrazilDate
+	To        *timeutil.BrazilDate
 }
 
 // URLQuery returns a URL query string with the filter parameters.
 // If parameters are present, the returned string includes a '?' prefix.
 // Returns an empty string if no parameters are set.
 func (f Filter) URLQuery() string {
-	if f.ConsentID == "" {
+	var params []string
+
+	if f.ConsentID != "" {
+		params = append(params, "recurringConsentId="+f.ConsentID)
+	}
+
+	if f.From != nil {
+		params = append(params, "from="+f.From.String())
+	}
+
+	if f.To != nil {
+		params = append(params, "to="+f.To.String())
+	}
+
+	if len(params) == 0 {
 		return ""
 	}
-	return "?recurringConsentId=" + f.ConsentID
 
+	return "?" + strings.Join(params, "&")
 }

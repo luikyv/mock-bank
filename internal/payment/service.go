@@ -76,7 +76,7 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *Accou
 
 func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
 
-	if !c.IsAwaitingAuthorization() {
+	if c.Status != ConsentStatusAwaitingAuthorization {
 		return errorutil.New("consent is not awaiting authorization")
 	}
 
@@ -131,7 +131,7 @@ func (s Service) CreatePayments(ctx context.Context, payments []*Payment) error 
 		return err
 	}
 
-	if !c.IsAuthorized() {
+	if c.Status != ConsentStatusAuthorized {
 		return ErrConsentNotAuthorized
 	}
 

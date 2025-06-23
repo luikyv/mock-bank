@@ -50,7 +50,7 @@ func (c Consent) URN() string {
 // the max time awaiting authorization has elapsed.
 func (c Consent) HasAuthExpired() bool {
 	now := timeutil.DateTimeNow()
-	return c.IsAwaitingAuthorization() &&
+	return c.Status == StatusAwaitingAuthorization &&
 		now.After(c.CreatedAt.Add(time.Second*maxTimeAwaitingAuthorizationSecs).Time)
 }
 
@@ -62,14 +62,6 @@ func (c Consent) IsExpired() bool {
 	}
 	now := timeutil.DateTimeNow()
 	return c.Status == StatusAuthorized && now.After(c.ExpiresAt.Time)
-}
-
-func (c Consent) IsAuthorized() bool {
-	return c.Status == StatusAuthorized
-}
-
-func (c Consent) IsAwaitingAuthorization() bool {
-	return c.Status == StatusAwaitingAuthorization
 }
 
 func (c Consent) HasPermissions(permissions []Permission) bool {

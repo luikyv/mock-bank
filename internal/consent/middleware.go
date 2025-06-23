@@ -22,7 +22,7 @@ func PermissionMiddleware(consentService Service, permissions ...Permission) fun
 				return
 			}
 
-			if !c.IsAuthorized() {
+			if c.Status != StatusAwaitingAuthorization {
 				slog.DebugContext(r.Context(), "the consent is not authorized")
 				api.WriteError(w, r, api.NewError("INVALID_STATUS", http.StatusUnauthorized, "the consent is not authorized"))
 				return

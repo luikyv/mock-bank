@@ -366,7 +366,7 @@ func openidProvider(
 		provider.WithTokenOptions(oidc.TokenOptionsFunc()),
 		provider.WithAuthorizationCodeGrant(),
 		provider.WithImplicitGrant(),
-		provider.WithRefreshTokenGrant(oidc.ShouldIssueRefreshTokenFunc(), 600),
+		provider.WithRefreshTokenGrant(oidc.ShouldIssueRefreshTokenFunc(), 3600),
 		provider.WithClientCredentialsGrant(),
 		provider.WithTokenAuthnMethods(goidc.ClientAuthnPrivateKeyJWT),
 		provider.WithPrivateKeyJWTSignatureAlgs(goidc.PS256),
@@ -384,7 +384,7 @@ func openidProvider(
 		provider.WithUserInfoEncryption(goidc.RSA_OAEP),
 		provider.WithIDTokenSignatureAlgs(goidc.PS256),
 		provider.WithIDTokenEncryption(goidc.RSA_OAEP),
-		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(op, consentService, paymentService)),
+		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(op, consentService, paymentService, autoPaymentService)),
 		provider.WithPolicies(oidc.Policies(AuthHost, userService, consentService, accountService, paymentService, autoPaymentService)...),
 		provider.WithNotifyErrorFunc(oidc.LogError),
 		provider.WithDCR(oidc.DCRFunc(oidc.DCRConfig{
