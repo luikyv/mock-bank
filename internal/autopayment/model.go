@@ -266,6 +266,15 @@ type Creditor struct {
 	Name    string               `json:"name"`
 }
 
+type Query struct {
+	ID        string
+	ConsentID string
+	Order     string
+	// DebtorAccount indicates whether the DebtorAccount will be preloaded.
+	DebtorAccount bool
+	Statuses      []payment.Status
+}
+
 type Filter struct {
 	ConsentID string
 	Statuses  []payment.Status

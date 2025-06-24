@@ -60,6 +60,11 @@ type Account struct {
 	UpdatedAt timeutil.DateTime
 }
 
+type Query struct {
+	ID     string
+	Number string
+}
+
 type Type string
 
 const (
@@ -94,8 +99,8 @@ func (Transaction) TableName() string {
 	return "account_transactions"
 }
 
-func (t *Transaction) BeforeCreate(tx *gorm.DB) error {
-	t.ID = newTransactionID(TransactionIDLength)
+func (t Transaction) BeforeCreate(_ *gorm.DB) error {
+	t.ID = newTransactionID()
 	return nil
 }
 
@@ -178,8 +183,8 @@ func NewTransactionFilter(from, to *timeutil.BrazilDate, current bool) (Transact
 	return filter, nil
 }
 
-func newTransactionID(length int) string {
-	b := make([]byte, length)
+func newTransactionID() string {
+	b := make([]byte, TransactionIDLength)
 	for i := range b {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterBytes))))
 		if err != nil {

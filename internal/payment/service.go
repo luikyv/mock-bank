@@ -40,7 +40,7 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *Accou
 	c.Status = ConsentStatusAwaitingAuthorization
 	c.ExpiresAt = timeutil.DateTimeNow().Add(5 * time.Minute)
 
-	u, err := s.userService.UserByCPF(ctx, c.UserIdentification, c.OrgID)
+	u, err := s.userService.User(ctx, user.Query{CPF: c.UserIdentification}, c.OrgID)
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			return ErrUserNotFound
@@ -53,7 +53,7 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *Accou
 		return s.createConsent(ctx, c)
 	}
 
-	acc, err := s.accountService.AccountByNumber(ctx, debtorAcc.Number, c.OrgID)
+	acc, err := s.accountService.Account(ctx, account.Query{Number: debtorAcc.Number}, c.OrgID)
 	if err != nil {
 		if errors.Is(err, account.ErrNotFound) {
 			return ErrAccountNotFound

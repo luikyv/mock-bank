@@ -10,17 +10,16 @@ import (
 )
 
 type Service struct {
-	db *gorm.DB
+	db        *gorm.DB
+	mockOrgID string
 }
 
-func NewService(db *gorm.DB) Service {
-	return Service{
-		db: db,
-	}
+func NewService(db *gorm.DB, mockOrgID string) Service {
+	return Service{db: db, mockOrgID: mockOrgID}
 }
 
 func (s Service) Save(ctx context.Context, u *User) error {
-	if err := s.db.WithContext(ctx).Where("id = ? AND org_id = ?", u.ID, u.OrgID).Save(u).Error; err != nil {
+	if err := s.db.WithContext(ctx).Save(u).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return ErrAlreadyExists
 		}
@@ -29,35 +28,30 @@ func (s Service) Save(ctx context.Context, u *User) error {
 	return nil
 }
 
-func (s Service) User(ctx context.Context, id, orgID string) (*User, error) {
+func (s Service) User(ctx context.Context, query Query, orgID string) (*User, error) {
 	u := &User{}
-	err := s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).First(u).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrNotFound
+	dbQuery := s.db.WithContext(ctx).Where("org_id = ? OR org_id = ?", orgID, s.mockOrgID)
+	if query.ID != "" {
+		dbQuery = dbQuery.Where("id = ?", query.ID)
 	}
-	return u, err
-}
+	if query.CPF != "" {
+		dbQuery = dbQuery.Where("cpf = ?", query.CPF)
+	}
+	if query.Username != "" {
+		dbQuery = dbQuery.Where("username = ?", query.Username)
+	}
 
-func (s Service) UserByCPF(ctx context.Context, cpf, orgID string) (*User, error) {
-	u := &User{}
-	err := s.db.WithContext(ctx).Where("cpf = ? AND org_id = ?", cpf, orgID).First(u).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrNotFound
+	if err := dbQuery.First(u).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
 	}
-	return u, err
-}
-
-func (s Service) UserByUsername(ctx context.Context, username, orgID string) (*User, error) {
-	u := &User{}
-	err := s.db.WithContext(ctx).Where("username = ? AND org_id = ?", username, orgID).First(u).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrNotFound
-	}
-	return u, err
+	return u, nil
 }
 
 func (s Service) Users(ctx context.Context, orgID string, pag page.Pagination) (page.Page[*User], error) {
-	query := s.db.WithContext(ctx).Model(&User{}).Where("org_id = ?", orgID)
+	query := s.db.WithContext(ctx).Model(&User{}).Where("org_id = ? OR org_id = ?", orgID, s.mockOrgID)
 
 	var users []*User
 	if err := query.

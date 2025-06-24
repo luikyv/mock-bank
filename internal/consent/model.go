@@ -35,7 +35,7 @@ type Consent struct {
 	BusinessIdentification *string
 	BusinessRel            *Relation
 	ClientID               string
-	Rejection              *Rejection
+	Rejection              *Rejection `gorm:"serializer:json"`
 
 	OrgID     string
 	CreatedAt timeutil.DateTime

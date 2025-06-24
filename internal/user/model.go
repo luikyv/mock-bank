@@ -21,6 +21,12 @@ func (User) TableName() string {
 	return "mock_users"
 }
 
+type Query struct {
+	ID       string
+	Username string
+	CPF      string
+}
+
 type Company struct {
 	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Name        string

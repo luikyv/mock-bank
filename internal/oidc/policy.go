@@ -1,10 +1,11 @@
 package oidc
 
 import (
-	"embed"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/luikyv/mock-bank/internal/page"
+	"github.com/luikyv/mock-bank/templates"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -32,7 +33,7 @@ func Policies(
 	paymentService payment.Service,
 	autoPaymentService autopayment.Service,
 ) []goidc.AuthnPolicy {
-	tmpl := template.Must(template.ParseFS(templates, "login.html", "consent.html", "payment.html"))
+	tmpl := template.Must(template.ParseFS(templates.Templates, "login.html", "consent.html", "payment.html"))
 	return []goidc.AuthnPolicy{
 		goidc.NewPolicyWithSteps(
 			"auto_payment",
@@ -92,9 +93,6 @@ func Policies(
 	}
 }
 
-//go:embed *.html
-var templates embed.FS
-
 const (
 	paramConsentID = "consent_id"
 	paramCPF       = "cpf"
@@ -152,7 +150,7 @@ func loginStep(baseURL string, tmpl *template.Template, userService user.Service
 
 		orgID := as.StoredParameter(OrgIDKey).(string)
 		username := r.PostFormValue(formParamUsername)
-		u, err := userService.UserByUsername(r.Context(), username, orgID)
+		u, err := userService.User(r.Context(), user.Query{Username: username}, orgID)
 		if err != nil {
 			slog.InfoContext(r.Context(), "could not fetch user", "error", err)
 			return renderLoginErrorPage(w, r, as, "invalid username")
@@ -201,7 +199,7 @@ func grantConsentStep(baseURL string, tmpl *template.Template, consentService co
 	}
 
 	renderConsentPage := func(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession, c *consent.Consent) (goidc.AuthnStatus, error) {
-		page := Page{
+		consentPage := Page{
 			BaseURL:    baseURL,
 			UserCPF:    c.UserIdentification,
 			CallbackID: as.CallbackID,
@@ -212,15 +210,15 @@ func grantConsentStep(baseURL string, tmpl *template.Template, consentService co
 		orgID := as.StoredParameter(OrgIDKey).(string)
 		if c.Permissions.HasAccountPermissions() {
 			slog.InfoContext(r.Context(), "rendering consent page with accounts")
-			accs, err := accountService.AllAccounts(r.Context(), userID, orgID)
+			accs, err := accountService.Accounts(r.Context(), userID, orgID, page.NewPagination(nil, nil))
 			if err != nil {
 				slog.ErrorContext(r.Context(), "could not load the user accounts", "error", err)
 				return goidc.StatusFailure, fmt.Errorf("could not load the user accounts")
 			}
-			page.Accounts = accs
+			consentPage.Accounts = accs.Records
 		}
 
-		return renderPage(w, tmpl, "consent", page)
+		return renderPage(w, tmpl, "consent", consentPage)
 	}
 
 	return func(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
@@ -306,7 +304,7 @@ func grantPaymentStep(baseURL string, tmpl *template.Template, paymentService pa
 			return goidc.StatusFailure, err
 		}
 
-		page := Page{
+		paymentPage := Page{
 			BaseURL:    baseURL,
 			CallbackID: as.CallbackID,
 			UserCPF:    c.UserIdentification,
@@ -314,22 +312,22 @@ func grantPaymentStep(baseURL string, tmpl *template.Template, paymentService pa
 		}
 
 		if cnpj := c.BusinessIdentification; cnpj != nil {
-			page.BusinessCNPJ = *cnpj
+			paymentPage.BusinessCNPJ = *cnpj
 		}
 
 		if c.DebtorAccount != nil {
-			page.Account = c.DebtorAccount
-			return renderPage(w, tmpl, "payment", page)
+			paymentPage.Account = c.DebtorAccount
+			return renderPage(w, tmpl, "payment", paymentPage)
 		}
 
-		accs, err := accountService.AllAccounts(r.Context(), userID, orgID)
+		accs, err := accountService.Accounts(r.Context(), userID, orgID, page.NewPagination(nil, nil))
 		if err != nil {
 			slog.ErrorContext(r.Context(), "could not load the user accounts", "error", err)
 			return goidc.StatusFailure, errors.New("could not load the user accounts")
 		}
-		page.Accounts = accs
+		paymentPage.Accounts = accs.Records
 
-		return renderPage(w, tmpl, "payment", page)
+		return renderPage(w, tmpl, "payment", paymentPage)
 	}
 
 	return func(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
@@ -399,7 +397,7 @@ func grantAutoPaymentStep(baseURL string, tmpl *template.Template, paymentServic
 
 	renderPaymentPage := func(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession, c *autopayment.Consent) (goidc.AuthnStatus, error) {
 
-		page := Page{
+		paymentPage := Page{
 			BaseURL:    baseURL,
 			CallbackID: as.CallbackID,
 			UserCPF:    c.UserIdentification,
@@ -407,28 +405,28 @@ func grantAutoPaymentStep(baseURL string, tmpl *template.Template, paymentServic
 		}
 
 		if c.Configuration.Automatic != nil {
-			page.OverdraftLimitIsEnabled = true
+			paymentPage.OverdraftLimitIsEnabled = true
 		}
 
 		if cnpj := c.BusinessIdentification; cnpj != nil {
-			page.BusinessCNPJ = *cnpj
+			paymentPage.BusinessCNPJ = *cnpj
 		}
 
 		if c.DebtorAccount != nil {
-			page.Account = c.DebtorAccount
-			return renderPage(w, tmpl, "payment", page)
+			paymentPage.Account = c.DebtorAccount
+			return renderPage(w, tmpl, "payment", paymentPage)
 		}
 
 		orgID := as.StoredParameter(OrgIDKey).(string)
 		userID := as.StoredParameter(paramUserID).(string)
-		accs, err := accountService.AllAccounts(r.Context(), userID, orgID)
+		accs, err := accountService.Accounts(r.Context(), userID, orgID, page.NewPagination(nil, nil))
 		if err != nil {
 			slog.ErrorContext(r.Context(), "could not load the user accounts", "error", err)
 			return goidc.StatusFailure, errors.New("could not load the user accounts")
 		}
-		page.Accounts = accs
+		paymentPage.Accounts = accs.Records
 
-		return renderPage(w, tmpl, "payment", page)
+		return renderPage(w, tmpl, "payment", paymentPage)
 	}
 
 	return func(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {

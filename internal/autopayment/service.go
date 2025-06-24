@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/luikyv/mock-bank/internal/bank"
+	"github.com/luikyv/mock-bank/internal/webhook"
 	"log/slog"
 	"reflect"
 	"slices"
@@ -26,14 +27,15 @@ type Service struct {
 	db             *gorm.DB
 	userService    user.Service
 	accountService account.Service
+	webhookService webhook.Service
 }
 
-func NewService(db *gorm.DB, userService user.Service, accountService account.Service) Service {
-	return Service{db: db, userService: userService, accountService: accountService}
+func NewService(db *gorm.DB, userService user.Service, accountService account.Service, webhookService webhook.Service) Service {
+	return Service{db: db, userService: userService, accountService: accountService, webhookService: webhookService}
 }
 
 func (s Service) WithTx(tx *gorm.DB) Service {
-	return NewService(tx, s.userService, s.accountService)
+	return NewService(tx, s.userService, s.accountService, s.webhookService)
 }
 
 func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payment.Account) error {
@@ -47,7 +49,7 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payme
 		return err
 	}
 
-	u, err := s.userService.UserByCPF(ctx, c.UserIdentification, c.OrgID)
+	u, err := s.userService.User(ctx, user.Query{CPF: c.UserIdentification}, c.OrgID)
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			return ErrUserNotFound
@@ -60,7 +62,7 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payme
 		return s.createConsent(ctx, c)
 	}
 
-	acc, err := s.accountService.AccountByNumber(ctx, debtorAcc.Number, c.OrgID)
+	acc, err := s.accountService.Account(ctx, account.Query{Number: debtorAcc.Number}, c.OrgID)
 	if err != nil {
 		if errors.Is(err, account.ErrNotFound) {
 			return ErrAccountNotFound
@@ -231,24 +233,12 @@ func (s Service) Create(ctx context.Context, p *Payment) error {
 }
 
 func (s Service) Payment(ctx context.Context, id, orgID string) (*Payment, error) {
-	p := &Payment{}
-	// TODO: Should I always load this?
-	if err := s.db.WithContext(ctx).Preload("DebtorAccount").First(p, "id = ? AND org_id = ?", id, orgID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
+	p, err := s.payment(ctx, Query{ID: id, DebtorAccount: true}, orgID)
+	if err != nil {
 		return nil, err
 	}
 
-	if clientID := ctx.Value(api.CtxKeyClientID); clientID != nil && clientID != p.ClientID {
-		return nil, ErrClientNotAllowed
-	}
-
-	if err := s.runPostCreationAutomations(ctx, p); err != nil {
-		return nil, err
-	}
-
-	return p, nil
+	return p, s.runPostCreationAutomations(ctx, p)
 }
 
 func (s Service) Payments(ctx context.Context, orgID string, opts *Filter) ([]*Payment, error) {
@@ -620,40 +610,47 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 		}
 
 		if automatic := c.Configuration.Automatic; automatic != nil {
-			if firstPayment := automatic.FirstPayment; firstPayment != nil && p.ID.String() == s.firstPaymentID(ctx, c.ID.String(), c.OrgID) {
-				if !p.Date.Equal(firstPayment.Date) {
-					return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment date does not match the configured first payment date in the consent")
-				}
 
-				if p.Amount != firstPayment.Amount {
-					return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment amount does not match the configured first payment amount in the consent")
+			if firstPaymentConfig := automatic.FirstPayment; firstPaymentConfig != nil {
+				firstPayment, err := s.payment(ctx, Query{ConsentID: c.ID.String(), Order: "created_at ASC"}, c.OrgID)
+				if err != nil {
+					return err
 				}
+				if p.ID == firstPayment.ID {
+					if !p.Date.Equal(firstPaymentConfig.Date) {
+						return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment date does not match the configured first payment date in the consent")
+					}
 
-				if p.Currency != firstPayment.Currency {
-					return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment currency does not match the configured first payment currency in the consent")
+					if p.Amount != firstPaymentConfig.Amount {
+						return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment amount does not match the configured first payment amount in the consent")
+					}
+
+					if p.Currency != firstPaymentConfig.Currency {
+						return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment currency does not match the configured first payment currency in the consent")
+					}
+
+					if p.CreditorAccountISBP != firstPaymentConfig.CreditorAccount.ISPB {
+						return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment creditor account isbp does not match the configured first payment creditor account isbp in the consent")
+					}
+
+					if p.CreditorAccountType != firstPaymentConfig.CreditorAccount.Type {
+						return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment creditor account type does not match the configured first payment creditor account type in the consent")
+					}
+
+					if !reflect.DeepEqual(p.CreditorAccountIssuer, firstPaymentConfig.CreditorAccount.Issuer) {
+						return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment creditor account issuer does not match the configured first payment creditor account issuer in the consent")
+					}
+
+					if p.CreditorAccountNumber != firstPaymentConfig.CreditorAccount.Number {
+						return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment creditor account number does not match the configured first payment creditor account number in the consent")
+					}
+
+					if p.Reference == nil || *p.Reference != "zero" {
+						return s.reject(ctx, p, RejectionNotInformed, "payment reference must be 'zero' for the first payment")
+					}
+
+					return s.updateStatus(ctx, p, payment.StatusACCP)
 				}
-
-				if p.CreditorAccountISBP != firstPayment.CreditorAccount.ISPB {
-					return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment creditor account isbp does not match the configured first payment creditor account isbp in the consent")
-				}
-
-				if p.CreditorAccountType != firstPayment.CreditorAccount.Type {
-					return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment creditor account type does not match the configured first payment creditor account type in the consent")
-				}
-
-				if !reflect.DeepEqual(p.CreditorAccountIssuer, firstPayment.CreditorAccount.Issuer) {
-					return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment creditor account issuer does not match the configured first payment creditor account issuer in the consent")
-				}
-
-				if p.CreditorAccountNumber != firstPayment.CreditorAccount.Number {
-					return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment creditor account number does not match the configured first payment creditor account number in the consent")
-				}
-
-				if p.Reference == nil || *p.Reference != "zero" {
-					return s.reject(ctx, p, RejectionNotInformed, "payment reference must be 'zero' for the first payment")
-				}
-
-				return s.updateStatus(ctx, p, payment.StatusACCP)
 			}
 
 			if p.Date.Before(automatic.ReferenceStartDate) {
@@ -675,6 +672,33 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 
 			if maxAmount := automatic.MaximumVariableAmount; maxAmount != nil && convertAmount(p.Amount) > convertAmount(*maxAmount) {
 				return s.reject(ctx, p, RejectionTransactionValueLimitExceeded, "payment amount is greater than the configured maximum variable amount in the consent")
+			}
+
+			if minAmount := automatic.MinimumVariableAmount; minAmount != nil && convertAmount(p.Amount) < convertAmount(*minAmount) {
+				return s.reject(ctx, p, RejectionTransactionValueLimitExceeded, "payment amount is less than the configured minimum variable amount in the consent")
+			}
+
+			lastPayment, err := s.payment(ctx, Query{
+				ConsentID: c.ID.String(),
+				Statuses:  []payment.Status{payment.StatusSCHD, payment.StatusACSC},
+				Order:     "date DESC",
+			}, c.OrgID)
+			if err != nil {
+				return err
+			}
+
+			// Skip interval validation if the last payment was the initial one.
+			if lastPayment.Reference != nil && *lastPayment.Reference != "zero" {
+				if automatic.Interval == IntervalWeekly && p.Date.StartOfWeek().Equal(lastPayment.Date.StartOfWeek()) {
+					return s.reject(ctx, p, RejectionOutOfAllowedPeriod, "payment cannot be scheduled more than once a week")
+				}
+				if automatic.Interval == IntervalMonthly && p.Date.StartOfMonth().Equal(lastPayment.Date.StartOfMonth()) {
+					return s.reject(ctx, p, RejectionOutOfAllowedPeriod, "payment cannot be scheduled more than once a month")
+				}
+				if automatic.Interval == IntervalAnnually && p.Date.StartOfYear().Equal(lastPayment.Date.StartOfYear()) {
+					return s.reject(ctx, p, RejectionOutOfAllowedPeriod, "payment cannot be scheduled more than once a year")
+				}
+				// TODO: Implement the other intervals.
 			}
 		}
 
@@ -794,6 +818,38 @@ func (s Service) save(ctx context.Context, p *Payment) error {
 	return s.db.WithContext(ctx).Save(p).Error
 }
 
+func (s Service) payment(ctx context.Context, query Query, orgID string) (*Payment, error) {
+	dbQuery := s.db.WithContext(ctx).Where("org_id = ?", orgID)
+	if query.ID != "" {
+		dbQuery = dbQuery.Where("id = ?", query.ID)
+	}
+	if query.ConsentID != "" {
+		dbQuery = dbQuery.Where("consent_id = ?", query.ConsentID)
+	}
+	if query.Statuses != nil {
+		dbQuery = dbQuery.Where("status IN ?", query.Statuses)
+	}
+	if query.DebtorAccount {
+		dbQuery = dbQuery.Preload("DebtorAccount")
+	}
+	if query.Order != "" {
+		dbQuery = dbQuery.Order(query.Order)
+	}
+	p := &Payment{}
+	if err := dbQuery.First(p).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	if clientID := ctx.Value(api.CtxKeyClientID); clientID != nil && clientID != p.ClientID {
+		return nil, ErrClientNotAllowed
+	}
+
+	return p, nil
+}
+
 func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCode, detail string) error {
 	if !slices.Contains([]payment.Status{
 		payment.StatusRCVD,
@@ -814,24 +870,6 @@ func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCod
 		Detail: detail,
 	}
 	return s.updateStatus(ctx, p, payment.StatusRJCT)
-}
-
-func (s Service) firstPaymentID(ctx context.Context, consentID, orgID string) string {
-	var p Payment
-	err := s.db.WithContext(ctx).
-		Where("consent_id = ? AND org_id = ?", consentID, orgID).
-		Order("created_at ASC").
-		Select("id").
-		First(&p).
-		Error
-
-	// TODO: Return an error.
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to get first payment id", "error", err)
-		return ""
-	}
-
-	return p.ID.String()
 }
 
 func (s Service) currentAmount(ctx context.Context, c *Consent, from *timeutil.BrazilDate, to *timeutil.BrazilDate) (int, float64, error) {

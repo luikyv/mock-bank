@@ -10,7 +10,9 @@ const (
 )
 
 const (
-	OrgIDKey = "org_id"
+	OrgIDKey       = "org_id"
+	SoftwareIDKey  = "software_id"
+	WebhookURIsKey = "webhook_uris"
 )
 
 type SoftwareStatement struct {

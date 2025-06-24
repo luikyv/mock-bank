@@ -7,7 +7,7 @@ CREATE TABLE consents (
     user_id UUID REFERENCES mock_users(id),
     user_identification TEXT NOT NULL,
 	user_rel TEXT NOT NULL,
-	business_dentification TEXT,
+	business_identification TEXT,
 	business_rel TEXT,
     client_id TEXT NOT NULL REFERENCES oauth_clients(id),
     rejection JSONB,

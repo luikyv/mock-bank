@@ -1,5 +1,6 @@
 package bank
 
+// TODO: Do I need this?
 const (
 	Brand        string = "MockBank"
 	CNPJ         string = "00000000000000"

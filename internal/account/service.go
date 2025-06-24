@@ -14,22 +14,23 @@ import (
 )
 
 type Service struct {
-	db *gorm.DB
+	db        *gorm.DB
+	mockOrgID string
 }
 
-func NewService(db *gorm.DB) Service {
-	return Service{db: db}
+func NewService(db *gorm.DB, mockOrgID string) Service {
+	return Service{db: db, mockOrgID: mockOrgID}
 }
 
 func (s Service) WithTx(tx *gorm.DB) Service {
-	return NewService(tx)
+	return NewService(tx, s.mockOrgID)
 }
 
 func (s Service) Authorize(ctx context.Context, accIDs []string, consentID, orgID string) error {
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		txService := s.WithTx(tx)
 		for _, accID := range accIDs {
-			acc, err := txService.Account(ctx, accID, orgID)
+			acc, err := txService.Account(ctx, Query{ID: accID}, orgID)
 			if err != nil {
 				return err
 			}
@@ -44,7 +45,7 @@ func (s Service) Authorize(ctx context.Context, accIDs []string, consentID, orgI
 				AccountID: uuid.MustParse(accID),
 				UserID:    acc.UserID,
 				Status:    status,
-				OrgID:     acc.OrgID,
+				OrgID:     orgID,
 			}); err != nil {
 				return fmt.Errorf("could not create resource for account: %w", err)
 			}
@@ -111,11 +112,17 @@ func (s Service) ConsentedAccount(ctx context.Context, accountID, consentID, org
 	return consentAcc.Account, nil
 }
 
-func (s Service) AccountByNumber(ctx context.Context, number, orgID string) (*Account, error) {
+func (s Service) Account(ctx context.Context, query Query, orgID string) (*Account, error) {
+	dbQuery := s.db.WithContext(ctx).Where("org_id = ? OR org_id = ?", orgID, s.mockOrgID)
+	if query.ID != "" {
+		dbQuery = dbQuery.Where("id = ?", query.ID)
+	}
+	if query.Number != "" {
+		dbQuery = dbQuery.Where("number = ?", query.Number)
+	}
+
 	acc := &Account{}
-	if err := s.db.WithContext(ctx).
-		Where("number = ? AND org_id = ?", number, orgID).
-		First(acc).Error; err != nil {
+	if err := dbQuery.First(acc).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
 		}
@@ -124,31 +131,8 @@ func (s Service) AccountByNumber(ctx context.Context, number, orgID string) (*Ac
 	return acc, nil
 }
 
-func (s Service) Account(ctx context.Context, id, orgID string) (*Account, error) {
-	acc := &Account{}
-	if err := s.db.WithContext(ctx).
-		Where("id = ? AND org_id = ?", id, orgID).
-		First(acc).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("could not fetch account: %w", err)
-	}
-	return acc, nil
-}
-
-func (s Service) AllAccounts(ctx context.Context, userID, orgID string) ([]*Account, error) {
-	var accounts []*Account
-	if err := s.db.WithContext(ctx).
-		Where("user_id = ? AND org_id = ?", userID, orgID).
-		Find(&accounts).Error; err != nil {
-		return nil, fmt.Errorf("could not find accounts: %w", err)
-	}
-	return accounts, nil
-}
-
-func (s Service) Accounts(ctx context.Context, userID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Account], error) {
-	query := s.db.WithContext(ctx).Where("user_id = ? AND org_id = ?", userID, orgID)
+func (s Service) Accounts(ctx context.Context, userID, orgID string, pag page.Pagination) (page.Page[*Account], error) {
+	query := s.db.WithContext(ctx).Where("user_id = ? AND (org_id = ? OR org_id = ?)", userID, orgID, s.mockOrgID)
 
 	var accounts []*Account
 	if err := query.
@@ -205,8 +189,8 @@ func (s Service) CreateTransaction(ctx context.Context, tx *Transaction) error {
 func (s Service) Transactions(ctx context.Context, accID, orgID string, pag page.Pagination, filter TransactionFilter) (page.Page[*Transaction], error) {
 	query := s.db.WithContext(ctx).
 		Model(&Transaction{}).
-		Where("account_id = ? AND org_id = ? AND created_at >= ? AND created_at < ?",
-			accID, orgID, filter.from.Time, filter.to.Time)
+		Where("account_id = ? AND created_at >= ? AND created_at < ? AND (org_id = ? OR org_id = ?)",
+			accID, filter.from.Time, filter.to.Time, orgID, s.mockOrgID)
 
 	var txs []*Transaction
 	if err := query.

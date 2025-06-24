@@ -103,25 +103,6 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("/api/", handler)
 }
 
-func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
-	if errors.Is(err, session.ErrNotFound) {
-		api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, err.Error()))
-		return
-	}
-
-	if errors.Is(err, user.ErrAlreadyExists) {
-		api.WriteError(w, r, api.NewError("USER_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
-		return
-	}
-
-	if errors.Is(err, account.ErrAlreadyExists) {
-		api.WriteError(w, r, api.NewError("ACCOUNT_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
-		return
-	}
-
-	api.WriteError(w, r, err)
-}
-
 func (s Server) GetDirectoryAuthURL(ctx context.Context, request GetDirectoryAuthURLRequestObject) (GetDirectoryAuthURLResponseObject, error) {
 	session, authURL, err := s.sessionService.CreateSession(ctx)
 	if err != nil {
@@ -412,7 +393,7 @@ func (s Server) UpdateAccount(ctx context.Context, req UpdateAccountRequestObjec
 
 func (s Server) GetAccounts(ctx context.Context, req GetAccountsRequestObject) (GetAccountsResponseObject, error) {
 	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
-	accs, err := s.accountService.Accounts(ctx, req.UserID, req.OrgID, pag)
+	accs, err := s.accountService.Accounts(ctx, req.UserID.String(), req.OrgID, pag)
 	if err != nil {
 		return nil, err
 	}
@@ -553,4 +534,23 @@ func (s Server) PatchResourceStatus(ctx context.Context, req PatchResourceStatus
 	}
 
 	return PatchResourceStatus204Response{}, nil
+}
+
+func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, session.ErrNotFound) {
+		api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, err.Error()))
+		return
+	}
+
+	if errors.Is(err, user.ErrAlreadyExists) {
+		api.WriteError(w, r, api.NewError("USER_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
+		return
+	}
+
+	if errors.Is(err, account.ErrAlreadyExists) {
+		api.WriteError(w, r, api.NewError("ACCOUNT_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
+		return
+	}
+
+	api.WriteError(w, r, err)
 }

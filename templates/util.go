@@ -1,3 +1,6 @@
 package templates
 
-// TODO?
+import "embed"
+
+//go:embed *.html
+var Templates embed.FS

@@ -104,8 +104,8 @@ func (s Service) Create(ctx context.Context, c *Consent) error {
 		return err
 	}
 
-	if user, err := s.userService.UserByCPF(ctx, c.UserIdentification, c.OrgID); err == nil {
-		c.UserID = &user.ID
+	if u, err := s.userService.User(ctx, user.Query{CPF: c.UserIdentification}, c.OrgID); err == nil {
+		c.UserID = &u.ID
 	}
 
 	return s.db.WithContext(ctx).Create(c).Error

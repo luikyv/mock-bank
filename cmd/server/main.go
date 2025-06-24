@@ -19,6 +19,7 @@ import (
 	"github.com/luikyv/mock-bank/internal/directory"
 	"github.com/luikyv/mock-bank/internal/idempotency"
 	"github.com/luikyv/mock-bank/internal/session"
+	"github.com/luikyv/mock-bank/internal/webhook"
 	"log"
 	"log/slog"
 	"net/http"
@@ -134,28 +135,31 @@ func main() {
 	}
 
 	// Services.
-	directoryService := directory.NewService(DirectoryIssuer, DirectoryClientID, APPHost+"/api/directory/callback", directoryClientSigner, mtlsHTTPClient(directoryClientTLSCert))
+	directoryService := directory.NewService(DirectoryIssuer, DirectoryClientID, APPHost+"/api/directory/callback",
+		directoryClientSigner, mtlsHTTPClient(directoryClientTLSCert))
 	sessionService := session.NewService(db, directoryService)
 	idempotencyService := idempotency.NewService(db)
-	userService := user.NewService(db)
+	webhookService := webhook.NewService()
+	userService := user.NewService(db, OrgID)
 	consentService := consent.NewService(db, userService)
-	resouceService := resource.NewService(db)
-	accountService := account.NewService(db)
+	resourceService := resource.NewService(db)
+	accountService := account.NewService(db, OrgID)
 	paymentService := payment.NewService(db, userService, accountService)
-	autoPaymentService := autopayment.NewService(db, userService, accountService)
+	autoPaymentService := autopayment.NewService(db, userService, accountService, webhookService)
 
 	op, err := openidProvider(db, opSigner, userService, consentService, accountService, paymentService, autoPaymentService)
 	if err != nil {
 		log.Fatal(err)
 	}
+	webhookService.SetOpenIDProvider(op)
 
 	// Servers.
 	mux := http.NewServeMux()
 
 	oidcapi.NewServer(AuthHost, op).RegisterRoutes(mux)
-	app.NewServer(APPHost, sessionService, userService, consentService, resouceService, accountService).RegisterRoutes(mux)
+	app.NewServer(APPHost, sessionService, userService, consentService, resourceService, accountService).RegisterRoutes(mux)
 	consentv3.NewServer(APIMTLSHost, consentService, op).RegisterRoutes(mux)
-	resourcev3.NewServer(APIMTLSHost, resouceService, consentService, op).RegisterRoutes(mux)
+	resourcev3.NewServer(APIMTLSHost, resourceService, consentService, op).RegisterRoutes(mux)
 	accountv2.NewServer(APIMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
 	paymentv4.NewServer(APIMTLSHost, paymentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 	autopaymentv2.NewServer(APIMTLSHost, autoPaymentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
@@ -178,7 +182,6 @@ func main() {
 				}
 			}
 		}
-
 	}()
 
 	if !Env.IsAWS() {
