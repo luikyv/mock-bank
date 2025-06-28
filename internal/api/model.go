@@ -13,6 +13,7 @@ type ContextKey string
 const (
 	CtxKeyCorrelationID ContextKey = "correlation_id"
 	CtxKeyClientID      ContextKey = "client_id"
+	CtxKeyCertCN        ContextKey = "cert_cn"
 	CtxKeySubject       ContextKey = "subject"
 	CtxKeyScopes        ContextKey = "scopes"
 	CtxKeyConsentID     ContextKey = "consent_id"

@@ -4,15 +4,16 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"github.com/go-jose/go-jose/v4"
-	"github.com/go-jose/go-jose/v4/jwt"
-	"github.com/luikyv/go-oidc/pkg/goidc"
-	"github.com/luikyv/mock-bank/internal/timeutil"
 	"net/http"
 	"slices"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
+	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 const (
@@ -121,12 +122,16 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 			}
 		}
 
+		c.Name = ss.SoftwareClientName
 		c.CustomAttributes = map[string]any{
 			OrgIDKey:      ss.OrgID,
 			SoftwareIDKey: ss.SoftwareID,
 		}
 		if webhookURIs := c.CustomAttribute(WebhookURIsKey); webhookURIs != nil {
 			c.SetCustomAttribute(WebhookURIsKey, webhookURIs)
+		}
+		if originURIs := c.CustomAttribute(SoftwareOriginURIsKey); originURIs != nil {
+			c.SetCustomAttribute(SoftwareOriginURIsKey, originURIs)
 		}
 		return nil
 	}

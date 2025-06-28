@@ -5,6 +5,9 @@ import (
 	"context"
 	"crypto"
 	"errors"
+	"net/http"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
@@ -13,14 +16,13 @@ import (
 	"github.com/luikyv/mock-bank/internal/autopayment"
 	"github.com/luikyv/mock-bank/internal/bank"
 	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/errorutil"
 	"github.com/luikyv/mock-bank/internal/idempotency"
 	"github.com/luikyv/mock-bank/internal/jwtutil"
 	"github.com/luikyv/mock-bank/internal/oidc"
 	"github.com/luikyv/mock-bank/internal/payment"
 	"github.com/luikyv/mock-bank/internal/timeutil"
-	"net/http"
-	"strings"
 )
 
 var _ StrictServerInterface = Server{}
@@ -61,7 +63,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	jwtMiddleware := jwtutil.Middleware(s.baseURL, s.orgID, s.keystoreHost, s.signer)
 	idempotencyMiddleware := idempotency.Middleware(s.idempotencyService)
 	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, autopayment.Scope)
-	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, autopayment.ScopeConsentID)
+	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID)
 	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string {
 		if strings.Contains(err.Error(), "is missing") {
 			return "PARAMETRO_NAO_INFORMADO"
@@ -221,6 +223,7 @@ func (s Server) AutomaticPaymentsPostRecurringConsents(ctx context.Context, req 
 			RecurringConfiguration: c.Configuration,
 			RecurringConsentID:     c.URN(),
 			Status:                 EnumAuthorisationStatusType(c.Status),
+			StatusUpdateDateTime:   c.StatusUpdatedAt,
 			UpdatedAtDateTime:      &c.UpdatedAt,
 		},
 		Meta:  *api.NewMeta(),
@@ -593,7 +596,6 @@ func (s Server) AutomaticPaymentsPostPixRecurringPayments(ctx context.Context, r
 	clientID := ctx.Value(api.CtxKeyClientID).(string)
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
 	scopes := ctx.Value(api.CtxKeyScopes).(string)
-	consentID, _ := autopayment.ConsentIDFromScopes(scopes)
 	p := &autopayment.Payment{
 		EndToEndID:                req.Body.Data.EndToEndID,
 		Date:                      req.Body.Data.Date,
@@ -613,9 +615,21 @@ func (s Server) AutomaticPaymentsPostPixRecurringPayments(ctx context.Context, r
 		DocumentRel:               consent.Relation(req.Body.Data.Document.Rel),
 		Reference:                 req.Body.Data.PaymentReference,
 		RiskSignals:               req.Body.Data.RiskSignals,
-		ConsentID:                 uuid.MustParse(consentID),
 		ClientID:                  clientID,
 		OrgID:                     orgID,
+	}
+
+	if req.Body.Data.RecurringConsentID != nil {
+		consentID := strings.TrimPrefix(*req.Body.Data.RecurringConsentID, autopayment.ConsentURNPrefix)
+		p.ConsentID = uuid.MustParse(consentID)
+	}
+
+	if consentID, _ := autopayment.ConsentIDFromScopes(scopes); consentID != "" {
+		p.ConsentID = uuid.MustParse(consentID)
+	}
+	if enrollmentID, _ := enrollment.IDFromScopes(scopes); enrollmentID != "" {
+		id := uuid.MustParse(enrollmentID)
+		p.EnrollmentID = &id
 	}
 
 	if req.Body.Data.AuthorisationFlow != nil {
@@ -635,7 +649,7 @@ func (s Server) AutomaticPaymentsPostPixRecurringPayments(ctx context.Context, r
 		return nil, err
 	}
 
-	consentID = consent.URN(p.ConsentID)
+	consentID := autopayment.ConsentURN(p.ConsentID)
 	resp := ResponseRecurringPaymentsIDPost{
 		Data: ResponseRecurringPaymentsPostData{
 			CnpjInitiator:    p.CNPJInitiator,
@@ -732,7 +746,7 @@ func (s Server) AutomaticPaymentsGetPixRecurringPaymentsPaymentID(ctx context.Co
 		return nil, err
 	}
 
-	consentID := consent.URN(p.ConsentID)
+	consentID := autopayment.ConsentURN(p.ConsentID)
 	resp := ResponseRecurringPaymentsIDRead{
 		Data: ResponseRecurringPaymentsDataRead{
 			CnpjInitiator:    p.CNPJInitiator,
@@ -835,7 +849,7 @@ func (s Server) AutomaticPaymentsGetPixRecurringPayments(ctx context.Context, re
 		Links: *api.NewLinks(s.baseURL + "/pix/recurring-payments" + filter.URLQuery()),
 	}
 	for _, p := range payments {
-		consentID := consent.URN(p.ConsentID)
+		consentID := autopayment.ConsentURN(p.ConsentID)
 		data := struct {
 			CreationDateTime timeutil.DateTime   "json:\"creationDateTime\""
 			Date             timeutil.BrazilDate "json:\"date\""
@@ -906,7 +920,7 @@ func (s Server) AutomaticPaymentsPatchPixRecurringPaymentsPaymentID(ctx context.
 		return nil, err
 	}
 
-	consentID := consent.URN(p.ConsentID)
+	consentID := autopayment.ConsentURN(p.ConsentID)
 	resp := ResponseRecurringPaymentsIDPatch{
 		Data: ResponseRecurringPaymentsDataPatch{
 			CnpjInitiator:    p.CNPJInitiator,
@@ -1027,7 +1041,7 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
-	if errors.Is(err, autopayment.ErrConsentNotAuthorized) {
+	if errors.Is(err, autopayment.ErrInvalidConsentStatus) {
 		api.WriteError(w, r, api.NewError("CONSENTIMENTO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
 		return
 	}

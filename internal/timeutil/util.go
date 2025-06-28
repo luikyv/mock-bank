@@ -152,14 +152,17 @@ func (d BrazilDate) Value() (driver.Value, error) {
 	return t, nil
 }
 
+// StartOfWeek returns a new BrazilDate representing the start of the current week (Monday).
 func (d BrazilDate) StartOfWeek() BrazilDate {
 	weekDay := int(d.Weekday())
 	if weekDay == 0 {
 		weekDay = 7
 	}
-	return d.AddDate(0, 0, -weekDay+1)
+	daysSinceMonday := weekDay - 1
+	return d.AddDate(0, 0, -daysSinceMonday)
 }
 
+// EndOfWeek returns a new BrazilDate representing the end of the current week (Sunday).
 func (d BrazilDate) EndOfWeek() BrazilDate {
 	weekDay := int(d.Weekday())
 	if weekDay == 0 {

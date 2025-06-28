@@ -4,9 +4,10 @@ package accountv2
 import (
 	"context"
 	"errors"
-	"github.com/luikyv/mock-bank/internal/bank"
 	"net/http"
 	"strings"
+
+	"github.com/luikyv/mock-bank/internal/bank"
 
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
@@ -236,15 +237,14 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts/"+req.AccountID+"/transactions", txs),
 	}
 	for _, tx := range txs.Records {
-		resp.Data = append(resp.Data, AccountTransactionsData{
+		data := AccountTransactionsData{
 			CompletedAuthorisedPaymentType: EnumCompletedAuthorisedPaymentIndicator(tx.Status),
 			CreditDebitType:                EnumCreditDebitIndicator(tx.MovementType),
-			// PartieBranchCode:               "",
-			// PartieCheckDigit:               "",
-			// PartieCnpjCpf:                  "",
-			// PartieCompeCode:                "",
-			// PartieNumber:                   "",
-			// PartiePersonType:               "",
+			PartieBranchCode:               tx.PartieBranchCode,
+			PartieCheckDigit:               tx.PartieCheckDigit,
+			PartieCnpjCpf:                  tx.PartieCNPJCPF,
+			PartieCompeCode:                tx.PartieCompeCode,
+			PartieNumber:                   tx.PartieNumber,
 			TransactionAmount: AccountTransactionsDataAmount{
 				Amount:   tx.Amount,
 				Currency: bank.Currency,
@@ -253,7 +253,12 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 			TransactionID:       tx.ID,
 			TransactionName:     tx.Name,
 			Type:                EnumTransactionTypes(tx.Type),
-		})
+		}
+		if tx.PartiePersonType != nil {
+			partiePersonType := EnumPartiePersonType(*tx.PartiePersonType)
+			data.PartiePersonType = &partiePersonType
+		}
+		resp.Data = append(resp.Data, data)
 	}
 	return AccountsGetAccountsAccountIDTransactions200JSONResponse{OKResponseAccountTransactionsJSONResponse(resp)}, nil
 }
@@ -278,15 +283,14 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts/"+req.AccountID+"/transactions-current", txs),
 	}
 	for _, tx := range txs.Records {
-		resp.Data = append(resp.Data, AccountTransactionsData{
+		data := AccountTransactionsData{
 			CompletedAuthorisedPaymentType: EnumCompletedAuthorisedPaymentIndicator(tx.Status),
 			CreditDebitType:                EnumCreditDebitIndicator(tx.MovementType),
-			// PartieBranchCode:               "",
-			// PartieCheckDigit:               "",
-			// PartieCnpjCpf:                  "",
-			// PartieCompeCode:                "",
-			// PartieNumber:                   "",
-			// PartiePersonType:               "",
+			PartieBranchCode:               tx.PartieBranchCode,
+			PartieCheckDigit:               tx.PartieCheckDigit,
+			PartieCnpjCpf:                  tx.PartieCNPJCPF,
+			PartieCompeCode:                tx.PartieCompeCode,
+			PartieNumber:                   tx.PartieNumber,
 			TransactionAmount: AccountTransactionsDataAmount{
 				Amount:   tx.Amount,
 				Currency: bank.Currency,
@@ -295,7 +299,12 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 			TransactionID:       tx.ID,
 			TransactionName:     tx.Name,
 			Type:                EnumTransactionTypes(tx.Type),
-		})
+		}
+		if tx.PartiePersonType != nil {
+			partiePersonType := EnumPartiePersonType(*tx.PartiePersonType)
+			data.PartiePersonType = &partiePersonType
+		}
+		resp.Data = append(resp.Data, data)
 	}
 
 	return AccountsGetAccountsAccountIDTransactionsCurrent200JSONResponse{OKResponseAccountTransactionsJSONResponse(resp)}, nil

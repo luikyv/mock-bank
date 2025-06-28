@@ -63,7 +63,11 @@ func (s Service) AuthorizeSession(ctx context.Context, sessionID, authCode strin
 		}
 	}
 
-	if err := s.db.WithContext(ctx).Save(&session).Error; err != nil {
+	if err := s.db.WithContext(ctx).
+		Model(&Session{}).
+		Omit("ID", "CreatedAt", "OrgID").
+		Where("id = ?", sessionID).
+		Updates(&session).Error; err != nil {
 		return fmt.Errorf("could not authorize session: %w", err)
 	}
 

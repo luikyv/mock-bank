@@ -3,13 +3,11 @@ package autopayment
 import "github.com/luikyv/mock-bank/internal/errorutil"
 
 var (
-	ErrUserNotFound               = errorutil.New("user not found")
-	ErrAccountNotFound            = errorutil.New("account not found")
-	ErrNotFound                   = errorutil.New("consent not found")
-	ErrUserDoesntMatchAccount     = errorutil.New("the logged user does not have access to the specified debtor account")
+	ErrNotFound                   = errorutil.New("resource not found")
+	ErrUserDoesntMatchAccount     = errorutil.New("entity does not have access to the specified debtor account")
 	ErrClientNotAllowed           = errorutil.New("access is not allowed to client")
 	ErrCannotRejectConsent        = errorutil.New("invalid consent status for rejection")
-	ErrConsentNotAuthorized       = errorutil.New("the consent is not authorized")
+	ErrInvalidConsentStatus       = errorutil.New("invalid consent status")
 	ErrInvalidData                = errorutil.New("invalid data")
 	ErrInvalidEndToEndID          = errorutil.New("invalid end to end id")
 	ErrPaymentDoesNotMatchConsent = errorutil.New("payment does not match the consent")

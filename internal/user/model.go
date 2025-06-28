@@ -10,7 +10,8 @@ type User struct {
 	Username    string
 	Name        string
 	CPF         string
-	Description string
+	CNPJ        *string
+	Description *string
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -25,19 +26,18 @@ type Query struct {
 	ID       string
 	Username string
 	CPF      string
+	CNPJ     string
 }
 
-type Company struct {
-	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Name        string
-	CNPJ        string
-	Description string
+type UserBusiness struct {
+	UserID         uuid.UUID
+	BusinessUserID uuid.UUID
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
 	UpdatedAt timeutil.DateTime
 }
 
-func (Company) TableName() string {
-	return "mock_companies"
+func (UserBusiness) TableName() string {
+	return "mock_user_business"
 }

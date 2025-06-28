@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/luikyv/mock-bank/internal/bank"
-	"github.com/luikyv/mock-bank/internal/webhook"
 	"log/slog"
 	"reflect"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/luikyv/mock-bank/internal/bank"
+	"github.com/luikyv/mock-bank/internal/webhook"
 
 	"github.com/google/uuid"
 	"github.com/luikyv/mock-bank/internal/account"
@@ -40,8 +41,11 @@ func (s Service) WithTx(tx *gorm.DB) Service {
 
 func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payment.Account) error {
 	c.Status = ConsentStatusAwaitingAuthorization
+	now := timeutil.DateTimeNow()
+	c.StatusUpdatedAt = now
+	c.CreatedAt = now
+	c.UpdatedAt = now
 	if sweeping := c.Configuration.Sweeping; sweeping != nil && sweeping.StartDateTime == nil {
-		now := timeutil.DateTimeNow()
 		sweeping.StartDateTime = &now
 	}
 
@@ -51,47 +55,77 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payme
 
 	u, err := s.userService.User(ctx, user.Query{CPF: c.UserIdentification}, c.OrgID)
 	if err != nil {
-		if errors.Is(err, user.ErrNotFound) {
-			return ErrUserNotFound
-		}
 		return err
 	}
-	c.UserID = u.ID
+	c.OwnerID = u.ID
+
+	if c.BusinessIdentification != nil {
+		business, err := s.userService.User(ctx, user.Query{CNPJ: *c.BusinessIdentification}, c.OrgID)
+		if err != nil {
+			return err
+		}
+		c.OwnerID = business.ID
+	}
 
 	if debtorAcc == nil {
-		return s.createConsent(ctx, c)
+		return s.db.WithContext(ctx).Create(c).Error
 	}
 
 	acc, err := s.accountService.Account(ctx, account.Query{Number: debtorAcc.Number}, c.OrgID)
 	if err != nil {
-		if errors.Is(err, account.ErrNotFound) {
-			return ErrAccountNotFound
-		}
 		return err
 	}
 
-	if acc.UserID != u.ID {
+	if acc.UserID != c.OwnerID {
 		return ErrUserDoesntMatchAccount
 	}
 
 	c.DebtorAccountID = &acc.ID
-
 	if err := s.runConsentPreCreationAutomations(ctx, c); err != nil {
 		return err
 	}
 
-	return s.createConsent(ctx, c)
+	return s.db.WithContext(ctx).Create(c).Error
 }
 
 func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
 
 	if c.Status != ConsentStatusAwaitingAuthorization {
-		return errorutil.New("consent is not awaiting authorization")
+		return errorutil.Format("%w: consent is not awaiting authorization", ErrInvalidConsentStatus)
 	}
 
 	now := timeutil.DateTimeNow()
 	c.AuthorizedAt = &now
 	return s.updateConsentStatus(ctx, c, ConsentStatusAuthorized)
+}
+
+func (s Service) EnrollConsent(ctx context.Context, id, orgID string, opts payment.EnrollmentOptions) error {
+	c, err := s.Consent(ctx, id, orgID)
+	if err != nil {
+		return err
+	}
+
+	if c.Status != ConsentStatusAwaitingAuthorization {
+		return errorutil.Format("%w: consent is not awaiting authorization", ErrInvalidConsentStatus)
+	}
+
+	if c.UserIdentification != opts.UserIdentification {
+		return errorutil.New("consent user identification mismatch")
+	}
+
+	if !reflect.DeepEqual(c.BusinessIdentification, opts.BusinessIdentification) {
+		return errorutil.New("consent business identification mismatch")
+	}
+
+	if c.EnrollmentID != nil {
+		return errorutil.New("consent already has an enrollment")
+	}
+
+	c.EnrollmentID = &opts.EnrollmentID
+	c.EnrollmentChallenge = &opts.Challenge
+	c.EnrollmentTransactionLimit = &opts.TransactionLimit
+	c.EnrollmentDailyLimit = &opts.DailyLimit
+	return s.updateConsent(ctx, c)
 }
 
 func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error) {
@@ -100,28 +134,7 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 		return nil, err
 	}
 
-	if err := s.runConsentPostCreationAutomations(ctx, c); err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
-
-func (s Service) consent(ctx context.Context, id, orgID string) (*Consent, error) {
-	id = strings.TrimPrefix(id, consent.URNPrefix)
-	c := &Consent{}
-	if err := s.db.WithContext(ctx).Preload("DebtorAccount").First(c, "id = ? AND org_id = ?", id, orgID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-
-	if ctx.Value(api.CtxKeyClientID) != nil && ctx.Value(api.CtxKeyClientID) != c.ClientID {
-		return nil, ErrClientNotAllowed
-	}
-
-	return c, nil
+	return c, s.runConsentPostCreationAutomations(ctx, c)
 }
 
 func (s Service) RejectConsentByID(ctx context.Context, id, orgID string, rejection ConsentRejection) (*Consent, error) {
@@ -198,13 +211,13 @@ func (s Service) EditConsent(ctx context.Context, id, orgID string, edition Cons
 	}
 	c.Configuration.Automatic.MaximumVariableAmount = maxAmount
 
-	return c, s.saveConsent(ctx, c)
+	return c, s.updateConsent(ctx, c)
 }
 
 func (s Service) Create(ctx context.Context, p *Payment) error {
 
 	if p.ConsentID == uuid.Nil {
-		return errorutil.New("could not infer consent id")
+		return errorutil.Format("%w: could not infer consent id", ErrMissingValue)
 	}
 
 	c, err := s.Consent(ctx, p.ConsentID.String(), p.OrgID)
@@ -213,23 +226,27 @@ func (s Service) Create(ctx context.Context, p *Payment) error {
 	}
 
 	if c.Status != ConsentStatusAuthorized {
-		return ErrConsentNotAuthorized
+		return ErrInvalidConsentStatus
 	}
+
+	p.Status = payment.StatusRCVD
+	p.StatusUpdatedAt = timeutil.DateTimeNow()
+	p.DebtorAccountID = c.DebtorAccountID
+	p.DebtorAccount = c.DebtorAccount
+	date, _ := payment.ParseEndToEndDate(p.EndToEndID)
+	p.Date = date.BrazilDate()
+	p.CreatedAt = timeutil.DateTimeNow()
+	p.UpdatedAt = timeutil.DateTimeNow()
 
 	if err := s.validate(ctx, c, p); err != nil {
 		return err
 	}
 
-	p.Status = payment.StatusRCVD
-	p.DebtorAccountID = c.DebtorAccountID
-	p.DebtorAccount = c.DebtorAccount
-	date, _ := payment.ParseEndToEndDate(p.EndToEndID)
-	p.Date = date.BrazilDate()
-
 	if err := s.runPreCreationAutomations(ctx, p); err != nil {
 		return err
 	}
-	return s.db.Create(p).Error
+
+	return s.db.WithContext(ctx).Create(p).Error
 }
 
 func (s Service) Payment(ctx context.Context, id, orgID string) (*Payment, error) {
@@ -285,32 +302,6 @@ func (s Service) Cancel(ctx context.Context, id, orgID string, doc consent.Docum
 	return p, nil
 }
 
-func (s Service) cancel(ctx context.Context, p *Payment, from payment.CancelledFrom, by string) error {
-	if !slices.Contains([]payment.Status{payment.StatusPDNG, payment.StatusSCHD}, p.Status) {
-		return errorutil.Format("%w: payment with status %s cannot be cancelled, only payments with status PDNG or SCHD can be cancelled", ErrCancelNotAllowed, p.Status)
-	}
-
-	if p.Status == payment.StatusSCHD && !timeutil.BrazilDateNow().Before(p.Date) {
-		return errorutil.Format("%w: scheduled payments can only be cancelled until 23:59 (BRT) of the day before the payment date (%s)", ErrCancelNotAllowed, p.Date.String())
-	}
-
-	reason := payment.CancellationReasonPending
-	if p.Status == payment.StatusSCHD {
-		reason = payment.CancellationReasonScheduled
-	}
-	p.Cancellation = &payment.Cancellation{
-		At:     timeutil.DateTimeNow(),
-		Reason: reason,
-		From:   from,
-		By:     by,
-	}
-	return s.updateStatus(ctx, p, payment.StatusCANC)
-}
-
-func (s Service) createConsent(ctx context.Context, c *Consent) error {
-	return s.db.WithContext(ctx).Create(c).Error
-}
-
 func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *payment.Account) error {
 	if c.UserRel != consent.RelationCPF {
 		return errorutil.Format("%w: only CPF is allowed for logged user document relation", ErrInvalidPayment)
@@ -353,7 +344,7 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *p
 			return errorutil.Format("%w: mininum variable amount cannot be informed if fixed amount is present", ErrInvalidPayment)
 		}
 
-		if automatic.MaximumVariableAmount != nil && automatic.MinimumVariableAmount != nil && convertAmount(*automatic.MinimumVariableAmount) > convertAmount(*automatic.MaximumVariableAmount) {
+		if automatic.MaximumVariableAmount != nil && automatic.MinimumVariableAmount != nil && payment.ConvertAmount(*automatic.MinimumVariableAmount) > payment.ConvertAmount(*automatic.MaximumVariableAmount) {
 			return errorutil.Format("%w: maximum variable amount cannot be lower than minimum variable amount", ErrInvalidPayment)
 		}
 
@@ -420,11 +411,11 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *p
 
 func (s Service) validateConsentEdition(_ context.Context, c *Consent, edition ConsentEdition) error {
 	if c.Status != ConsentStatusAuthorized {
-		return errorutil.New("consent is not authorized")
+		return errorutil.Format("%w: consent is not authorized", ErrInvalidConsentStatus)
 	}
 
 	if c.Status != ConsentStatusAuthorized {
-		return ErrConsentNotAuthorized
+		return ErrInvalidConsentStatus
 	}
 
 	if c.Configuration.Automatic == nil {
@@ -457,14 +448,7 @@ func (s Service) validateConsentEdition(_ context.Context, c *Consent, edition C
 	return nil
 }
 
-func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status ConsentStatus) error {
-	c.Status = status
-	c.StatusUpdatedAt = timeutil.DateTimeNow()
-	c.UpdatedAt = timeutil.DateTimeNow()
-	return s.saveConsent(ctx, c)
-}
-
-func (s Service) runConsentPreCreationAutomations(_ context.Context, c *Consent) error {
+func (s Service) runConsentPreCreationAutomations(_ context.Context, _ *Consent) error {
 	return nil
 }
 
@@ -492,7 +476,7 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 				if err != nil {
 					return err
 				}
-				if currentTotalAmount > convertAmount(*totalAllowedAmount) {
+				if currentTotalAmount > payment.ConvertAmount(*totalAllowedAmount) {
 					return s.updateConsentStatus(ctx, c, ConsentStatusConsumed)
 				}
 			}
@@ -504,18 +488,39 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 
 func (s Service) revokeConsent(ctx context.Context, c *Consent, revocation ConsentRevocation) error {
 	if c.Status != ConsentStatusAuthorized {
-		return ErrConsentNotAuthorized
+		return ErrInvalidConsentStatus
 	}
 
 	c.Revocation = &revocation
 	return s.updateConsentStatus(ctx, c, ConsentStatusRevoked)
 }
 
-func (s Service) saveConsent(ctx context.Context, c *Consent) error {
-	return s.db.WithContext(ctx).Save(c).Error
+func (s Service) consent(ctx context.Context, id, orgID string) (*Consent, error) {
+	id = strings.TrimPrefix(id, ConsentURNPrefix)
+	c := &Consent{}
+	if err := s.db.WithContext(ctx).Preload("DebtorAccount").First(c, "id = ? AND org_id = ?", id, orgID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	if ctx.Value(api.CtxKeyClientID) != nil && ctx.Value(api.CtxKeyClientID) != c.ClientID {
+		return nil, ErrClientNotAllowed
+	}
+
+	return c, nil
 }
 
 func (s Service) validate(_ context.Context, c *Consent, p *Payment) error {
+	if !reflect.DeepEqual(c.EnrollmentID, p.EnrollmentID) {
+		return errorutil.Format("%w: payment enrollment id doesn't match the consent", ErrPaymentDoesNotMatchConsent)
+	}
+
+	if p.EnrollmentID != nil && (p.AuthorisationFlow == nil || *p.AuthorisationFlow != payment.AuthorisationFlowFIDOFlow) {
+		return errorutil.New("payment enrollment id is set but authorisation flow is not FIDO")
+	}
+
 	if sweeping := c.Configuration.Sweeping; sweeping != nil {
 		if p.RiskSignals == nil {
 			return errorutil.New("risk signals is required for sweeping payments")
@@ -670,11 +675,11 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 				return s.reject(ctx, p, RejectionPaymentConsentMismatch, "payment amount does not match the configured fixed amount in the consent")
 			}
 
-			if maxAmount := automatic.MaximumVariableAmount; maxAmount != nil && convertAmount(p.Amount) > convertAmount(*maxAmount) {
+			if maxAmount := automatic.MaximumVariableAmount; maxAmount != nil && payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*maxAmount) {
 				return s.reject(ctx, p, RejectionTransactionValueLimitExceeded, "payment amount is greater than the configured maximum variable amount in the consent")
 			}
 
-			if minAmount := automatic.MinimumVariableAmount; minAmount != nil && convertAmount(p.Amount) < convertAmount(*minAmount) {
+			if minAmount := automatic.MinimumVariableAmount; minAmount != nil && payment.ConvertAmount(p.Amount) < payment.ConvertAmount(*minAmount) {
 				return s.reject(ctx, p, RejectionTransactionValueLimitExceeded, "payment amount is less than the configured minimum variable amount in the consent")
 			}
 
@@ -689,13 +694,15 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 
 			// Skip interval validation if the last payment was the initial one.
 			if lastPayment.Reference != nil && *lastPayment.Reference != "zero" {
-				if automatic.Interval == IntervalWeekly && p.Date.StartOfWeek().Equal(lastPayment.Date.StartOfWeek()) {
+				if automatic.Interval == IntervalWeekly && lastPayment.Date.StartOfWeek().Equal(p.Date.StartOfWeek()) {
 					return s.reject(ctx, p, RejectionOutOfAllowedPeriod, "payment cannot be scheduled more than once a week")
 				}
-				if automatic.Interval == IntervalMonthly && p.Date.StartOfMonth().Equal(lastPayment.Date.StartOfMonth()) {
+
+				if automatic.Interval == IntervalMonthly && lastPayment.Date.StartOfMonth().Equal(p.Date.StartOfMonth()) {
 					return s.reject(ctx, p, RejectionOutOfAllowedPeriod, "payment cannot be scheduled more than once a month")
 				}
-				if automatic.Interval == IntervalAnnually && p.Date.StartOfYear().Equal(lastPayment.Date.StartOfYear()) {
+
+				if automatic.Interval == IntervalAnnually && lastPayment.Date.StartOfYear().Equal(p.Date.StartOfYear()) {
 					return s.reject(ctx, p, RejectionOutOfAllowedPeriod, "payment cannot be scheduled more than once a year")
 				}
 				// TODO: Implement the other intervals.
@@ -703,7 +710,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 		}
 
 		if sweeping := c.Configuration.Sweeping; sweeping != nil {
-			if sweeping.TransactionLimit != nil && convertAmount(p.Amount) > convertAmount(*sweeping.TransactionLimit) {
+			if sweeping.TransactionLimit != nil && payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*sweeping.TransactionLimit) {
 				return s.reject(ctx, p, RejectionTransactionValueLimitExceeded, "sweeping payment amount is greater than the configured transaction limit in the consent")
 			}
 
@@ -712,7 +719,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 				if err != nil {
 					return err
 				}
-				if currentTotalAmount+convertAmount(p.Amount) > convertAmount(*sweeping.TotalAllowedAmount) {
+				if currentTotalAmount+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*sweeping.TotalAllowedAmount) {
 					return s.reject(ctx, p, RejectionTotalConsentValueLimitExceeded, "sweeping payment amount is greater than the configured total allowed amount in the consent")
 				}
 			}
@@ -727,7 +734,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 					if dayLimit.Quantity != nil && numberOfPayments+1 > *dayLimit.Quantity {
 						return s.reject(ctx, p, RejectionPeriodQuantityLimitExceeded, "sweeping payment amount is greater than the configured daily limit quantity in the consent")
 					}
-					if dayLimit.TransactionLimit != nil && currentAmount+convertAmount(p.Amount) > convertAmount(*dayLimit.TransactionLimit) {
+					if dayLimit.TransactionLimit != nil && currentAmount+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*dayLimit.TransactionLimit) {
 						return s.reject(ctx, p, RejectionPeriodValueLimitExceeded, "sweeping payment amount is greater than the configured daily limit amount in the consent")
 					}
 				}
@@ -743,7 +750,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 					if weekLimit.Quantity != nil && numberOfPayments+1 > *weekLimit.Quantity {
 						return s.reject(ctx, p, RejectionPeriodQuantityLimitExceeded, "sweeping payment amount is greater than the configured weekly limit quantity in the consent")
 					}
-					if weekLimit.TransactionLimit != nil && currentAmount+convertAmount(p.Amount) > convertAmount(*weekLimit.TransactionLimit) {
+					if weekLimit.TransactionLimit != nil && currentAmount+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*weekLimit.TransactionLimit) {
 						return s.reject(ctx, p, RejectionPeriodValueLimitExceeded, "sweeping payment amount is greater than the configured weekly limit amount in the consent")
 					}
 				}
@@ -759,7 +766,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 					if monthLimit.Quantity != nil && numberOfPayments+1 > *monthLimit.Quantity {
 						return s.reject(ctx, p, RejectionPeriodQuantityLimitExceeded, "sweeping payment amount is greater than the configured monthly limit quantity in the consent")
 					}
-					if monthLimit.TransactionLimit != nil && currentAmount+convertAmount(p.Amount) > convertAmount(*monthLimit.TransactionLimit) {
+					if monthLimit.TransactionLimit != nil && currentAmount+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*monthLimit.TransactionLimit) {
 						return s.reject(ctx, p, RejectionPeriodValueLimitExceeded, "sweeping payment amount is greater than the configured monthly limit amount in the consent")
 					}
 				}
@@ -775,12 +782,27 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 					if yearLimit.Quantity != nil && numberOfPayments+1 > *yearLimit.Quantity {
 						return s.reject(ctx, p, RejectionPeriodQuantityLimitExceeded, "sweeping payment amount is greater than the configured yearly limit quantity in the consent")
 					}
-					if yearLimit.TransactionLimit != nil && currentAmount+convertAmount(p.Amount) > convertAmount(*yearLimit.TransactionLimit) {
+					if yearLimit.TransactionLimit != nil && currentAmount+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*yearLimit.TransactionLimit) {
 						return s.reject(ctx, p, RejectionPeriodValueLimitExceeded, "sweeping payment amount is greater than the configured yearly limit amount in the consent")
 					}
 				}
 			}
 		}
+
+		if c.EnrollmentTransactionLimit != nil && payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*c.EnrollmentTransactionLimit) {
+			return s.reject(ctx, p, RejectionTransactionValueLimitExceeded, "payment amount is greater than the configured transaction limit in the consent")
+		}
+
+		if c.EnrollmentDailyLimit != nil {
+			_, currentAmount, err := s.currentAmount(ctx, c, nil, nil)
+			if err != nil {
+				return err
+			}
+			if payment.ConvertAmount(p.Amount)+currentAmount > payment.ConvertAmount(*c.EnrollmentDailyLimit) {
+				return s.reject(ctx, p, RejectionTransactionValueLimitExceeded, "payment amount is greater than the configured daily limit in the consent")
+			}
+		}
+
 		return s.updateStatus(ctx, p, payment.StatusACCP)
 
 	case payment.StatusACCP:
@@ -803,19 +825,6 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 	}
 
 	return nil
-}
-
-func (s Service) updateStatus(ctx context.Context, p *Payment, status payment.Status) error {
-	slog.DebugContext(ctx, "updating payment status", "current_status", p.Status, "new_status", status)
-
-	p.Status = status
-	p.StatusUpdatedAt = timeutil.DateTimeNow()
-	p.UpdatedAt = timeutil.DateTimeNow()
-	return s.save(ctx, p)
-}
-
-func (s Service) save(ctx context.Context, p *Payment) error {
-	return s.db.WithContext(ctx).Save(p).Error
 }
 
 func (s Service) payment(ctx context.Context, query Query, orgID string) (*Payment, error) {
@@ -885,7 +894,7 @@ func (s Service) currentAmount(ctx context.Context, c *Consent, from *timeutil.B
 
 	amount := 0.0
 	for _, p := range payments {
-		amount += convertAmount(p.Amount)
+		amount += payment.ConvertAmount(p.Amount)
 	}
 
 	return len(payments), amount, nil
@@ -915,4 +924,65 @@ func (s Service) payments(ctx context.Context, orgID string, opts *Filter) ([]*P
 	}
 
 	return payments, nil
+}
+
+func (s Service) cancel(ctx context.Context, p *Payment, from payment.CancelledFrom, by string) error {
+	if !slices.Contains([]payment.Status{payment.StatusPDNG, payment.StatusSCHD}, p.Status) {
+		return errorutil.Format("%w: payment with status %s cannot be cancelled, only payments with status PDNG or SCHD can be cancelled", ErrCancelNotAllowed, p.Status)
+	}
+
+	if p.Status == payment.StatusSCHD && !timeutil.BrazilDateNow().Before(p.Date) {
+		return errorutil.Format("%w: scheduled payments can only be cancelled until 23:59 (BRT) of the day before the payment date (%s)", ErrCancelNotAllowed, p.Date.String())
+	}
+
+	reason := payment.CancellationReasonPending
+	if p.Status == payment.StatusSCHD {
+		reason = payment.CancellationReasonScheduled
+	}
+	p.Cancellation = &payment.Cancellation{
+		At:     timeutil.DateTimeNow(),
+		Reason: reason,
+		From:   from,
+		By:     by,
+	}
+	return s.updateStatus(ctx, p, payment.StatusCANC)
+}
+
+func (s Service) updateStatus(ctx context.Context, p *Payment, status payment.Status) error {
+	slog.DebugContext(ctx, "updating payment status", "current_status", p.Status, "new_status", status)
+
+	if slices.Contains([]payment.Status{
+		payment.StatusPDNG,
+		payment.StatusSCHD,
+		payment.StatusACSC,
+		payment.StatusRJCT,
+		payment.StatusCANC,
+	}, status) {
+		// TODO. Implement this.
+		defer s.webhookService.Notify(ctx, p.ClientID, "")
+	}
+
+	p.Status = status
+	p.StatusUpdatedAt = timeutil.DateTimeNow()
+	p.UpdatedAt = timeutil.DateTimeNow()
+	return s.db.WithContext(ctx).
+		Model(&Payment{}).
+		Omit("ID", "CreatedAt", "OrgID").
+		Where("id = ? AND org_id = ?", p.ID, p.OrgID).
+		Updates(p).Error
+}
+
+func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status ConsentStatus) error {
+	c.Status = status
+	c.StatusUpdatedAt = timeutil.DateTimeNow()
+	return s.updateConsent(ctx, c)
+}
+
+func (s Service) updateConsent(ctx context.Context, c *Consent) error {
+	c.UpdatedAt = timeutil.DateTimeNow()
+	return s.db.WithContext(ctx).
+		Model(&Consent{}).
+		Omit("ID", "CreatedAt", "OrgID").
+		Where("id = ? AND org_id = ?", c.ID, c.OrgID).
+		Updates(c).Error
 }

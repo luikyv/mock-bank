@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/luikyv/mock-bank/internal/api"
@@ -27,16 +28,36 @@ func NewService(db *gorm.DB, userService user.Service) Service {
 	}
 }
 
-func (s Service) Authorize(ctx context.Context, c *Consent) error {
+func (s Service) Create(ctx context.Context, c *Consent) error {
+	c.Status = StatusAwaitingAuthorization
+	now := timeutil.DateTimeNow()
+	c.StatusUpdatedAt = now
+	c.CreatedAt = now
+	c.UpdatedAt = now
 
+	if err := s.validate(ctx, c); err != nil {
+		return err
+	}
+
+	if u, err := s.userService.User(ctx, user.Query{CPF: c.UserIdentification}, c.OrgID); err == nil {
+		c.OwnerID = &u.ID
+	}
+
+	if c.BusinessIdentification != nil {
+		if u, err := s.userService.User(ctx, user.Query{CNPJ: *c.BusinessIdentification}, c.OrgID); err == nil {
+			c.OwnerID = &u.ID
+		}
+	}
+
+	return s.db.WithContext(ctx).Create(c).Error
+}
+
+func (s Service) Authorize(ctx context.Context, c *Consent) error {
 	if c.Status != StatusAwaitingAuthorization {
 		return errorutil.New("consent is not in the awaiting authorization status")
 	}
 
-	c.Status = StatusAuthorized
-	c.StatusUpdatedAt = timeutil.DateTimeNow()
-	c.UpdatedAt = timeutil.DateTimeNow()
-	return s.save(ctx, c)
+	return s.updateStatus(ctx, c, StatusAuthorized)
 }
 
 func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error) {
@@ -53,117 +74,7 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 		return nil, ErrAccessNotAllowed
 	}
 
-	if err := s.modify(ctx, c); err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
-
-func (s Service) Reject(ctx context.Context, id, orgID string, by RejectedBy, reason RejectionReason) error {
-	c, err := s.Consent(ctx, id, orgID)
-	if err != nil {
-		return err
-	}
-
-	return s.reject(ctx, c, by, reason)
-}
-
-func (s Service) reject(ctx context.Context, c *Consent, by RejectedBy, reason RejectionReason) error {
-	if c.Status == StatusRejected {
-		return ErrAlreadyRejected
-	}
-
-	c.Status = StatusRejected
-	c.StatusUpdatedAt = timeutil.DateTimeNow()
-	c.UpdatedAt = timeutil.DateTimeNow()
-	c.Rejection = &Rejection{
-		By:     by,
-		Reason: reason,
-	}
-	return s.save(ctx, c)
-}
-
-func (s Service) Delete(ctx context.Context, id, orgID string) error {
-	c, err := s.Consent(ctx, id, orgID)
-	if err != nil {
-		return err
-	}
-
-	rejectedBy := RejectedByUser
-	rejectionReason := RejectionReasonCustomerManuallyRejected
-	if c.Status == StatusAuthorized {
-		rejectionReason = RejectionReasonCustomerManuallyRevoked
-	}
-
-	return s.Reject(ctx, id, orgID, rejectedBy, rejectionReason)
-}
-
-func (s Service) Create(ctx context.Context, c *Consent) error {
-	if err := s.validate(ctx, c); err != nil {
-		return err
-	}
-
-	if u, err := s.userService.User(ctx, user.Query{CPF: c.UserIdentification}, c.OrgID); err == nil {
-		c.UserID = &u.ID
-	}
-
-	return s.db.WithContext(ctx).Create(c).Error
-}
-
-// modify will evaluated the consent information and modify it to be compliant.
-func (s Service) modify(ctx context.Context, c *Consent) error {
-	if c.HasAuthExpired() {
-		slog.DebugContext(ctx, "consent awaiting authorization for too long, moving to rejected")
-		return s.reject(ctx, c, RejectedByUser, RejectionReasonConsentExpired)
-	}
-
-	if c.IsExpired() {
-		slog.DebugContext(ctx, "consent reached expiration, moving to rejected")
-		return s.reject(ctx, c, RejectedByASPSP, RejectionReasonConsentMaxDateReached)
-	}
-
-	return nil
-}
-
-func (s Service) Extend(ctx context.Context, id, orgID string, ext *Extension) (*Consent, error) {
-	c, err := s.Consent(ctx, id, orgID)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := validateExtension(c, ext); err != nil {
-		return nil, err
-	}
-
-	c.ExpiresAt = ext.ExpiresAt
-	if err := s.save(ctx, c); err != nil {
-		return nil, err
-	}
-
-	ext.PreviousExpiresAt = c.ExpiresAt
-	if err := s.saveExtension(ctx, ext); err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
-
-func (s Service) validate(_ context.Context, c *Consent) error {
-	if err := validatePermissions(c.Permissions); err != nil {
-		return err
-	}
-
-	now := timeutil.DateTimeNow()
-	if c.ExpiresAt != nil && (c.ExpiresAt.After(now.AddDate(1, 0, 0)) || c.ExpiresAt.Before(now)) {
-		return ErrInvalidExpiration
-	}
-
-	return nil
-}
-
-func (s Service) save(ctx context.Context, c *Consent) error {
-	return s.db.WithContext(ctx).Save(c).Error
+	return c, s.runPostCreationAutomations(ctx, c)
 }
 
 func (s Service) Consents(ctx context.Context, userID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Consent], error) {
@@ -184,7 +95,7 @@ func (s Service) Consents(ctx context.Context, userID uuid.UUID, orgID string, p
 	}
 
 	for _, c := range consents {
-		if err := s.modify(ctx, c); err != nil {
+		if err := s.runPostCreationAutomations(ctx, c); err != nil {
 			return page.Page[*Consent]{}, err
 		}
 	}
@@ -192,8 +103,64 @@ func (s Service) Consents(ctx context.Context, userID uuid.UUID, orgID string, p
 	return page.New(consents, pag, int(total)), nil
 }
 
-func (s Service) saveExtension(ctx context.Context, ext *Extension) error {
-	return s.db.WithContext(ctx).Save(ext).Error
+func (s Service) Reject(ctx context.Context, id, orgID string, by RejectedBy, reason RejectionReason) error {
+	c, err := s.Consent(ctx, id, orgID)
+	if err != nil {
+		return err
+	}
+
+	return s.reject(ctx, c, by, reason)
+}
+
+func (s Service) Delete(ctx context.Context, id, orgID string) error {
+	c, err := s.Consent(ctx, id, orgID)
+	if err != nil {
+		return err
+	}
+
+	rejectedBy := RejectedByUser
+	rejectionReason := RejectionReasonCustomerManuallyRejected
+	if c.Status == StatusAuthorized {
+		rejectionReason = RejectionReasonCustomerManuallyRevoked
+	}
+
+	return s.Reject(ctx, id, orgID, rejectedBy, rejectionReason)
+}
+
+func (s Service) runPostCreationAutomations(ctx context.Context, c *Consent) error {
+	switch c.Status {
+	case StatusAwaitingAuthorization:
+		if timeutil.DateTimeNow().After(c.CreatedAt.Add(3600 * time.Second).Time) {
+			slog.DebugContext(ctx, "consent awaiting authorization for too long, moving to rejected")
+			return s.reject(ctx, c, RejectedByUser, RejectionReasonConsentExpired)
+		}
+	case StatusAuthorized:
+		if c.ExpiresAt != nil && timeutil.DateTimeNow().After(c.ExpiresAt.Time) {
+			slog.DebugContext(ctx, "consent reached expiration, moving to rejected")
+			return s.reject(ctx, c, RejectedByASPSP, RejectionReasonConsentMaxDateReached)
+		}
+	}
+
+	return nil
+}
+
+func (s Service) Extend(ctx context.Context, id, orgID string, ext *Extension) (*Consent, error) {
+	c, err := s.Consent(ctx, id, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateExtension(c, ext); err != nil {
+		return nil, err
+	}
+
+	c.ExpiresAt = ext.ExpiresAt
+	if err := s.update(ctx, c); err != nil {
+		return nil, err
+	}
+
+	ext.PreviousExpiresAt = c.ExpiresAt
+	return c, s.db.WithContext(ctx).Create(ext).Error
 }
 
 func (s Service) Extensions(ctx context.Context, consentURN, orgID string, pag page.Pagination) (page.Page[*Extension], error) {
@@ -215,4 +182,44 @@ func (s Service) Extensions(ctx context.Context, consentURN, orgID string, pag p
 	}
 
 	return page.New(extensions, pag, int(total)), nil
+}
+
+func (s Service) validate(_ context.Context, c *Consent) error {
+	if err := validatePermissions(c.Permissions); err != nil {
+		return err
+	}
+
+	now := timeutil.DateTimeNow()
+	if c.ExpiresAt != nil && (c.ExpiresAt.After(now.AddDate(1, 0, 0)) || c.ExpiresAt.Before(now)) {
+		return ErrInvalidExpiration
+	}
+
+	return nil
+}
+
+func (s Service) reject(ctx context.Context, c *Consent, by RejectedBy, reason RejectionReason) error {
+	if c.Status == StatusRejected {
+		return ErrAlreadyRejected
+	}
+
+	c.Rejection = &Rejection{
+		By:     by,
+		Reason: reason,
+	}
+	return s.updateStatus(ctx, c, StatusRejected)
+}
+
+func (s Service) updateStatus(ctx context.Context, c *Consent, status Status) error {
+	c.Status = status
+	c.StatusUpdatedAt = timeutil.DateTimeNow()
+	return s.update(ctx, c)
+}
+
+func (s Service) update(ctx context.Context, c *Consent) error {
+	c.UpdatedAt = timeutil.DateTimeNow()
+	return s.db.WithContext(ctx).
+		Model(&Consent{}).
+		Omit("ID", "CreatedAt", "OrgID").
+		Where("id = ? AND org_id = ?", c.ID, c.OrgID).
+		Updates(c).Error
 }

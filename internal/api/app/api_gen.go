@@ -188,6 +188,9 @@ type UserResponse struct {
 // AccountID defines model for accountId.
 type AccountID = openapi_types.UUID
 
+// BusinessID defines model for businessId.
+type BusinessID = openapi_types.UUID
+
 // MockUserID defines model for mockUserId.
 type MockUserID = openapi_types.UUID
 
@@ -306,6 +309,9 @@ type ServerInterface interface {
 	// Update an account
 	// (PUT /api/orgs/{orgId}/users/{userId}/accounts/{accountId})
 	UpdateAccount(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, accountID AccountID)
+	// Bind a user to a business
+	// (POST /api/orgs/{orgId}/users/{userId}/businesses/{businessId}/bind)
+	BindUserToBusiness(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, businessID BusinessID)
 	// Get consents of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/consents)
 	GetConsents(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetConsentsParams)
@@ -778,6 +784,55 @@ func (siw *ServerInterfaceWrapper) UpdateAccount(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// BindUserToBusiness operation middleware
+func (siw *ServerInterfaceWrapper) BindUserToBusiness(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "orgId" -------------
+	var orgID OrganizationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", r.PathValue("orgId"), &orgID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "orgId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "userId" -------------
+	var userID MockUserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "businessId" -------------
+	var businessID BusinessID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "businessId", r.PathValue("businessId"), &businessID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "businessId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BindUserToBusiness(w, r, orgID, userID, businessID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetConsents operation middleware
 func (siw *ServerInterfaceWrapper) GetConsents(w http.ResponseWriter, r *http.Request) {
 
@@ -1104,6 +1159,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("POST "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts", wrapper.CreateAccount)
 	m.HandleFunc("DELETE "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts/{accountId}", wrapper.DeleteAccount)
 	m.HandleFunc("PUT "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts/{accountId}", wrapper.UpdateAccount)
+	m.HandleFunc("POST "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/businesses/{businessId}/bind", wrapper.BindUserToBusiness)
 	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/consents", wrapper.GetConsents)
 	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/resources", wrapper.GetResources)
 	m.HandleFunc("PATCH "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/resources/{resourceId}/consents/{consentId}", wrapper.PatchResourceStatus)
@@ -1346,6 +1402,24 @@ func (response UpdateAccount201JSONResponse) VisitUpdateAccountResponse(w http.R
 	return json.NewEncoder(w).Encode(response)
 }
 
+type BindUserToBusinessRequestObject struct {
+	OrgID      OrganizationID `json:"orgId"`
+	UserID     MockUserID     `json:"userId"`
+	BusinessID BusinessID     `json:"businessId"`
+}
+
+type BindUserToBusinessResponseObject interface {
+	VisitBindUserToBusinessResponse(w http.ResponseWriter) error
+}
+
+type BindUserToBusiness201Response struct {
+}
+
+func (response BindUserToBusiness201Response) VisitBindUserToBusinessResponse(w http.ResponseWriter) error {
+	w.WriteHeader(201)
+	return nil
+}
+
 type GetConsentsRequestObject struct {
 	OrgID  OrganizationID `json:"orgId"`
 	UserID MockUserID     `json:"userId"`
@@ -1443,6 +1517,9 @@ type StrictServerInterface interface {
 	// Update an account
 	// (PUT /api/orgs/{orgId}/users/{userId}/accounts/{accountId})
 	UpdateAccount(ctx context.Context, request UpdateAccountRequestObject) (UpdateAccountResponseObject, error)
+	// Bind a user to a business
+	// (POST /api/orgs/{orgId}/users/{userId}/businesses/{businessId}/bind)
+	BindUserToBusiness(ctx context.Context, request BindUserToBusinessRequestObject) (BindUserToBusinessResponseObject, error)
 	// Get consents of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/consents)
 	GetConsents(ctx context.Context, request GetConsentsRequestObject) (GetConsentsResponseObject, error)
@@ -1827,6 +1904,34 @@ func (sh *strictHandler) UpdateAccount(w http.ResponseWriter, r *http.Request, o
 	}
 }
 
+// BindUserToBusiness operation middleware
+func (sh *strictHandler) BindUserToBusiness(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, businessID BusinessID) {
+	var request BindUserToBusinessRequestObject
+
+	request.OrgID = orgID
+	request.UserID = userID
+	request.BusinessID = businessID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BindUserToBusiness(ctx, request.(BindUserToBusinessRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BindUserToBusiness")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BindUserToBusinessResponseObject); ok {
+		if err := validResponse.VisitBindUserToBusinessResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetConsents operation middleware
 func (sh *strictHandler) GetConsents(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetConsentsParams) {
 	var request GetConsentsRequestObject
@@ -1923,42 +2028,43 @@ func (sh *strictHandler) PatchResourceStatus(w http.ResponseWriter, r *http.Requ
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"nVpBrNuVnNHUDP8NAAD//xZwF7BxNAAA",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

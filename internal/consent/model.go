@@ -3,7 +3,6 @@ package consent
 import (
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
@@ -11,9 +10,8 @@ import (
 )
 
 const (
-	DefaultUserDocumentRelation      = "CPF"
-	URNPrefix                        = "urn:mockbank:"
-	maxTimeAwaitingAuthorizationSecs = 3600
+	DefaultUserDocumentRelation = "CPF"
+	URNPrefix                   = "urn:mockbank:consent:"
 )
 
 var (
@@ -29,9 +27,9 @@ type Consent struct {
 	Permissions            Permissions `gorm:"serializer:json"`
 	StatusUpdatedAt        timeutil.DateTime
 	ExpiresAt              *timeutil.DateTime
-	UserID                 *uuid.UUID
 	UserIdentification     string
 	UserRel                Relation
+	OwnerID                *uuid.UUID
 	BusinessIdentification *string
 	BusinessRel            *Relation
 	ClientID               string
@@ -44,24 +42,6 @@ type Consent struct {
 
 func (c Consent) URN() string {
 	return URN(c.ID)
-}
-
-// HasAuthExpired returns true if the status is [StatusAwaitingAuthorization] and
-// the max time awaiting authorization has elapsed.
-func (c Consent) HasAuthExpired() bool {
-	now := timeutil.DateTimeNow()
-	return c.Status == StatusAwaitingAuthorization &&
-		now.After(c.CreatedAt.Add(time.Second*maxTimeAwaitingAuthorizationSecs).Time)
-}
-
-// IsExpired returns true if the status is [StatusAuthorized] and the consent
-// reached the expiration date.
-func (c Consent) IsExpired() bool {
-	if c.ExpiresAt == nil {
-		return false
-	}
-	now := timeutil.DateTimeNow()
-	return c.Status == StatusAuthorized && now.After(c.ExpiresAt.Time)
 }
 
 func (c Consent) HasPermissions(permissions []Permission) bool {

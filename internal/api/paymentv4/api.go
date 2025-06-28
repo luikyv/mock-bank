@@ -5,8 +5,11 @@ import (
 	"context"
 	"crypto"
 	"errors"
-	"github.com/luikyv/mock-bank/internal/bank"
 	"net/http"
+	"strings"
+
+	"github.com/luikyv/mock-bank/internal/bank"
+	"github.com/luikyv/mock-bank/internal/enrollment"
 
 	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
@@ -60,7 +63,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	jwtMiddleware := jwtutil.Middleware(s.baseURL, s.orgID, s.keystoreHost, s.signer)
 	idempotencyMiddleware := idempotency.Middleware(s.idempotencyService)
 	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, payment.Scope)
-	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, consent.ScopeID)
+	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID)
 	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string { return "PARAMETRO_INVALIDO" })
 
 	wrapper := ServerInterfaceWrapper{
@@ -356,8 +359,8 @@ func (s Server) PaymentsGetConsentsConsentID(ctx context.Context, req PaymentsGe
 
 func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPixPaymentsRequestObject) (PaymentsPostPixPaymentsResponseObject, error) {
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
-	consentID, _ := consent.IDFromScopes(ctx.Value(api.CtxKeyScopes).(string))
 	clientID := ctx.Value(api.CtxKeyClientID).(string)
+	scopes := ctx.Value(api.CtxKeyScopes).(string)
 	var payments []*payment.Payment
 	for _, reqPayment := range req.Body.Data {
 		p := &payment.Payment{
@@ -379,7 +382,20 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 			OrgID:                     orgID,
 		}
 
-		if consentID != "" {
+		if reqPayment.ConsentID != nil {
+			p.ConsentID = uuid.MustParse(strings.TrimPrefix(*reqPayment.ConsentID, payment.ConsentURNPrefix))
+		}
+
+		if consentID, _ := payment.ConsentIDFromScopes(scopes); consentID != "" {
+			p.ConsentID = uuid.MustParse(consentID)
+		}
+
+		if enrollmentID, _ := enrollment.IDFromScopes(scopes); enrollmentID != "" {
+			id := uuid.MustParse(enrollmentID)
+			p.EnrollmentID = &id
+		}
+
+		if consentID, ok := consent.IDFromScopes(ctx.Value(api.CtxKeyScopes).(string)); ok {
 			p.ConsentID = uuid.MustParse(consentID)
 		}
 
@@ -401,7 +417,7 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 		Meta:  *api.NewMeta(),
 	}
 	for _, p := range payments {
-		consentID := consent.URN(p.ConsentID)
+		consentID := payment.ConsentURN(p.ConsentID)
 		respPayment := struct {
 			AuthorisationFlow *ResponseCreatePixPaymentDataAuthorisationFlow `json:"authorisationFlow,omitempty"`
 			CnpjInitiator     string                                         `json:"cnpjInitiator"`
@@ -502,7 +518,7 @@ func (s Server) PaymentsGetPixPaymentsPaymentID(ctx context.Context, req Payment
 		Data: ResponsePixPaymentData{
 			PaymentID:        p.ID.String(),
 			CnpjInitiator:    p.CNPJInitiator,
-			ConsentID:        consent.URN(p.ConsentID),
+			ConsentID:        payment.ConsentURN(p.ConsentID),
 			CreationDateTime: p.CreatedAt,
 			CreditorAccount: CreditorAccount{
 				AccountType: EnumAccountPaymentsType(p.CreditorAccountType),
@@ -572,7 +588,7 @@ func (s Server) PaymentsPatchPixPaymentsPaymentID(ctx context.Context, req Payme
 		Data: ResponsePatchPixPaymentData{
 			PaymentID:        p.ID.String(),
 			CnpjInitiator:    p.CNPJInitiator,
-			ConsentID:        consent.URN(p.ConsentID),
+			ConsentID:        payment.ConsentURN(p.ConsentID),
 			CreationDateTime: p.CreatedAt,
 			CreditorAccount: CreditorAccount{
 				AccountType: EnumAccountPaymentsType(p.CreditorAccountType),
@@ -656,7 +672,7 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
-	if errors.Is(err, payment.ErrConsentNotAuthorized) {
+	if errors.Is(err, payment.ErrInvalidConsentStatus) {
 		api.WriteError(w, r, api.NewError("CONSENTIMENTO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
 		return
 	}

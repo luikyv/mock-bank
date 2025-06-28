@@ -10,6 +10,10 @@ import (
 	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
+const (
+	ConsentURNPrefix = "urn:mockbank:consent:"
+)
+
 var (
 	Scope = goidc.NewScope("payments")
 )
@@ -34,6 +38,7 @@ type Payment struct {
 	IBGETownCode              *string
 	AuthorisationFlow         *AuthorisationFlow
 	ConsentID                 uuid.UUID
+	EnrollmentID              *uuid.UUID
 	ClientID                  string
 	DebtorAccountID           *uuid.UUID `gorm:"column:account_id"`
 	DebtorAccount             *account.Account
@@ -112,39 +117,55 @@ const (
 )
 
 type Consent struct {
-	ID                     uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Status                 ConsentStatus
-	StatusUpdatedAt        timeutil.DateTime
-	ExpiresAt              timeutil.DateTime
-	UserID                 uuid.UUID
-	UserIdentification     string
-	UserRel                consent.Relation
-	BusinessIdentification *string
-	BusinessRel            *consent.Relation
-	ClientID               string
-	CreditorType           CreditorType
-	CreditorCPFCNPJ        string `gorm:"column:creditor_cpf_cnpj"`
-	CreditorName           string
-	CreditorAccountISBP    string
-	CreditorAccountIssuer  *string
-	CreditorAccountNumber  string
-	CreditorAccountType    AccountType
-	PaymentType            Type
-	PaymentSchedule        *Schedule `gorm:"serializer:json"`
-	PaymentDate            *timeutil.BrazilDate
-	PaymentCurrency        string
-	PaymentAmount          string
-	IBGETownCode           *string
-	LocalInstrument        LocalInstrument
-	QRCode                 *string
-	Proxy                  *string
-	DebtorAccountID        *uuid.UUID `gorm:"column:account_id"`
-	DebtorAccount          *account.Account
-	Rejection              *ConsentRejection `gorm:"serializer:json"`
+	ID                         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Status                     ConsentStatus
+	StatusUpdatedAt            timeutil.DateTime
+	ExpiresAt                  timeutil.DateTime
+	OwnerID                    uuid.UUID
+	UserIdentification         string
+	UserRel                    consent.Relation
+	BusinessIdentification     *string
+	BusinessRel                *consent.Relation
+	ClientID                   string
+	CreditorType               CreditorType
+	CreditorCPFCNPJ            string `gorm:"column:creditor_cpf_cnpj"`
+	CreditorName               string
+	CreditorAccountISBP        string
+	CreditorAccountIssuer      *string
+	CreditorAccountNumber      string
+	CreditorAccountType        AccountType
+	PaymentType                Type
+	PaymentSchedule            *Schedule `gorm:"serializer:json"`
+	PaymentDate                *timeutil.BrazilDate
+	PaymentCurrency            string
+	PaymentAmount              string
+	IBGETownCode               *string
+	LocalInstrument            LocalInstrument
+	QRCode                     *string
+	Proxy                      *string
+	DebtorAccountID            *uuid.UUID `gorm:"column:account_id"`
+	DebtorAccount              *account.Account
+	Rejection                  *ConsentRejection `gorm:"serializer:json"`
+	EnrollmentID               *uuid.UUID
+	EnrollmentChallenge        *string
+	EnrollmentTransactionLimit *string
+	EnrollmentDailyLimit       *string
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
 	UpdatedAt timeutil.DateTime
+}
+
+func (Consent) TableName() string {
+	return "payment_consents"
+}
+
+func (c Consent) URN() string {
+	return ConsentURN(c.ID)
+}
+
+func (c Consent) IsExpired() bool {
+	return timeutil.DateTimeNow().After(c.ExpiresAt.Time)
 }
 
 func (c Consent) PaymentDates() []timeutil.BrazilDate {
@@ -165,50 +186,29 @@ func (c Consent) PaymentDates() []timeutil.BrazilDate {
 		}
 		return dates
 
-	// TODO.
-	// case schedule.Weekly != nil:
-	// 	start := schedule.Weekly.StartDate
-	// 	targetDay := parseWeekday(schedule.Weekly.DayOfWeek)
-	// 	var dates []timeutil.BrazilDate
-	// 	current := nextWeekdayOnOrAfter(start, targetDay)
-	// 	for i := 0; i < schedule.Weekly.Quantity; i++ {
-	// 		dates = append(dates, timeutil.BrazilDate{Time: current})
-	// 		current = current.AddDate(0, 0, 7)
-	// 	}
-	// 	return dates
+	case schedule.Weekly != nil:
+		// TODO: Use DayOfWeek to find the first occurrence of the target weekday on or after the start date.
+		start := schedule.Weekly.StartDate
+		var dates []timeutil.BrazilDate
+		for i := range schedule.Weekly.Quantity {
+			dates = append(dates, start.AddDate(0, 0, i*7))
+		}
+		return dates
 
-	// case schedule.Monthly != nil:
-	// 	start := schedule.Monthly.StartDate.Time
-	// 	day := schedule.Monthly.DayOfMonth
-	// 	var dates []timeutil.BrazilDate
-	// 	for i := 0; i < schedule.Monthly.Quantity; i++ {
-	// 		y, m := start.AddDate(0, i, 0).Date()
-	// 		d := time.Date(y, m, 1, 0, 0, 0, 0, time.UTC)
-	// 		lastDay := lastDayOfMonth(d)
-	// 		if day > lastDay {
-	// 			day = lastDay
-	// 		}
-	// 		dates = append(dates, timeutil.BrazilDate{Time: time.Date(y, m, day, 0, 0, 0, 0, time.UTC)})
-	// 	}
-	// 	return dates
+	case schedule.Monthly != nil:
+		// TODO: Use DayOfMonth to find the first occurrence of the target day of month on or after the start date.
+		start := schedule.Monthly.StartDate
+		var dates []timeutil.BrazilDate
+		for i := range schedule.Monthly.Quantity {
+			dates = append(dates, start.AddDate(0, i, 0))
+		}
+		return dates
 
 	case schedule.Custom != nil:
 		return schedule.Custom.Dates
 	}
 
 	return nil
-}
-
-func (Consent) TableName() string {
-	return "payment_consents"
-}
-
-func (c Consent) URN() string {
-	return consent.URN(c.ID)
-}
-
-func (c Consent) IsExpired() bool {
-	return timeutil.DateTimeNow().After(c.ExpiresAt.Time)
 }
 
 type ConsentStatus string
@@ -337,6 +337,15 @@ const (
 	AuthorisationFlowFIDOFlow   AuthorisationFlow = "FIDO_FLOW"
 )
 
+type EnrollmentOptions struct {
+	EnrollmentID           uuid.UUID
+	UserIdentification     string
+	BusinessIdentification *string
+	Challenge              string
+	TransactionLimit       string
+	DailyLimit             string
+}
+
 func parseWeekday(weekDay DayOfWeek) time.Weekday {
 	switch weekDay {
 	case "DOMINGO":
@@ -358,11 +367,9 @@ func parseWeekday(weekDay DayOfWeek) time.Weekday {
 	}
 }
 
-func nextWeekdayOnOrAfter(t time.Time, target time.Weekday) time.Time {
-	daysAhead := (int(target) - int(t.Weekday()) + 7) % 7
-	return t.AddDate(0, 0, daysAhead)
-}
-
-func lastDayOfMonth(t time.Time) int {
-	return t.AddDate(0, 1, -t.Day()).Day()
+type Filter struct {
+	ConsentID string
+	Statuses  []Status
+	From      *timeutil.BrazilDate
+	To        *timeutil.BrazilDate
 }

@@ -30,12 +30,11 @@ type ConsentAccount struct {
 	AccountID uuid.UUID
 	UserID    uuid.UUID
 	Status    resource.Status
+	Account   *Account
 
 	OrgID     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-
-	Account *Account
+	CreatedAt timeutil.DateTime
+	UpdatedAt timeutil.DateTime
 }
 
 func (ConsentAccount) TableName() string {
@@ -82,13 +81,19 @@ const (
 )
 
 type Transaction struct {
-	ID           string `gorm:"primaryKey"`
-	AccountID    string
-	Status       TransactionStatus
-	MovementType MovementType
-	Name         string
-	Type         TransactionType
-	Amount       string
+	ID               string `gorm:"primaryKey"`
+	AccountID        uuid.UUID
+	Status           TransactionStatus
+	MovementType     MovementType
+	Name             string
+	Type             TransactionType
+	Amount           string
+	PartieBranchCode *string
+	PartieCheckDigit *string
+	PartieCNPJCPF    *string `gorm:"column:partie_cnpj_cpf"`
+	PartieCompeCode  *string
+	PartieNumber     *string
+	PartiePersonType *PersonType
 
 	OrgID     string
 	CreatedAt time.Time
@@ -99,7 +104,7 @@ func (Transaction) TableName() string {
 	return "account_transactions"
 }
 
-func (t Transaction) BeforeCreate(_ *gorm.DB) error {
+func (t *Transaction) BeforeCreate(_ *gorm.DB) error {
 	t.ID = newTransactionID()
 	return nil
 }
@@ -140,6 +145,13 @@ type MovementType string
 const (
 	MovementTypeCredit MovementType = "CREDITO"
 	MovementTypeDebit  MovementType = "DEBITO"
+)
+
+type PersonType string
+
+const (
+	PersonTypeIndividual PersonType = "PESSOA_NATURAL"
+	PersonTypeCompany    PersonType = "PESSOA_JURIDICA"
 )
 
 type TransactionFilter struct {

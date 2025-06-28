@@ -1,11 +1,11 @@
-CREATE TABLE recurring_consents (
+CREATE TABLE recurring_payment_consents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     status TEXT NOT NULL,
     status_updated_at TIMESTAMPTZ NOT NULL,
     authorized_at TIMESTAMPTZ,
     approval_due_at DATE,
     expires_at TIMESTAMPTZ,
-    user_id UUID NOT NULL REFERENCES mock_users(id),
+    owner_id UUID REFERENCES mock_users(id) NOT NULL,
     user_identification TEXT NOT NULL,
 	user_rel            TEXT NOT NULL,
 	business_identification TEXT,
@@ -18,14 +18,15 @@ CREATE TABLE recurring_consents (
     rejection JSONB,
     revocation JSONB,
     client_id TEXT NOT NULL REFERENCES oauth_clients(id),
+
     org_id TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE recurring_payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    consent_id UUID NOT NULL REFERENCES recurring_consents(id),
+    consent_id UUID NOT NULL REFERENCES recurring_payment_consents(id),
     end_to_end_id TEXT NOT NULL,
     date DATE NOT NULL,
     status TEXT NOT NULL,

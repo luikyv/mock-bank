@@ -1,6 +1,9 @@
 CREATE TABLE oauth_clients (
     id TEXT PRIMARY KEY,
     data JSONB NOT NULL,
+    name TEXT,
+    webhook_uris JSONB,
+    origin_uris JSONB,
 
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,

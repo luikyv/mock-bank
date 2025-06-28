@@ -2,36 +2,34 @@ package webhook
 
 import (
 	"context"
-	"github.com/luikyv/go-oidc/pkg/provider"
 	"log/slog"
 	"net/http"
+
+	"github.com/luikyv/mock-bank/internal/client"
 )
 
-type Service interface {
-	Notify(ctx context.Context, clientID, path string)
+type Service struct {
+	clientService client.Service
 }
 
-type service struct {
-	op *provider.Provider
+func NewService(clientService client.Service) Service {
+	return Service{clientService: clientService}
 }
 
-func NewService() *service {
-	return &service{}
-}
+func (s Service) Notify(ctx context.Context, clientID, path string) {
+	slog.DebugContext(ctx, "notifying client", "client_id", clientID, "path", path)
 
-func (s *service) Notify(ctx context.Context, clientID, path string) {
-	client, err := s.op.Client(ctx, clientID)
+	client, err := s.clientService.Client(ctx, clientID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to get client", "error", err)
 		return
 	}
 
-	webhookURIs, ok := client.CustomAttribute("webhook_uris").([]string)
-	if !ok || len(webhookURIs) == 0 {
-		slog.InfoContext(ctx, "client has no webhook URIs")
+	if len(client.WebhookURIs) == 0 {
+		slog.DebugContext(ctx, "client has no webhook uris")
 		return
 	}
-	webhookURI := webhookURIs[0]
+	webhookURI := client.WebhookURIs[0]
 
 	resp, err := http.Get(webhookURI + path)
 	if err != nil {
@@ -39,8 +37,6 @@ func (s *service) Notify(ctx context.Context, clientID, path string) {
 		return
 	}
 	defer resp.Body.Close()
-}
 
-func (s *service) SetOpenIDProvider(op *provider.Provider) {
-	s.op = op
+	slog.DebugContext(ctx, "client was notified", "status", resp.Status)
 }

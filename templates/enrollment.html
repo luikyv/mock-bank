@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MockBank – Confirm Enrollment</title>
+  <style nonce="{{ .Nonce }}">
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #f9fafb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #111827;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 0.75rem;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+      width: 100%;
+      max-width: 500px;
+    }
+    h1 {
+      font-size: 1.75rem;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+      color: #4b5563;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 0.25rem;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      font-size: 0.95rem;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .info-label {
+      font-weight: 600;
+      color: #374151;
+    }
+    .info-value {
+      color: #111827;
+      text-align: right;
+      max-width: 60%;
+    }
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      font-size: 1rem;
+      font-weight: 500;
+      border: none;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .consent-button {
+      background: #2563eb;
+      color: #fff;
+      margin-top: 2rem;
+      margin-bottom: 0.5rem;
+    }
+    .consent-button:hover {
+      background: #1e40af;
+    }
+    .cancel-button {
+      background: #e5e7eb;
+      color: #374151;
+    }
+    .cancel-button:hover {
+      background: #d1d5db;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Confirm Enrollment</h1>
+
+    <div class="section-title">From</div>
+    <div class="info-row">
+      <div class="info-label">CPF</div>
+      <div class="info-value">{{ .UserCPF }}</div>
+    </div>
+
+    <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
+      <input type="hidden" name="consent" value="true" />
+
+      {{ if .Account }}
+      <input type="hidden" name="account" value="{{ .Account.ID }}" />
+      <div class="info-row">
+        <div class="info-label">Account</div>
+        <div class="info-value">Branch 0001, Number {{ .Account.Number }}</div>
+      </div>
+      {{ else }}
+      <div class="info-row">
+        <div class="info-label">Choose Account</div>
+        <div class="info-value">
+          <select name="account" required style="width: 100%; padding: 0.5rem;">
+            {{ range .Accounts }}
+            <option value="{{ .ID }}">
+              Branch 0001, Number {{ .Number }}
+            </option>
+            {{ end }}
+          </select>
+        </div>
+      </div>
+      {{ end }}
+
+      <button type="submit" class="consent-button">Confirm Enrollment</button>
+    </form>
+
+    <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
+      <input type="hidden" name="consent" value="false" />
+      <button type="submit" class="cancel-button">Cancel</button>
+    </form>
+  </div>
+</body>
+</html>

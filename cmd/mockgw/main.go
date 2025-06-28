@@ -53,118 +53,136 @@ func main() {
 	var ssClaims map[string]any
 	_ = json.Unmarshal(ssBytes, &ssClaims)
 
+	directoryHandler := func() http.Handler {
+		mux := http.NewServeMux()
+
+		mux.HandleFunc("GET /.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+			log.Println("request directory openid configuration")
+			w.Header().Set("Content-Type", "application/json")
+			http.ServeFile(w, r, "/mocks/directory_well_known.json")
+		})
+
+		mux.HandleFunc("GET /jwks", func(w http.ResponseWriter, r *http.Request) {
+			log.Println("request directory jwks")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			var jwks jose.JSONWebKeySet
+			for _, key := range directoryJWKS.Keys {
+				jwks.Keys = append(jwks.Keys, key.Public())
+			}
+			_ = json.NewEncoder(w).Encode(jwks)
+		})
+
+		mux.HandleFunc("GET /authorize", func(w http.ResponseWriter, r *http.Request) {
+			log.Println("request directory authorize")
+			http.Redirect(w, r, "https://app.mockbank.local/api/directory/callback?code=random_code", http.StatusSeeOther)
+		})
+
+		mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
+			log.Println("request directory token")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+
+			grantType := r.FormValue("grant_type")
+			if grantType == "client_credentials" {
+				_, _ = io.WriteString(w, `{
+					"access_token": "random_token",
+					"token_type": "bearer"
+				}`)
+				return
+			}
+
+			key := directoryJWKS.Keys[0]
+			joseSigner, _ := jose.NewSigner(jose.SigningKey{
+				Algorithm: jose.SignatureAlgorithm(key.Algorithm),
+				Key:       key,
+			}, (&jose.SignerOptions{}).WithType("JWT"))
+
+			idTokenClaims["iat"] = time.Now().Unix()
+			idTokenClaims["exp"] = time.Now().Unix() + 60
+			idToken, _ := jwt.Signed(joseSigner).Claims(idTokenClaims).Serialize()
+
+			_, _ = io.WriteString(w, fmt.Sprintf(`{
+				"access_token": "random_token",
+				"id_token": "%s",
+				"token_type": "bearer"
+			}`, idToken))
+		})
+
+		mux.HandleFunc("POST /par", func(w http.ResponseWriter, r *http.Request) {
+			log.Println("request directory par")
+
+			_ = r.ParseForm()
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{
+				"request_uri": "urn:ietf:params:oauth:request_uri:random_uri",
+				"expires_in": 60
+			}`)
+		})
+
+		mux.HandleFunc("GET /participants", func(w http.ResponseWriter, r *http.Request) {
+			log.Println("request directory participants")
+			w.Header().Set("Content-Type", "application/json")
+			http.ServeFile(w, r, "/mocks/participants.json")
+		})
+
+		mux.HandleFunc("GET /organisations/{org_id}/softwarestatements/{ss_id}/assertion", func(w http.ResponseWriter, r *http.Request) {
+			log.Println("request directory software statement")
+			key := keystoreJWKS.Keys[0]
+			joseSigner, _ := jose.NewSigner(jose.SigningKey{
+				Algorithm: jose.SignatureAlgorithm(key.Algorithm),
+				Key:       key,
+			}, (&jose.SignerOptions{}).WithType("JWT"))
+
+			ssClaims["iat"] = time.Now().Unix()
+			ssa, _ := jwt.Signed(joseSigner).Claims(ssClaims).Serialize()
+
+			w.Header().Set("Content-Type", "application/jwt")
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, ssa)
+		})
+
+		return mux
+	}
+
+	keystoreHandler := func() http.Handler {
+		mux := http.NewServeMux()
+
+		mux.HandleFunc("GET /{org_id}/{software_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {
+			log.Println("request keystore client jwks")
+			w.Header().Set("Content-Type", "application/json")
+			http.ServeFile(w, r, "/mocks/client.jwks")
+		})
+
+		mux.HandleFunc("GET /{org_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {
+			log.Println("request keystore organization jwks")
+			w.Header().Set("Content-Type", "application/json")
+			http.ServeFile(w, r, "/mocks/org.jwks")
+		})
+
+		mux.HandleFunc("GET /openbanking.jwks", func(w http.ResponseWriter, r *http.Request) {
+			log.Println("request keystore open banking jwks")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			var jwks jose.JSONWebKeySet
+			for _, key := range keystoreJWKS.Keys {
+				jwks.Keys = append(jwks.Keys, key.Public())
+			}
+			_ = json.NewEncoder(w).Encode(jwks)
+		})
+
+		return mux
+	}
+
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET directory.local/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request directory openid configuration")
-		w.Header().Set("Content-Type", "application/json")
-		http.ServeFile(w, r, "/mocks/directory_well_known.json")
-	})
+	mux.Handle("directory.local/", directoryHandler())
+	mux.Handle("matls-directory.local/", directoryHandler())
 
-	mux.HandleFunc("GET directory.local/jwks", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request directory jwks")
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		var jwks jose.JSONWebKeySet
-		for _, key := range directoryJWKS.Keys {
-			jwks.Keys = append(jwks.Keys, key.Public())
-		}
-		_ = json.NewEncoder(w).Encode(jwks)
-	})
-
-	mux.HandleFunc("GET directory.local/authorize", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request directory authorize")
-		http.Redirect(w, r, "https://app.mockbank.local/api/directory/callback?code=random_code", http.StatusSeeOther)
-	})
-
-	mux.HandleFunc("POST matls-directory.local/token", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request directory token")
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-
-		grantType := r.FormValue("grant_type")
-		if grantType == "client_credentials" {
-			_, _ = io.WriteString(w, `{
-				"access_token": "random_token",
-				"token_type": "bearer"
-			}`)
-			return
-		}
-
-		key := directoryJWKS.Keys[0]
-		joseSigner, _ := jose.NewSigner(jose.SigningKey{
-			Algorithm: jose.SignatureAlgorithm(key.Algorithm),
-			Key:       key,
-		}, (&jose.SignerOptions{}).WithType("JWT"))
-
-		idTokenClaims["iat"] = time.Now().Unix()
-		idTokenClaims["exp"] = time.Now().Unix() + 60
-		idToken, _ := jwt.Signed(joseSigner).Claims(idTokenClaims).Serialize()
-
-		_, _ = io.WriteString(w, fmt.Sprintf(`{
-			"access_token": "random_token",
-			"id_token": "%s",
-			"token_type": "bearer"
-		}`, idToken))
-	})
-
-	mux.HandleFunc("POST matls-directory.local/par", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request directory par")
-
-		_ = r.ParseForm()
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_, _ = io.WriteString(w, `{
-			"request_uri": "urn:ietf:params:oauth:request_uri:random_uri",
-			"expires_in": 60
-		}`)
-	})
-
-	mux.HandleFunc("GET directory.local/participants", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request directory participants")
-		w.Header().Set("Content-Type", "application/json")
-		http.ServeFile(w, r, "/mocks/participants.json")
-	})
-
-	mux.HandleFunc("GET directory.local/organisations/{org_id}/softwarestatements/{ss_id}/assertion", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request directory software statement")
-		key := keystoreJWKS.Keys[0]
-		joseSigner, _ := jose.NewSigner(jose.SigningKey{
-			Algorithm: jose.SignatureAlgorithm(key.Algorithm),
-			Key:       key,
-		}, (&jose.SignerOptions{}).WithType("JWT"))
-
-		ssClaims["iat"] = time.Now().Unix()
-		ssa, _ := jwt.Signed(joseSigner).Claims(ssClaims).Serialize()
-
-		w.Header().Set("Content-Type", "application/jwt")
-		w.WriteHeader(http.StatusOK)
-		_, _ = io.WriteString(w, ssa)
-	})
-
-	mux.HandleFunc("GET keystore.local/{org_id}/{software_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request keystore client jwks")
-		w.Header().Set("Content-Type", "application/json")
-		http.ServeFile(w, r, "/mocks/client.jwks")
-	})
-
-	mux.HandleFunc("GET keystore.local/{org_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request keystore organization jwks")
-		w.Header().Set("Content-Type", "application/json")
-		http.ServeFile(w, r, "/mocks/org.jwks")
-	})
-
-	mux.HandleFunc("GET keystore.local/openbanking.jwks", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request keystore open banking jwks")
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		var jwks jose.JSONWebKeySet
-		for _, key := range keystoreJWKS.Keys {
-			jwks.Keys = append(jwks.Keys, key.Public())
-		}
-		_ = json.NewEncoder(w).Encode(jwks)
-	})
+	mux.Handle("keystore.local/", keystoreHandler())
+	mux.Handle("matls-keystore.local/", keystoreHandler())
 
 	mockbankLocalhostURL, _ := url.Parse("http://host.docker.internal")
 	mockbankLocalhostReverseProxy := httputil.NewSingleHostReverseProxy(mockbankLocalhostURL)

@@ -37,7 +37,7 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 		jwsBytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			slog.InfoContext(r.Context(), "failed to read request jwt body", "error", err)
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to read request body"))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, "failed to read request body"))
 			return
 		}
 		defer r.Body.Close()
@@ -46,7 +46,7 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 		parsedJWT, err := jwt.ParseSigned(jws, []jose.SignatureAlgorithm{goidc.PS256})
 		if err != nil {
 			slog.InfoContext(r.Context(), "invalid jwt", "error", err)
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "invalid jwt"))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, "invalid jwt"))
 			return
 		}
 
@@ -54,21 +54,21 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 		resp, err := http.Get(keystoreHost + fmt.Sprintf("/%s/application.jwks", clientOrgID))
 		if err != nil {
 			slog.InfoContext(r.Context(), "failed to fetch jwks", "error", err)
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to fetch JWKS"))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, "failed to fetch jwks"))
 			return
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			slog.InfoContext(r.Context(), "failed to fetch jwks", "status", resp.StatusCode)
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to fetch jwks"))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, "failed to fetch jwks"))
 			return
 		}
 
 		var jwks jose.JSONWebKeySet
 		if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
 			slog.InfoContext(r.Context(), "failed to decode jwks", "error", err)
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusUnauthorized, "failed to decode organization jwks"))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, "failed to decode organization jwks"))
 			return
 		}
 
@@ -81,12 +81,12 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 		}
 
 		if jwtClaims.IssuedAt == nil {
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusForbidden, "iat claim is missing"))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, "iat claim is missing"))
 			return
 		}
 
 		if jwtClaims.ID == "" {
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusForbidden, "jti claim is missing"))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, "jti claim is missing"))
 			return
 		}
 
@@ -95,7 +95,7 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 			AnyAudience: []string{baseURL + r.URL.Path},
 		}); err != nil {
 			slog.InfoContext(r.Context(), "invalid jwt claims", slog.String("error", err.Error()))
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusForbidden, "JWT validation failed"))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, "JWT validation failed"))
 			return
 		}
 
@@ -105,7 +105,8 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 
 		jsonBytes, err := json.Marshal(claims)
 		if err != nil {
-			api.WriteError(w, r, api.NewError("UNAUTHORIZED", http.StatusForbidden, "failed to convert claims to json"))
+			slog.InfoContext(r.Context(), "failed to convert claims to json", "error", err)
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, "failed to convert claims to json"))
 			return
 		}
 
@@ -118,13 +119,6 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 }
 
 func responseMiddlewareHandler(next http.Handler, bankOrgID string, signer crypto.Signer) http.Handler {
-	statusCodes := []int{
-		http.StatusOK,
-		http.StatusCreated,
-		http.StatusAccepted,
-		http.StatusUnprocessableEntity,
-	}
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &responseRecorder{
 			ResponseWriter: w,
@@ -133,7 +127,17 @@ func responseMiddlewareHandler(next http.Handler, bankOrgID string, signer crypt
 		}
 		next.ServeHTTP(rec, r)
 
-		if !slices.Contains(statusCodes, rec.StatusCode) {
+		if rec.Body.Len() == 0 {
+			w.WriteHeader(rec.StatusCode)
+			return
+		}
+
+		if !slices.Contains([]int{
+			http.StatusOK,
+			http.StatusCreated,
+			http.StatusAccepted,
+			http.StatusUnprocessableEntity,
+		}, rec.StatusCode) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(rec.StatusCode)
 			_, _ = w.Write(rec.Body.Bytes())

@@ -104,7 +104,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MockUserResponse'
-
   /api/orgs/{orgId}/users/{userId}:
     put:
       summary: Update a user in an organization
@@ -137,6 +136,20 @@ paths:
       responses:
         '204':
           description: Mock user deleted
+
+  /api/orgs/{orgId}/users/{userId}/businesses/{businessId}/bind:
+    post:
+      summary: Bind a user to a business
+      operationId: bindUserToBusiness
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/mockUserId'
+        - $ref: '#/components/parameters/businessId'
+      responses:
+        '201':
+          description: User successfully bound to business
 
   /api/orgs/{orgId}/users/{userId}/accounts:
     post:
@@ -398,6 +411,29 @@ components:
               type: string
             description:
               type: string
+    ErrorResponse:
+      type: object
+      required:
+        - errors
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            required:
+              - code
+              - title
+              - detail
+            properties:
+              code:
+                type: string
+                description: Error code
+              title:
+                type: string
+                description: Error title
+              detail:
+                type: string
+                description: Error detail
     AccountRequest:
       type: object
       required:
@@ -670,6 +706,13 @@ components:
         type: string
     mockUserId:
       name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    businessId:
+      name: businessId
       in: path
       required: true
       schema:

@@ -38,30 +38,33 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *Accou
 	}
 
 	c.Status = ConsentStatusAwaitingAuthorization
+	c.StatusUpdatedAt = timeutil.DateTimeNow()
 	c.ExpiresAt = timeutil.DateTimeNow().Add(5 * time.Minute)
 
 	u, err := s.userService.User(ctx, user.Query{CPF: c.UserIdentification}, c.OrgID)
 	if err != nil {
-		if errors.Is(err, user.ErrNotFound) {
-			return ErrUserNotFound
-		}
 		return err
 	}
-	c.UserID = u.ID
+	c.OwnerID = u.ID
+
+	if c.BusinessIdentification != nil {
+		business, err := s.userService.User(ctx, user.Query{CNPJ: *c.BusinessIdentification}, c.OrgID)
+		if err != nil {
+			return err
+		}
+		c.OwnerID = business.ID
+	}
 
 	if debtorAcc == nil {
-		return s.createConsent(ctx, c)
+		return s.db.WithContext(ctx).Create(c).Error
 	}
 
 	acc, err := s.accountService.Account(ctx, account.Query{Number: debtorAcc.Number}, c.OrgID)
 	if err != nil {
-		if errors.Is(err, account.ErrNotFound) {
-			return ErrAccountNotFound
-		}
 		return err
 	}
 
-	if acc.UserID != u.ID {
+	if acc.UserID != c.OwnerID {
 		return ErrUserDoesntMatchAccount
 	}
 
@@ -71,33 +74,21 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *Accou
 		return err
 	}
 
-	return s.createConsent(ctx, c)
+	return s.db.WithContext(ctx).Create(c).Error
 }
 
 func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
 
 	if c.Status != ConsentStatusAwaitingAuthorization {
-		return errorutil.New("consent is not awaiting authorization")
+		return errorutil.Format("%w: consent is not awaiting authorization", ErrInvalidConsentStatus)
 	}
 
 	c.ExpiresAt = timeutil.DateTimeNow().Add(60 * time.Minute)
 	return s.updateConsentStatus(ctx, c, ConsentStatusAuthorized)
 }
 
-func (s Service) UpdateDebtorAccount(ctx context.Context, consentID, accountID, orgID string) error {
-	c, err := s.Consent(ctx, consentID, orgID)
-	if err != nil {
-		return err
-	}
-
-	accID := uuid.MustParse(accountID)
-	c.DebtorAccountID = &accID
-	c.UpdatedAt = timeutil.DateTimeNow()
-	return s.db.WithContext(ctx).Save(c).Error
-}
-
 func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error) {
-	id = strings.TrimPrefix(id, consent.URNPrefix)
+	id = strings.TrimPrefix(id, ConsentURNPrefix)
 	c := &Consent{}
 	if err := s.db.WithContext(ctx).Preload("DebtorAccount").First(c, "id = ? AND org_id = ?", id, orgID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -117,22 +108,51 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 	return c, nil
 }
 
+func (s Service) EnrollConsent(ctx context.Context, id, orgID string, opts EnrollmentOptions) error {
+	c, err := s.Consent(ctx, id, orgID)
+	if err != nil {
+		return err
+	}
+
+	if c.Status != ConsentStatusAwaitingAuthorization {
+		return errorutil.Format("%w: payment consent is not in awaiting authorization status", ErrInvalidConsentStatus)
+	}
+
+	if c.UserIdentification != opts.UserIdentification {
+		return errorutil.New("payment consent user identification mismatch")
+	}
+
+	if !reflect.DeepEqual(c.BusinessIdentification, opts.BusinessIdentification) {
+		return errorutil.New("payment consent business identification mismatch")
+	}
+
+	if c.EnrollmentID != nil {
+		return errorutil.New("payment consent already has an enrollment")
+	}
+
+	c.EnrollmentID = &opts.EnrollmentID
+	c.EnrollmentChallenge = &opts.Challenge
+	c.EnrollmentTransactionLimit = &opts.TransactionLimit
+	c.EnrollmentDailyLimit = &opts.DailyLimit
+	return s.updateConsent(ctx, c)
+}
+
 func (s Service) CreatePayments(ctx context.Context, payments []*Payment) error {
 
 	firstPayment := payments[0]
-	consentID := firstPayment.ConsentID.String()
-	if consentID == uuid.Nil.String() {
-		return errorutil.New("invalid payment: could not infer consent id")
+	consentID := firstPayment.ConsentID
+	if consentID == uuid.Nil {
+		return errorutil.Format("%w: could not infer consent id", ErrMissingValue)
 	}
 
 	orgID := firstPayment.OrgID
-	c, err := s.Consent(ctx, consentID, orgID)
+	c, err := s.Consent(ctx, consentID.String(), orgID)
 	if err != nil {
 		return err
 	}
 
 	if c.Status != ConsentStatusAuthorized {
-		return ErrConsentNotAuthorized
+		return errorutil.Format("%w: payment consent is not in authorized status", ErrInvalidConsentStatus)
 	}
 
 	if err := s.updateConsentStatus(ctx, c, ConsentStatusConsumed); err != nil {
@@ -217,11 +237,9 @@ func (s Service) CancelAll(ctx context.Context, consentID, orgID string, doc con
 		return nil, errorutil.Format("%w: invalid identification", ErrCancelNotAllowed)
 	}
 
-	var payments []*Payment
-	if err := s.db.WithContext(ctx).
-		Where("consent_id = ? AND org_id = ?", c.ID, orgID).
-		Find(&payments).Error; err != nil {
-		return nil, fmt.Errorf("could not find payments: %w", err)
+	payments, err := s.payments(ctx, orgID, &Filter{ConsentID: c.ID.String()})
+	if err != nil {
+		return nil, err
 	}
 
 	var cancelled []*Payment
@@ -242,6 +260,26 @@ func (s Service) CancelAll(ctx context.Context, consentID, orgID string, doc con
 	}
 
 	return cancelled, nil
+}
+
+func (s Service) RejectConsentByID(ctx context.Context, id, orgID string, code ConsentRejectionReasonCode, detail string) (*Consent, error) {
+	c, err := s.Consent(ctx, id, orgID)
+	if err != nil {
+		return nil, err
+	}
+	return c, s.RejectConsent(ctx, c, code, detail)
+}
+
+func (s Service) RejectConsent(ctx context.Context, c *Consent, code ConsentRejectionReasonCode, detail string) error {
+	if c.Status == ConsentStatusRejected {
+		return ErrConsentAlreadyRejected
+	}
+
+	c.Rejection = &ConsentRejection{
+		Code:   code,
+		Detail: detail,
+	}
+	return s.updateConsentStatus(ctx, c, ConsentStatusRejected)
 }
 
 func (s Service) cancel(ctx context.Context, p *Payment, from CancelledFrom, by string) error {
@@ -266,8 +304,12 @@ func (s Service) cancel(ctx context.Context, p *Payment, from CancelledFrom, by 
 	return s.updateStatus(ctx, p, StatusCANC)
 }
 
-func (s Service) createConsent(ctx context.Context, c *Consent) error {
-	return s.db.WithContext(ctx).Create(c).Error
+func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCode, detail string) error {
+	p.Rejection = &Rejection{
+		Code:   code,
+		Detail: detail,
+	}
+	return s.updateStatus(ctx, p, StatusRJCT)
 }
 
 func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *Account) error {
@@ -375,12 +417,6 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *A
 	return nil
 }
 
-func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status ConsentStatus) error {
-	c.Status = status
-	c.StatusUpdatedAt = timeutil.DateTimeNow()
-	return s.saveConsent(ctx, c)
-}
-
 func (s Service) runConsentPreCreationAutomations(_ context.Context, c *Consent) error {
 	switch c.PaymentAmount {
 	case "10422.00":
@@ -430,23 +466,6 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 	}
 }
 
-func (s Service) RejectConsent(ctx context.Context, c *Consent, code ConsentRejectionReasonCode, detail string) error {
-	if c.Status == ConsentStatusRejected {
-		return ErrConsentAlreadyRejected
-	}
-
-	c.Rejection = &ConsentRejection{
-		Code:   code,
-		Detail: detail,
-	}
-	return s.updateConsentStatus(ctx, c, ConsentStatusRejected)
-}
-
-func (s Service) saveConsent(ctx context.Context, c *Consent) error {
-	c.UpdatedAt = timeutil.DateTimeNow()
-	return s.db.WithContext(ctx).Save(c).Error
-}
-
 func (s Service) validatePayments(_ context.Context, c *Consent, payments []*Payment) error {
 	dates := c.PaymentDates()
 	if len(dates) != len(payments) {
@@ -458,6 +477,14 @@ func (s Service) validatePayments(_ context.Context, c *Consent, payments []*Pay
 	for _, p := range payments {
 		if p.ConsentID != consentID {
 			return errorutil.New("invalid payment: invalid consent id")
+		}
+
+		if !reflect.DeepEqual(p.EnrollmentID, c.EnrollmentID) {
+			return errorutil.Format("%w: payment enrollment id doesn't match the consent", ErrPaymentDoesNotMatchConsent)
+		}
+
+		if p.EnrollmentID != nil && (p.AuthorisationFlow == nil || *p.AuthorisationFlow != AuthorisationFlowFIDOFlow) {
+			return errorutil.New("payment enrollment id is set but authorisation flow is not FIDO")
 		}
 
 		endToEndDate, err := ParseEndToEndDate(p.EndToEndID)
@@ -537,8 +564,28 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 
 	slog.DebugContext(ctx, "evaluating payment automations", "status", p.Status, "amount", p.Amount)
 
+	c, err := s.Consent(ctx, p.ConsentID.String(), p.OrgID)
+	if err != nil {
+		return err
+	}
+
 	switch p.Status {
 	case StatusRCVD:
+		if c.EnrollmentTransactionLimit != nil && ConvertAmount(p.Amount) > ConvertAmount(*c.EnrollmentTransactionLimit) {
+			return s.reject(ctx, p, RejectionExceedsLimit, "payment amount is greater than the configured transaction limit in the consent")
+		}
+
+		if c.EnrollmentDailyLimit != nil {
+			today := timeutil.BrazilDateNow()
+			_, currentAmount, err := s.currentAmount(ctx, c, &today, &today)
+			if err != nil {
+				return err
+			}
+			if ConvertAmount(p.Amount)+currentAmount > ConvertAmount(*c.EnrollmentDailyLimit) {
+				return s.reject(ctx, p, RejectionExceedsLimit, "payment amount is greater than the configured daily limit in the consent")
+			}
+		}
+
 		return s.updateStatus(ctx, p, StatusACCP)
 
 	case StatusACCP:
@@ -567,18 +614,74 @@ func (s Service) updateStatus(ctx context.Context, p *Payment, status Status) er
 
 	p.Status = status
 	p.StatusUpdatedAt = timeutil.DateTimeNow()
+	return s.update(ctx, p)
+}
+
+func (s Service) update(ctx context.Context, p *Payment) error {
 	p.UpdatedAt = timeutil.DateTimeNow()
-	return s.save(ctx, p)
+	return s.db.WithContext(ctx).
+		Model(&Payment{}).
+		Omit("ID", "CreatedAt", "OrgID").
+		Where("id = ? AND org_id = ?", p.ID, p.OrgID).
+		Updates(p).Error
 }
 
-func (s Service) save(ctx context.Context, p *Payment) error {
-	return s.db.WithContext(ctx).Save(p).Error
+func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status ConsentStatus) error {
+	c.Status = status
+	c.StatusUpdatedAt = timeutil.DateTimeNow()
+	return s.updateConsent(ctx, c)
 }
 
-func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCode, detail string) error {
-	p.Rejection = &Rejection{
-		Code:   code,
-		Detail: detail,
+func (s Service) updateConsent(ctx context.Context, c *Consent) error {
+	c.UpdatedAt = timeutil.DateTimeNow()
+	return s.db.WithContext(ctx).
+		Model(&Consent{}).
+		Omit("ID", "CreatedAt", "OrgID").
+		Where("id = ? AND org_id = ?", c.ID, c.OrgID).
+		Updates(c).Error
+}
+
+func (s Service) currentAmount(ctx context.Context, c *Consent, from *timeutil.BrazilDate, to *timeutil.BrazilDate) (int, float64, error) {
+	payments, err := s.payments(ctx, c.OrgID, &Filter{
+		ConsentID: c.ID.String(),
+		Statuses:  []Status{StatusACSC, StatusSCHD},
+		From:      from,
+		To:        to,
+	})
+	if err != nil {
+		return 0, 0.0, nil
 	}
-	return s.updateStatus(ctx, p, StatusRJCT)
+
+	amount := 0.0
+	for _, p := range payments {
+		amount += ConvertAmount(p.Amount)
+	}
+
+	return len(payments), amount, nil
+}
+
+func (s Service) payments(ctx context.Context, orgID string, opts *Filter) ([]*Payment, error) {
+	query := s.db.WithContext(ctx).
+		Model(&Payment{}).
+		Where("org_id = ?", orgID)
+
+	if opts.ConsentID != "" {
+		query = query.Where("consent_id = ?", opts.ConsentID)
+	}
+	if opts.Statuses != nil {
+		query = query.Where("status IN ?", opts.Statuses)
+	}
+	if opts.From != nil {
+		query = query.Where("date >= ?", opts.From)
+	}
+	if opts.To != nil {
+		query = query.Where("date <= ?", opts.To)
+	}
+
+	var payments []*Payment
+	if err := query.Find(&payments).Error; err != nil {
+		return nil, fmt.Errorf("could not find payments: %w", err)
+	}
+
+	return payments, nil
 }

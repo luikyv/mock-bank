@@ -32,5 +32,8 @@
   "software_roles": [
     "DADOS",
     "PAGTO"
+  ],
+  "software_origin_uris": [
+    "https://mockbank.local"
   ]
 }

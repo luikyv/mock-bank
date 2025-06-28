@@ -158,6 +158,34 @@
                                 "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}"
                             }
                         ]
+                    },
+                    {
+                        "ApiFamilyType": "enrollments",
+                        "ApiVersion": "2.1.0",
+                        "Status": "Active",
+                        "ApiDiscoveryEndpoints": [
+                            {
+                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/risk-signals"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-sign-options"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/consents/{consentId}/authorise"
+                            }
+                        ]
                     }
                 ]
             }

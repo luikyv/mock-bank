@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/luikyv/mock-bank/internal/page"
 	"gorm.io/gorm"
 )
@@ -19,28 +18,14 @@ func NewService(db *gorm.DB) Service {
 	}
 }
 
-func (s Service) ConsentedResources(ctx context.Context, consentID, orgID string, pag page.Pagination) (page.Page[*Resource], error) {
-	query := s.db.WithContext(ctx).Where("consent_id = ? AND org_id = ?", consentID, orgID)
-
-	var rs []*Resource
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("created_at DESC").
-		Find(&rs).Error; err != nil {
-		return page.Page[*Resource]{}, fmt.Errorf("could not find consented resources: %w", err)
+func (s Service) Resources(ctx context.Context, orgID string, filter Filter, pag page.Pagination) (page.Page[*Resource], error) {
+	query := s.db.WithContext(ctx).Where("org_id = ?", orgID)
+	if filter.UserID != "" {
+		query = query.Where("user_id = ?", filter.UserID)
 	}
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*Resource]{}, fmt.Errorf("count failed: %w", err)
+	if filter.ConsentID != "" {
+		query = query.Where("consent_id = ?", filter.ConsentID)
 	}
-
-	return page.New(rs, pag, int(total)), nil
-}
-
-func (s Service) Resources(ctx context.Context, userID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Resource], error) {
-	query := s.db.WithContext(ctx).Where("user_id = ? AND org_id = ?", userID, orgID)
 
 	var rs []*Resource
 	if err := query.

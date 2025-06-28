@@ -3,7 +3,7 @@ CREATE TABLE payment_consents (
     status TEXT NOT NULL,
     status_updated_at TIMESTAMPTZ DEFAULT now(),
     expires_at TIMESTAMPTZ NOT NULL,
-    user_id UUID NOT NULL REFERENCES mock_users(id),
+    owner_id UUID REFERENCES mock_users(id) NOT NULL,
     user_identification TEXT NOT NULL,
 	user_rel            TEXT NOT NULL,
 	business_identification TEXT,
@@ -32,7 +32,6 @@ CREATE TABLE payment_consents (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_payment_consents_org_id_account_id ON payment_consents (org_id, account_id);
 
 CREATE TABLE payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -64,4 +63,3 @@ CREATE TABLE payments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_payments_org_id_consent_id ON payments (org_id, consent_id);

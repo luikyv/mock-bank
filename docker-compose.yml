@@ -48,16 +48,6 @@ services:
       POSTGRES_DB: mockbank
     ports:
       - "5432:5432"
-    volumes:
-      - ./db/migrations/000001_setup.up.sql:/docker-entrypoint-initdb.d/000001_setup.up.sql:ro
-      - ./db/migrations/000002_oauth.up.sql:/docker-entrypoint-initdb.d/000002_oauth.up.sql:ro
-      - ./db/migrations/000003_consents.up.sql:/docker-entrypoint-initdb.d/000003_consents.up.sql:ro
-      - ./db/migrations/000004_accounts.up.sql:/docker-entrypoint-initdb.d/000004_accounts.up.sql:ro
-      - ./db/migrations/000005_resources.up.sql:/docker-entrypoint-initdb.d/000005_resources.up.sql:ro
-      - ./db/migrations/000006_payments.up.sql:/docker-entrypoint-initdb.d/000006_payments.up.sql:ro
-      - ./db/migrations/000007_auto_payments.up.sql:/docker-entrypoint-initdb.d/000007_auto_payments.up.sql:ro
-      - ./db/migrations/000008_idempotency.up.sql:/docker-entrypoint-initdb.d/000008_idempotency.up.sql:ro
-      - ./testdata/seed.sql:/docker-entrypoint-initdb.d/999999_seed.sql:ro
     networks:
       default:
         aliases:

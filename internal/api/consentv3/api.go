@@ -317,5 +317,5 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
-	api.WriteError(w, r, api.NewError("INTERNAL_ERROR", http.StatusInternalServerError, "internal error"))
+	api.WriteError(w, r, err)
 }

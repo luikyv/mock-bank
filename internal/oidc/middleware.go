@@ -12,13 +12,26 @@ import (
 	"github.com/luikyv/mock-bank/internal/api"
 )
 
+func CertCNMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cert, err := ClientCert(r)
+		if err != nil {
+			slog.ErrorContext(r.Context(), "could not get client certificate", "error", err.Error())
+			api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid certificate: could not get client certificate").Pagination(true))
+			return
+		}
+
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, api.CtxKeyCertCN, cert.Subject.CommonName)
+		r = r.WithContext(ctx)
+		next.ServeHTTP(w, r)
+	})
+}
+
 func AuthMiddleware(op *provider.Provider, scopes ...goidc.Scope) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			if r.Header.Get(api.HeaderXFAPIInteractionID) != "" {
-				ctx = context.WithValue(r.Context(), api.CtxKeyInteractionID, r.Header.Get(api.HeaderXFAPIInteractionID))
-			}
 
 			tokenInfo, err := op.TokenInfoFromRequest(w, r)
 			if err != nil {

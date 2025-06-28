@@ -1,0 +1,222 @@
+overlay: 1.0.0
+info:
+  title: Overlay
+  version: 0.0.0
+actions:
+
+- target: $.components.schemas[*].properties.meta
+  update:
+    x-go-type: api.Meta
+    x-go-type-import:
+      path: github.com/luikyv/mock-bank/internal/api
+- target: $.components.schemas[*].properties.meta.$ref
+  remove: true
+
+- target: $.components.schemas[*].properties.links
+  update:
+    x-go-type: api.Links
+    x-go-type-import:
+      path: github.com/luikyv/mock-bank/internal/api
+- target: $.components.schemas[*].properties.links.$ref
+  remove: true
+
+- target: $..[*][?(@.format == "date")]
+  update:
+    x-go-type: timeutil.BrazilDate
+    x-go-type-import:
+      path: github.com/luikyv/mock-bank/internal/timeutil
+
+- target: $..[*][?(@.format == "date-time")]
+  update:
+    x-go-type: timeutil.DateTime
+    x-go-type-import:
+      path: github.com/luikyv/mock-bank/internal/timeutil2
+
+- target: $..[*][?(@.format == "byte")]
+  update:
+    x-go-type: string
+
+- target: $.components.schemas.RiskSignals.properties.data
+  update:
+    x-go-type: map[string]any
+
+- target: $.components.schemas.CreateEnrollment.properties.data.properties.permissions.items.$ref
+  remove: true
+- target: $.components.schemas.CreateEnrollment.properties.data.properties.permissions.items
+  update:
+    x-go-type: enrollment.Permission
+    x-go-type-import:
+      path: github.com/luikyv/mock-bank/internal/enrollment
+
+- target: $.components.responses[*].headers.x-fapi-interaction-id
+  remove: true
+
+- target: $.components.parameters.XIdempotencyKey.schema.pattern
+  remove: true
+
+- target: $.components.schemas.consentId
+  update:
+    x-go-name: ConsentIDType
+
+- target: $.components.parameters.consentId
+  update:
+    x-go-name: ParameterConsentID
+
+- target: $.paths./enrollments.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./enrollments.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/CreateEnrollment'
+
+- target: $.paths./enrollments/{enrollmentId}.patch.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./enrollments/{enrollmentId}.patch.requestBody.content
+  update:
+    application/json:
+      schema:
+        type: object
+        required:
+          - data
+        properties:
+          data:
+            type: object
+            required:
+              - cancellation
+            properties:
+              cancellation:
+                type: object
+                required:
+                  - reason
+                properties:
+                  cancelledBy:
+                    type: object
+                    required:
+                      - document
+                    properties:
+                      document:
+                        type: object
+                        required:
+                          - identification
+                          - rel
+                        properties:
+                          identification:
+                            type: string
+                            maxLength: 11
+                            pattern: '^\d{11}$'
+                          rel:
+                            type: string
+                            maxLength: 3
+                            pattern: '^[A-Z]{3}$'
+                  reason:
+                    oneOf:
+                      - type: object
+                        required:
+                        - rejectionReason
+                        properties:
+                          rejectionReason:
+                            $ref: '#/components/schemas/EnrollmentRejectionReason'
+                      - type: object
+                        required:
+                        - revocationReason
+                        properties:
+                          revocationReason:
+                            $ref: '#/components/schemas/EnrollmentRevocationReason'
+                  additionalInformation:
+                    type: string
+                    pattern: '[\w\W\s]*'
+                    maxLength: 2048
+
+- target: $.paths./enrollments/{enrollmentId}/fido-registration-options.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./enrollments/{enrollmentId}/fido-registration-options.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/EnrollmentFidoOptionsInput'
+
+- target: $.paths./enrollments/{enrollmentId}/fido-registration.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./enrollments/{enrollmentId}/fido-registration.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/EnrollmentFidoRegistration'
+
+- target: $.paths./enrollments/{enrollmentId}/fido-sign-options.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./enrollments/{enrollmentId}/fido-sign-options.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        type: object
+        required:
+          - data
+        properties:
+          data:
+            type: object
+            required:
+              - rp
+              - platform
+              - consentId
+            properties:
+              rp:
+                type: string
+              platform:
+                type: string
+                enum:
+                  - ANDROID
+                  - BROWSER
+                  - CROSS_PLATFORM
+                  - IOS
+              consentId:
+                $ref: '#/components/schemas/consentId'
+
+- target: $.paths./enrollments/{enrollmentId}/risk-signals.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./enrollments/{enrollmentId}/risk-signals.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/RiskSignals'
+
+- target: $.paths./consents/{consentId}/authorise.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./consents/{consentId}/authorise.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ConsentAuthorization'
+
+- target: $.components.responses.201EnrollmentsCreated.content.application/jwt
+  remove: true
+- target: $.components.responses.201EnrollmentsCreated.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponseCreateEnrollment'
+
+- target: $.components.responses.200EnrollmentsEnrollmentIdRead.content.application/jwt
+  remove: true
+- target: $.components.responses.200EnrollmentsEnrollmentIdRead.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponseEnrollment'
+
+- target: $.components.responses.201EnrollmentFidoRegistrationOptions.content.application/jwt
+  remove: true
+- target: $.components.responses.201EnrollmentFidoRegistrationOptions.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/EnrollmentFidoRegistrationOptions'
+
+- target: $.components.responses.201EnrollmentFidoSignOptions.content.application/jwt
+  remove: true
+- target: $.components.responses.201EnrollmentFidoSignOptions.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/EnrollmentFidoSignOptions'

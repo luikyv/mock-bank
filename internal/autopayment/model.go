@@ -1,13 +1,18 @@
 package autopayment
 
 import (
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/payment"
 	"github.com/luikyv/mock-bank/internal/timeutil"
-	"strings"
+)
+
+const (
+	ConsentURNPrefix = "urn:mockbank:recurring-consent:"
 )
 
 var (
@@ -20,6 +25,7 @@ var (
 type Payment struct {
 	ID                        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	ConsentID                 uuid.UUID
+	EnrollmentID              *uuid.UUID
 	EndToEndID                string
 	Date                      timeutil.BrazilDate
 	Status                    payment.Status
@@ -58,26 +64,30 @@ func (Payment) TableName() string {
 }
 
 type Consent struct {
-	ID                     uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Status                 ConsentStatus
-	StatusUpdatedAt        timeutil.DateTime
-	AuthorizedAt           *timeutil.DateTime
-	ApprovalDueAt          *timeutil.BrazilDate
-	ExpiresAt              *timeutil.DateTime
-	UserID                 uuid.UUID
-	UserIdentification     string
-	UserRel                consent.Relation
-	BusinessIdentification *string
-	BusinessRel            *consent.Relation
-	Creditors              []Creditor `gorm:"serializer:json"`
-	AdditionalInfo         *string
-	Configuration          Configuration   `gorm:"serializer:json"`
-	RiskSignals            *map[string]any `gorm:"serializer:json"`
-	DebtorAccountID        *uuid.UUID      `gorm:"column:account_id"`
-	DebtorAccount          *account.Account
-	Rejection              *ConsentRejection  `gorm:"serializer:json"`
-	Revocation             *ConsentRevocation `gorm:"serializer:json"`
-	ClientID               string
+	ID                         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Status                     ConsentStatus
+	StatusUpdatedAt            timeutil.DateTime
+	AuthorizedAt               *timeutil.DateTime
+	ApprovalDueAt              *timeutil.BrazilDate
+	ExpiresAt                  *timeutil.DateTime
+	UserIdentification         string
+	UserRel                    consent.Relation
+	BusinessIdentification     *string
+	BusinessRel                *consent.Relation
+	OwnerID                    uuid.UUID
+	Creditors                  []Creditor `gorm:"serializer:json"`
+	AdditionalInfo             *string
+	Configuration              Configuration   `gorm:"serializer:json"`
+	RiskSignals                *map[string]any `gorm:"serializer:json"`
+	DebtorAccountID            *uuid.UUID      `gorm:"column:account_id"`
+	DebtorAccount              *account.Account
+	Rejection                  *ConsentRejection  `gorm:"serializer:json"`
+	Revocation                 *ConsentRevocation `gorm:"serializer:json"`
+	ClientID                   string
+	EnrollmentID               *uuid.UUID
+	EnrollmentChallenge        *string
+	EnrollmentTransactionLimit *string
+	EnrollmentDailyLimit       *string
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -85,11 +95,11 @@ type Consent struct {
 }
 
 func (Consent) TableName() string {
-	return "recurring_consents"
+	return "recurring_payment_consents"
 }
 
 func (c Consent) URN() string {
-	return consent.URN(c.ID)
+	return ConsentURN(c.ID)
 }
 
 type ConsentStatus string

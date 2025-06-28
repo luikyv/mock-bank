@@ -39,7 +39,7 @@ func (m GrantSessionManager) SessionByRefreshTokenID(ctx context.Context, id str
 }
 
 func (m GrantSessionManager) Delete(ctx context.Context, id string) error {
-	return m.db.WithContext(ctx).Where("id = ?", id).Delete(&Client{}).Error
+	return m.db.WithContext(ctx).Where("id = ?", id).Delete(&Grant{}).Error
 }
 
 func (m GrantSessionManager) DeleteByAuthCode(ctx context.Context, code string) error {
@@ -47,7 +47,6 @@ func (m GrantSessionManager) DeleteByAuthCode(ctx context.Context, code string) 
 }
 
 func (m GrantSessionManager) grant(ctx context.Context, tx *gorm.DB) (*goidc.GrantSession, error) {
-
 	var grant Grant
 	if err := tx.WithContext(ctx).First(&grant).Error; err != nil {
 		return nil, err

@@ -4,51 +4,44 @@ import (
 	"context"
 
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/mock-bank/internal/client"
 	"github.com/luikyv/mock-bank/internal/timeutil"
-
-	"gorm.io/gorm"
 )
 
 type ClientManager struct {
-	db *gorm.DB
+	service client.Service
 }
 
-func NewClientManager(db *gorm.DB) ClientManager {
-	return ClientManager{db: db}
+func NewClientManager(service client.Service) ClientManager {
+	return ClientManager{service: service}
 }
 
 func (cm ClientManager) Save(ctx context.Context, oidcClient *goidc.Client) error {
-	client := &Client{
+	c := &client.Client{
 		ID:        oidcClient.ID,
 		Data:      *oidcClient,
+		Name:      oidcClient.Name,
 		UpdatedAt: timeutil.DateTimeNow(),
 		OrgID:     oidcClient.CustomAttribute(OrgIDKey).(string),
 	}
-	return cm.db.WithContext(ctx).Save(client).Error
+	if webhookURIs, ok := oidcClient.CustomAttribute(WebhookURIsKey).([]string); ok {
+		c.WebhookURIs = webhookURIs
+	}
+	if originURIs, ok := oidcClient.CustomAttribute(SoftwareOriginURIsKey).([]string); ok {
+		c.OriginURIs = originURIs
+	}
+	return cm.service.Save(ctx, c)
 }
 
 func (cm ClientManager) Client(ctx context.Context, id string) (*goidc.Client, error) {
-	var client Client
-	if err := cm.db.WithContext(ctx).First(&client, "id = ?", id).Error; err != nil {
+	c, err := cm.service.Client(ctx, id)
+	if err != nil {
 		return nil, err
 	}
 
-	return &client.Data, nil
+	return &c.Data, nil
 }
 
 func (cm ClientManager) Delete(ctx context.Context, id string) error {
-	return cm.db.WithContext(ctx).Where("id = ?", id).Delete(&Client{}).Error
-}
-
-type Client struct {
-	ID   string       `gorm:"primaryKey"`
-	Data goidc.Client `gorm:"serializer:json"`
-
-	OrgID     string
-	CreatedAt timeutil.DateTime
-	UpdatedAt timeutil.DateTime
-}
-
-func (Client) TableName() string {
-	return "oauth_clients"
+	return cm.service.Delete(ctx, id)
 }

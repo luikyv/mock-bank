@@ -7,15 +7,11 @@ mock op mTLS: https://matls-auth.mockbank.local
 mock backend: https://matls-api.mockbank.local
 
 ## TODO
-- Validate auto pix dates.
+- Organize sql files.
+- Review indexes.
 - Update swaggers to undo modifications.
 - Improve loops that query the db.
-- Companies.
 - Remove descriptions.
-- Save orgs.
-- Allow setting the currency.
-- Set up new orgs.
-- What's happening with created_at?
 - Accounts overdraft limits.
 - Account filters.
 - Transactions.

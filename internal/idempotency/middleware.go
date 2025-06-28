@@ -57,6 +57,7 @@ func Middleware(service Service) func(http.Handler) http.Handler {
 			next.ServeHTTP(recorder, r)
 
 			// Only successful responses are stored.
+			// TODO: Add 204 to the list.
 			if !slices.Contains([]int{http.StatusOK, http.StatusCreated, http.StatusAccepted}, recorder.StatusCode) {
 				return
 			}
@@ -76,13 +77,14 @@ func Middleware(service Service) func(http.Handler) http.Handler {
 }
 
 func writeIdempotencyResp(w http.ResponseWriter, r *http.Request, rec *Record) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(rec.StatusCode)
-
 	if len(rec.Response) == 0 {
+		w.WriteHeader(rec.StatusCode)
 		slog.DebugContext(r.Context(), "idempotency record has no response body", "id", rec.ID)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(rec.StatusCode)
 
 	resp, _ := base64.RawStdEncoding.DecodeString(rec.Response)
 	if _, err := w.Write(resp); err != nil {

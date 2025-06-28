@@ -9,24 +9,27 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/luikyv/mock-bank/internal/api/accountv2"
-	"github.com/luikyv/mock-bank/internal/api/app"
-	"github.com/luikyv/mock-bank/internal/api/autopaymentv2"
-	"github.com/luikyv/mock-bank/internal/api/consentv3"
-	oidcapi "github.com/luikyv/mock-bank/internal/api/oidc"
-	"github.com/luikyv/mock-bank/internal/api/paymentv4"
-	"github.com/luikyv/mock-bank/internal/api/resourcev3"
-	"github.com/luikyv/mock-bank/internal/directory"
-	"github.com/luikyv/mock-bank/internal/idempotency"
-	"github.com/luikyv/mock-bank/internal/session"
-	"github.com/luikyv/mock-bank/internal/webhook"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"runtime/debug"
-	"strings"
 	"time"
+
+	"github.com/luikyv/mock-bank/internal/api/accountv2"
+	"github.com/luikyv/mock-bank/internal/api/app"
+	"github.com/luikyv/mock-bank/internal/api/autopaymentv2"
+	"github.com/luikyv/mock-bank/internal/api/consentv3"
+	"github.com/luikyv/mock-bank/internal/api/enrollmentv2"
+	oidcapi "github.com/luikyv/mock-bank/internal/api/oidc"
+	"github.com/luikyv/mock-bank/internal/api/paymentv4"
+	"github.com/luikyv/mock-bank/internal/api/resourcev3"
+	"github.com/luikyv/mock-bank/internal/client"
+	"github.com/luikyv/mock-bank/internal/directory"
+	"github.com/luikyv/mock-bank/internal/enrollment"
+	"github.com/luikyv/mock-bank/internal/idempotency"
+	"github.com/luikyv/mock-bank/internal/session"
+	"github.com/luikyv/mock-bank/internal/webhook"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -54,41 +57,36 @@ import (
 type Environment string
 
 const (
-	AWSEnvironment   Environment = "AWS"
 	LocalEnvironment Environment = "LOCAL"
 )
 
-func (e Environment) IsAWS() bool {
-	return strings.Contains(string(e), "AWS")
-}
-
-func (e Environment) IsLocal() bool {
-	return strings.Contains(string(e), "LOCAL")
-}
-
 var (
-	Env                     = getEnv("ENV", LocalEnvironment)
-	OrgID                   = getEnv("ORG_ID", "00000000-0000-0000-0000-000000000000")
-	BaseDomain              = getEnv("BASE_DOMAIN", "mockbank.local")
-	APPHost                 = "https://app." + BaseDomain
-	APIMTLSHost             = "https://matls-api." + BaseDomain
-	AuthHost                = "https://auth." + BaseDomain
-	AuthMTLSHost            = "https://matls-auth." + BaseDomain
-	DirectoryIssuer         = getEnv("DIRECTORY_ISSUER", "https://directory.local")
+	Env = getEnv("ENV", LocalEnvironment)
+	// OrgID is the Mock Bank organization identifier.
+	OrgID        = getEnv("ORG_ID", "00000000-0000-0000-0000-000000000000")
+	BaseDomain   = getEnv("BASE_DOMAIN", "mockbank.local")
+	APPHost      = "https://app." + BaseDomain
+	APIMTLSHost  = "https://matls-api." + BaseDomain
+	AuthHost     = "https://auth." + BaseDomain
+	AuthMTLSHost = "https://matls-auth." + BaseDomain
+	// DirectoryIssuer is the issuer used by the directory to sign ID tokens, etc.
+	DirectoryIssuer = getEnv("DIRECTORY_ISSUER", "https://directory.local")
+	// DirectoryClientID is the client ID for Mock Bank to make OAuth requests to the directory.
 	DirectoryClientID       = getEnv("DIRECTORY_CLIENT_ID", "mockbank")
 	KeyStoreHost            = getEnv("KEYSTORE_HOST", "https://keystore.local")
 	SoftwareStatementIssuer = getEnv("SS_ISSUER", "Open Banking Brasil sandbox SSA issuer")
 	Port                    = getEnv("PORT", "80")
 	DBSecretName            = getEnv("DB_SECRET_NAME", "mockbank/db-credentials")
-	// OPSigningKeySSMParamName is used to sign JWTs for the OpenID Provider.
+	// OPSigningKeySSMParamName is the parameter used to sign JWTs for the OpenID Provider.
 	OPSigningKeySSMParamName = getEnv("OP_SIGNING_KEY_SSM_PARAM", "/mockbank/op-signing-key")
-	// DirectoryClientSigningKeySSMParamName is used to sign JWTs for the directory client.
+	// DirectoryClientSigningKeySSMParamName is the parameter used to sign JWTs for the directory client.
 	DirectoryClientSigningKeySSMParamName = getEnv("DIRECTORY_CLIENT_SIGNING_KEY_SSM_PARAM", "/mockbank/directory-client-signing-key")
-	// DirectoryClientMTLSCertSSMParamName and DirectoryClientMTLSKeySSMParamName are used for mutual TLS connection with the directory.
+	// DirectoryClientMTLSCertSSMParamName and DirectoryClientMTLSKeySSMParamName are the parameters used for mutual TLS connection with the directory.
 	DirectoryClientMTLSCertSSMParamName = getEnv("DIRECTORY_CLIENT_MTLS_CERT_SSM_PARAM", "/mockbank/directory-client-transport-cert")
 	DirectoryClientMTLSKeySSMParamName  = getEnv("DIRECTORY_CLIENT_MTLS_KEY_SSM_PARAM", "/mockbank/directory-client-transport-key")
-	OrgSigningKeySSMParamName           = getEnv("ORG_SIGNING_KEY_SSM_PARAM", "/mockbank/org-signing-key")
-	AWSEndpoint                         = getEnv("AWS_ENDPOINT_URL", "http://localhost:4566")
+	// OrgSigningKeySSMParamName is the parameter used by Mock Bank to sign responses.
+	OrgSigningKeySSMParamName = getEnv("ORG_SIGNING_KEY_SSM_PARAM", "/mockbank/org-signing-key")
+	AWSEndpoint               = getEnv("AWS_ENDPOINT_URL", "http://localhost:4566")
 )
 
 func main() {
@@ -138,20 +136,22 @@ func main() {
 	directoryService := directory.NewService(DirectoryIssuer, DirectoryClientID, APPHost+"/api/directory/callback",
 		directoryClientSigner, mtlsHTTPClient(directoryClientTLSCert))
 	sessionService := session.NewService(db, directoryService)
+	clientService := client.NewService(db)
 	idempotencyService := idempotency.NewService(db)
-	webhookService := webhook.NewService()
+	webhookService := webhook.NewService(clientService)
 	userService := user.NewService(db, OrgID)
 	consentService := consent.NewService(db, userService)
 	resourceService := resource.NewService(db)
 	accountService := account.NewService(db, OrgID)
 	paymentService := payment.NewService(db, userService, accountService)
 	autoPaymentService := autopayment.NewService(db, userService, accountService, webhookService)
+	enrollmentService := enrollment.NewService(db, userService, accountService, paymentService, autoPaymentService, webhookService)
 
-	op, err := openidProvider(db, opSigner, userService, consentService, accountService, paymentService, autoPaymentService)
+	op, err := openidProvider(db, opSigner, clientService, userService, consentService, accountService,
+		paymentService, autoPaymentService, enrollmentService)
 	if err != nil {
 		log.Fatal(err)
 	}
-	webhookService.SetOpenIDProvider(op)
 
 	// Servers.
 	mux := http.NewServeMux()
@@ -163,32 +163,17 @@ func main() {
 	accountv2.NewServer(APIMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
 	paymentv4.NewServer(APIMTLSHost, paymentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 	autopaymentv2.NewServer(APIMTLSHost, autoPaymentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
+	enrollmentv2.NewServer(APIMTLSHost, enrollmentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 
 	handler := middleware(mux)
-
 	slog.Info("starting mock bank")
 
-	go func() {
-		ticker := time.NewTicker(time.Second * 10)
-		for {
-			select {
-			case <-ctx.Done():
-				slog.InfoContext(ctx, "finished polling recurring payments")
-				return
-			case <-ticker.C:
-				slog.InfoContext(ctx, "polling recurring payments")
-				if _, err := autoPaymentService.Payments(ctx, OrgID, nil); err != nil {
-					slog.ErrorContext(ctx, "error polling the recurring payments", "error", err)
-				}
-			}
-		}
-	}()
+	if Env == LocalEnvironment {
+		go pollRecurringPayments(ctx, autoPaymentService, time.NewTicker(time.Second*15))
 
-	if !Env.IsAWS() {
 		if err := http.ListenAndServe(":"+Port, handler); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
 		}
-
 		return
 	}
 
@@ -285,7 +270,7 @@ func (h *logCtxHandler) Handle(ctx context.Context, r slog.Record) error {
 
 func httpClient() *http.Client {
 	tlsConfig := &tls.Config{}
-	if Env.IsLocal() {
+	if Env == LocalEnvironment {
 		tlsConfig.InsecureSkipVerify = true
 	}
 	return &http.Client{
@@ -299,7 +284,7 @@ func mtlsHTTPClient(cert tls.Certificate) *http.Client {
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 	}
-	if Env.IsLocal() {
+	if Env == LocalEnvironment {
 		tlsConfig.InsecureSkipVerify = true
 	}
 	return &http.Client{
@@ -312,15 +297,14 @@ func mtlsHTTPClient(cert tls.Certificate) *http.Client {
 func openidProvider(
 	db *gorm.DB,
 	signer crypto.Signer,
+	clientService client.Service,
 	userService user.Service,
 	consentService consent.Service,
 	accountService account.Service,
 	paymentService payment.Service,
 	autoPaymentService autopayment.Service,
-) (
-	*provider.Provider,
-	error,
-) {
+	enrollmentService enrollment.Service,
+) (*provider.Provider, error) {
 	var scopes = []goidc.Scope{
 		goidc.ScopeOpenID,
 		consent.ScopeID,
@@ -342,6 +326,8 @@ func openidProvider(
 		payment.Scope,
 		autopayment.ScopeConsentID,
 		autopayment.Scope,
+		enrollment.ScopeConsent,
+		enrollment.ScopeID,
 	}
 
 	op, err := provider.New(goidc.ProfileFAPI1, AuthHost, func(_ context.Context) (goidc.JSONWebKeySet, error) {
@@ -359,7 +345,7 @@ func openidProvider(
 	}
 
 	opts := []provider.Option{
-		provider.WithClientStorage(oidc.NewClientManager(db)),
+		provider.WithClientStorage(oidc.NewClientManager(clientService)),
 		provider.WithAuthnSessionStorage(oidc.NewAuthnSessionManager(db)),
 		provider.WithGrantSessionStorage(oidc.NewGrantSessionManager(db)),
 		provider.WithSignerFunc(func(ctx context.Context, alg goidc.SignatureAlgorithm) (kid string, s crypto.Signer, err error) {
@@ -387,8 +373,8 @@ func openidProvider(
 		provider.WithUserInfoEncryption(goidc.RSA_OAEP),
 		provider.WithIDTokenSignatureAlgs(goidc.PS256),
 		provider.WithIDTokenEncryption(goidc.RSA_OAEP),
-		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(op, consentService, paymentService, autoPaymentService)),
-		provider.WithPolicies(oidc.Policies(AuthHost, userService, consentService, accountService, paymentService, autoPaymentService)...),
+		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(op, consentService, paymentService, autoPaymentService, enrollmentService)),
+		provider.WithPolicies(oidc.Policies(AuthHost, userService, consentService, accountService, paymentService, autoPaymentService, enrollmentService)...),
 		provider.WithNotifyErrorFunc(oidc.LogError),
 		provider.WithDCR(oidc.DCRFunc(oidc.DCRConfig{
 			Scopes:       scopes,
@@ -410,7 +396,7 @@ func awsConfig(ctx context.Context) *aws.Config {
 		log.Fatalf("unable to load aws config, %v", err)
 	}
 
-	if Env.IsLocal() {
+	if Env == LocalEnvironment {
 		cfg.BaseEndpoint = &AWSEndpoint
 		cfg.Credentials = credentials.NewStaticCredentialsProvider("test", "test", "")
 	}
@@ -489,6 +475,9 @@ func middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, api.CtxKeyCorrelationID, uuid.NewString())
+		if fapiID := r.Header.Get(api.HeaderXFAPIInteractionID); fapiID != "" {
+			ctx = context.WithValue(ctx, api.CtxKeyInteractionID, fapiID)
+		}
 		slog.InfoContext(ctx, "request received", "method", r.Method, "path", r.URL.Path, "url", r.URL.String())
 
 		start := timeutil.DateTimeNow()
@@ -497,12 +486,31 @@ func middleware(next http.Handler) http.Handler {
 				slog.Error("panic recovered", "error", rec, "stack", string(debug.Stack()))
 				api.WriteError(w, r, fmt.Errorf("internal error: %v", rec))
 			}
-		}()
-		defer func() {
 			slog.InfoContext(ctx, "request completed", slog.Duration("duration", time.Since(start.Time)))
 		}()
 
 		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	})
+}
+
+func pollRecurringPayments(ctx context.Context, service autopayment.Service, ticker *time.Ticker) {
+	for {
+		select {
+		case <-ctx.Done():
+			slog.InfoContext(ctx, "finished polling recurring payments")
+			return
+		case <-ticker.C:
+			slog.InfoContext(ctx, "polling recurring payments")
+			if _, err := service.Payments(ctx, OrgID, &autopayment.Filter{Statuses: []payment.Status{
+				payment.StatusRCVD,
+				payment.StatusACCP,
+				payment.StatusACPD,
+				payment.StatusPDNG,
+				payment.StatusSCHD,
+			}}); err != nil {
+				slog.ErrorContext(ctx, "error polling the recurring payments", "error", err)
+			}
+		}
+	}
 }

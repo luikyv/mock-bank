@@ -6,11 +6,11 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/luikyv/mock-bank/internal/page"
 	"github.com/luikyv/mock-bank/internal/resource"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Service struct {
@@ -55,22 +55,46 @@ func (s Service) Authorize(ctx context.Context, accIDs []string, consentID, orgI
 	})
 }
 
-func (s Service) Save(ctx context.Context, acc *Account) error {
-	if err := s.db.WithContext(ctx).Save(acc).Error; err != nil {
+func (s Service) Create(ctx context.Context, acc *Account) error {
+	now := timeutil.DateTimeNow()
+	acc.CreatedAt = now
+	acc.UpdatedAt = now
+	tx := s.db.WithContext(ctx).Create(acc)
+	if err := tx.Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return ErrAlreadyExists
-		}
-		var pgerr *pgconn.PgError
-		if errors.As(err, &pgerr) && pgerr.Code == "23505" {
 			return ErrAlreadyExists
 		}
 		return err
 	}
+
+	return nil
+}
+
+func (s Service) Update(ctx context.Context, acc *Account) error {
+	acc.UpdatedAt = timeutil.DateTimeNow()
+	tx := s.db.WithContext(ctx).
+		Model(&Account{}).
+		Omit("ID", "CreatedAt", "OrgID").
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "created_at"}}}).
+		Where("id = ? AND org_id = ?", acc.ID, acc.OrgID).
+		Updates(acc)
+
+	if err := tx.Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrAlreadyExists
+		}
+		return err
+	}
+
+	if tx.RowsAffected == 0 {
+		return ErrNotFound
+	}
+
 	return nil
 }
 
 func (s Service) UpdateConsent(ctx context.Context, consentID, accountID uuid.UUID, orgID string, status resource.Status) error {
-	result := s.db.WithContext(ctx).
+	tx := s.db.WithContext(ctx).
 		Model(&ConsentAccount{}).
 		Where("consent_id = ? AND account_id = ? AND org_id = ?", consentID, accountID, orgID).
 		Updates(map[string]any{
@@ -78,19 +102,15 @@ func (s Service) UpdateConsent(ctx context.Context, consentID, accountID uuid.UU
 			"updated_at": timeutil.DateTimeNow(),
 		})
 
-	if result.Error != nil {
-		return fmt.Errorf("failed to update consent account: %w", result.Error)
+	if tx.Error != nil {
+		return fmt.Errorf("failed to update consent account: %w", tx.Error)
 	}
 
-	if result.RowsAffected == 0 {
+	if tx.RowsAffected == 0 {
 		return fmt.Errorf("no matching consent account found for consent_id=%s account_id=%s", consentID, accountID)
 	}
 
 	return nil
-}
-
-func (s Service) createConsent(ctx context.Context, consentAcc *ConsentAccount) error {
-	return s.db.WithContext(ctx).Create(consentAcc).Error
 }
 
 func (s Service) ConsentedAccount(ctx context.Context, accountID, consentID, orgID string) (*Account, error) {
@@ -182,10 +202,6 @@ func (s Service) Delete(ctx context.Context, id uuid.UUID, orgID string) error {
 	return s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).Delete(&Account{}).Error
 }
 
-func (s Service) CreateTransaction(ctx context.Context, tx *Transaction) error {
-	return s.db.WithContext(ctx).Create(tx).Error
-}
-
 func (s Service) Transactions(ctx context.Context, accID, orgID string, pag page.Pagination, filter TransactionFilter) (page.Page[*Transaction], error) {
 	query := s.db.WithContext(ctx).
 		Model(&Transaction{}).
@@ -237,4 +253,11 @@ func (s Service) ConsentedTransactions(ctx context.Context, accID, consentID, or
 	}
 
 	return page.New(txs, pag, int(total)), nil
+}
+
+func (s Service) createConsent(ctx context.Context, consentAcc *ConsentAccount) error {
+	now := timeutil.DateTimeNow()
+	consentAcc.CreatedAt = now
+	consentAcc.UpdatedAt = now
+	return s.db.WithContext(ctx).Create(consentAcc).Error
 }

@@ -6,16 +6,18 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/luikyv/go-oidc/pkg/goidc"
-	"github.com/luikyv/go-oidc/pkg/provider"
-	"github.com/luikyv/mock-bank/internal/autopayment"
-	"github.com/luikyv/mock-bank/internal/consent"
-	"github.com/luikyv/mock-bank/internal/payment"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"slices"
 	"strings"
+
+	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/go-oidc/pkg/provider"
+	"github.com/luikyv/mock-bank/internal/autopayment"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/enrollment"
+	"github.com/luikyv/mock-bank/internal/payment"
 )
 
 const (
@@ -33,7 +35,25 @@ func HandleGrantFunc(
 	consentService consent.Service,
 	paymentService payment.Service,
 	autoPaymentService autopayment.Service,
+	enrollmentService enrollment.Service,
 ) goidc.HandleGrantFunc {
+
+	verifyEnrollment := func(ctx context.Context, id, orgID string) error {
+		e, err := enrollmentService.Enrollment(ctx, enrollment.Query{ID: id}, orgID)
+		if err != nil {
+			return fmt.Errorf("could not fetch enrollment for verifying grant: %w", err)
+		}
+
+		if !slices.Contains([]enrollment.Status{
+			enrollment.StatusAwaitingEnrollment,
+			enrollment.StatusAuthorized,
+		}, e.Status) {
+			return goidc.NewError(goidc.ErrorCodeInvalidGrant, "enrollment is not in awaiting enrollment or authorized status")
+		}
+
+		return nil
+	}
+
 	verifyRecurringPaymentConsent := func(ctx context.Context, id, orgID string) error {
 		c, err := autoPaymentService.Consent(ctx, id, orgID)
 		if err != nil {
@@ -84,6 +104,10 @@ func HandleGrantFunc(
 
 		orgID := client.CustomAttribute(OrgIDKey).(string)
 		gi.AdditionalTokenClaims[OrgIDKey] = orgID
+
+		if enrollmentID, _ := enrollment.IDFromScopes(gi.ActiveScopes); enrollmentID != "" {
+			return verifyEnrollment(r.Context(), enrollmentID, orgID)
+		}
 
 		if recurringConsentID, _ := autopayment.ConsentIDFromScopes(gi.ActiveScopes); recurringConsentID != "" {
 			return verifyRecurringPaymentConsent(r.Context(), recurringConsentID, orgID)

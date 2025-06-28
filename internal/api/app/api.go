@@ -224,13 +224,11 @@ func (s Server) GetMockUsers(ctx context.Context, req GetMockUsersRequestObject)
 			Name        string  `json:"name"`
 			Username    string  `json:"username"`
 		}{
-			ID:       u.ID.String(),
-			Username: u.Username,
-			Cpf:      u.CPF,
-			Name:     u.Name,
-		}
-		if u.Description != "" {
-			data.Description = &u.Description
+			ID:          u.ID.String(),
+			Username:    u.Username,
+			Cpf:         u.CPF,
+			Name:        u.Name,
+			Description: u.Description,
 		}
 		resp.Data = append(resp.Data, data)
 	}
@@ -239,16 +237,14 @@ func (s Server) GetMockUsers(ctx context.Context, req GetMockUsersRequestObject)
 
 func (s Server) CreateMockUser(ctx context.Context, req CreateMockUserRequestObject) (CreateMockUserResponseObject, error) {
 	u := &user.User{
-		Username: req.Body.Data.Username,
-		Name:     req.Body.Data.Name,
-		CPF:      req.Body.Data.Cpf,
-		OrgID:    req.OrgID,
-	}
-	if req.Body.Data.Description != nil {
-		u.Description = *req.Body.Data.Description
+		Username:    req.Body.Data.Username,
+		Name:        req.Body.Data.Name,
+		CPF:         req.Body.Data.Cpf,
+		Description: req.Body.Data.Description,
+		OrgID:       req.OrgID,
 	}
 
-	if err := s.userService.Save(ctx, u); err != nil {
+	if err := s.userService.Create(ctx, u); err != nil {
 		return nil, err
 	}
 
@@ -261,30 +257,26 @@ func (s Server) CreateMockUser(ctx context.Context, req CreateMockUserRequestObj
 			Password    *string `json:"password,omitempty"`
 			Username    string  `json:"username"`
 		}{
-			Cpf:      u.CPF,
-			ID:       u.ID.String(),
-			Name:     u.Name,
-			Username: u.Name,
+			Cpf:         u.CPF,
+			ID:          u.ID.String(),
+			Name:        u.Name,
+			Username:    u.Name,
+			Description: u.Description,
 		},
-	}
-	if u.Description != "" {
-		resp.Data.Description = &u.Description
 	}
 	return CreateMockUser201JSONResponse(resp), nil
 }
 
 func (s Server) UpdateMockUser(ctx context.Context, req UpdateMockUserRequestObject) (UpdateMockUserResponseObject, error) {
 	u := &user.User{
-		ID:       req.UserID,
-		Username: req.Body.Data.Username,
-		Name:     req.Body.Data.Name,
-		CPF:      req.Body.Data.Cpf,
-		OrgID:    req.OrgID,
+		ID:          req.UserID,
+		Username:    req.Body.Data.Username,
+		Name:        req.Body.Data.Name,
+		CPF:         req.Body.Data.Cpf,
+		Description: req.Body.Data.Description,
+		OrgID:       req.OrgID,
 	}
-	if req.Body.Data.Description != nil {
-		u.Description = *req.Body.Data.Description
-	}
-	if err := s.userService.Save(ctx, u); err != nil {
+	if err := s.userService.Update(ctx, u); err != nil {
 		return nil, err
 	}
 
@@ -297,14 +289,12 @@ func (s Server) UpdateMockUser(ctx context.Context, req UpdateMockUserRequestObj
 			Password    *string `json:"password,omitempty"`
 			Username    string  `json:"username"`
 		}{
-			Cpf:      u.CPF,
-			ID:       u.ID.String(),
-			Name:     u.Name,
-			Username: u.Name,
+			Cpf:         u.CPF,
+			ID:          u.ID.String(),
+			Name:        u.Name,
+			Username:    u.Name,
+			Description: u.Description,
 		},
-	}
-	if u.Description != "" {
-		resp.Data.Description = &u.Description
 	}
 	return UpdateMockUser200JSONResponse(resp), nil
 }
@@ -315,6 +305,14 @@ func (s Server) DeleteMockUser(ctx context.Context, req DeleteMockUserRequestObj
 	}
 
 	return DeleteMockUser204Response{}, nil
+}
+
+func (s Server) BindUserToBusiness(ctx context.Context, req BindUserToBusinessRequestObject) (BindUserToBusinessResponseObject, error) {
+	if err := s.userService.BindUserToBusiness(ctx, req.UserID, req.BusinessID, req.OrgID); err != nil {
+		return nil, err
+	}
+
+	return BindUserToBusiness201Response{}, nil
 }
 
 func (s Server) CreateAccount(ctx context.Context, req CreateAccountRequestObject) (CreateAccountResponseObject, error) {
@@ -328,7 +326,7 @@ func (s Server) CreateAccount(ctx context.Context, req CreateAccountRequestObjec
 		OrgID:                       req.OrgID,
 		UserID:                      req.UserID,
 	}
-	if err := s.accountService.Save(ctx, acc); err != nil {
+	if err := s.accountService.Create(ctx, acc); err != nil {
 		return nil, err
 	}
 
@@ -369,7 +367,7 @@ func (s Server) UpdateAccount(ctx context.Context, req UpdateAccountRequestObjec
 		OrgID:                       req.OrgID,
 		UserID:                      req.UserID,
 	}
-	if err := s.accountService.Save(ctx, acc); err != nil {
+	if err := s.accountService.Update(ctx, acc); err != nil {
 		return nil, err
 	}
 
@@ -463,7 +461,7 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 			Status:               string(c.Status),
 			StatusUpdateDateTime: c.StatusUpdatedAt,
 			ExpirationDateTime:   c.ExpiresAt,
-			UserID:               c.UserID.String(),
+			UserID:               c.OwnerID.String(),
 		}
 		perms := make([]string, len(c.Permissions))
 		for i, p := range c.Permissions {
@@ -487,7 +485,7 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 func (s Server) GetResources(ctx context.Context, req GetResourcesRequestObject) (GetResourcesResponseObject, error) {
 	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
 
-	rs, err := s.resourceService.Resources(ctx, req.UserID, req.OrgID, pag)
+	rs, err := s.resourceService.Resources(ctx, req.OrgID, resource.Filter{UserID: req.UserID.String()}, pag)
 	if err != nil {
 		return nil, err
 	}
@@ -544,6 +542,11 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 
 	if errors.Is(err, user.ErrAlreadyExists) {
 		api.WriteError(w, r, api.NewError("USER_ALREADY_EXISTS", http.StatusBadRequest, err.Error()))
+		return
+	}
+
+	if errors.Is(err, user.ErrInvalidOrgID) {
+		api.WriteError(w, r, api.NewError("INVALID_ORG_ID", http.StatusBadRequest, err.Error()))
 		return
 	}
 

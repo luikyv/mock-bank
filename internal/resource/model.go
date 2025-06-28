@@ -37,3 +37,8 @@ type Resource struct {
 func (Resource) TableName() string {
 	return "consent_resources"
 }
+
+type Filter struct {
+	UserID    string
+	ConsentID string
+}
