@@ -487,7 +487,7 @@ func middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, api.CtxKeyCorrelationID, uuid.NewString())
-		if fapiID := r.Header.Get(api.HeaderXFAPIInteractionID); fapiID != "" {
+		if fapiID := r.Header.Get("X-Fapi-Interaction-Id"); fapiID != "" {
 			ctx = context.WithValue(ctx, api.CtxKeyInteractionID, fapiID)
 		}
 		slog.InfoContext(ctx, "request received", "method", r.Method, "path", r.URL.Path, "url", r.URL.String())

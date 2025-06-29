@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/luikyv/mock-bank/internal/api/middleware"
 	"github.com/luikyv/mock-bank/internal/bank"
 
 	"github.com/luikyv/go-oidc/pkg/goidc"
@@ -14,7 +15,6 @@ import (
 	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/api"
 	"github.com/luikyv/mock-bank/internal/consent"
-	"github.com/luikyv/mock-bank/internal/oidc"
 	"github.com/luikyv/mock-bank/internal/page"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 )
@@ -40,8 +40,8 @@ func NewServer(host string, service account.Service, consentService consent.Serv
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	accountMux := http.NewServeMux()
 
-	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)
-	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string { return "PARAMETRO_INVALIDO" })
+	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)
+	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) string { return "PARAMETRO_INVALIDO" })
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
@@ -51,7 +51,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		}),
 		HandlerMiddlewares: []MiddlewareFunc{
 			swaggerMiddleware,
-			api.FAPIIDMiddleware(nil),
+			middleware.FAPIID(nil),
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
@@ -61,32 +61,32 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	var handler http.Handler
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccounts)
-	handler = consent.PermissionMiddleware(s.consentService, consent.PermissionAccountsRead)(handler)
+	handler = middleware.Permission(s.consentService, consent.PermissionAccountsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
 	accountMux.Handle("GET /accounts", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountID)
-	handler = consent.PermissionMiddleware(s.consentService, consent.PermissionAccountsRead)(handler)
+	handler = middleware.Permission(s.consentService, consent.PermissionAccountsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
 	accountMux.Handle("GET /accounts/{accountId}", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDBalances)
-	handler = consent.PermissionMiddleware(s.consentService, consent.PermissionAccountsBalanceRead)(handler)
+	handler = middleware.Permission(s.consentService, consent.PermissionAccountsBalanceRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
 	accountMux.Handle("GET /accounts/{accountId}/balances", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDOverdraftLimits)
-	handler = consent.PermissionMiddleware(s.consentService, consent.PermissionAccountsOverdraftLimitsRead)(handler)
+	handler = middleware.Permission(s.consentService, consent.PermissionAccountsOverdraftLimitsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
 	accountMux.Handle("GET /accounts/{accountId}/overdraft-limits", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDTransactions)
-	handler = consent.PermissionMiddleware(s.consentService, consent.PermissionAccountsTransactionsRead)(handler)
+	handler = middleware.Permission(s.consentService, consent.PermissionAccountsTransactionsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
 	accountMux.Handle("GET /accounts/{accountId}/transactions", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDTransactionsCurrent)
-	handler = consent.PermissionMiddleware(s.consentService, consent.PermissionAccountsTransactionsRead)(handler)
+	handler = middleware.Permission(s.consentService, consent.PermissionAccountsTransactionsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
 	accountMux.Handle("GET /accounts/{accountId}/transactions-current", handler)
 

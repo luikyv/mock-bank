@@ -8,8 +8,8 @@ import (
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/api/middleware"
 	"github.com/luikyv/mock-bank/internal/consent"
-	"github.com/luikyv/mock-bank/internal/oidc"
 	"github.com/luikyv/mock-bank/internal/page"
 	"github.com/luikyv/mock-bank/internal/resource"
 )
@@ -35,7 +35,7 @@ func NewServer(host string, service resource.Service, consentService consent.Ser
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	resourceMux := http.NewServeMux()
 
-	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string { return "INVALID_REQUEST" })
+	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) string { return "INVALID_REQUEST" })
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
@@ -45,7 +45,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		}),
 		HandlerMiddlewares: []MiddlewareFunc{
 			swaggerMiddleware,
-			api.FAPIIDMiddleware(nil),
+			middleware.FAPIID(nil),
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
@@ -55,8 +55,8 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	var handler http.Handler
 
 	handler = http.HandlerFunc(wrapper.ResourcesGetResources)
-	handler = consent.PermissionMiddleware(s.consentService, consent.PermissionResourcesRead)(handler)
-	handler = oidc.AuthMiddleware(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)(handler)
+	handler = middleware.Permission(s.consentService, consent.PermissionResourcesRead)(handler)
+	handler = middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)(handler)
 	resourceMux.Handle("GET /resources", handler)
 
 	mux.Handle("/open-banking/resources/v3/", http.StripPrefix("/open-banking/resources/v3", resourceMux))

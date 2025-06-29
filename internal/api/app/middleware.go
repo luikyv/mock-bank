@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/api/middleware"
 	"github.com/luikyv/mock-bank/internal/session"
 )
 
@@ -53,14 +54,14 @@ func authSessionMiddlewareHandler(next http.Handler, service session.Service) ht
 
 func fapiIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		interactionID := r.Header.Get(api.HeaderXFAPIInteractionID)
+		interactionID := r.Header.Get(middleware.HeaderXFAPIInteractionID)
 		// Verify if the interaction ID is valid, return a new value if not.
 		if _, err := uuid.Parse(interactionID); err != nil {
 			interactionID = uuid.NewString()
 		}
 
 		// Return the same interaction ID in the response.
-		w.Header().Set(api.HeaderXFAPIInteractionID, interactionID)
+		w.Header().Set(middleware.HeaderXFAPIInteractionID, interactionID)
 		next.ServeHTTP(w, r)
 	})
 }

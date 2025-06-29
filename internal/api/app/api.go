@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/api/middleware"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/page"
 	"github.com/luikyv/mock-bank/internal/resource"
@@ -57,7 +58,7 @@ func NewServer(
 
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
-	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string { return "PARAMETRO_INVALIDO" })
+	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) string { return "PARAMETRO_INVALIDO" })
 	secureMiddleware := secure.New(secure.Options{
 		STSSeconds:            31536000,
 		STSIncludeSubdomains:  true,

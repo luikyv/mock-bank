@@ -17,11 +17,10 @@ import (
 	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/api/middleware"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/errorutil"
 	"github.com/luikyv/mock-bank/internal/idempotency"
-	"github.com/luikyv/mock-bank/internal/jwtutil"
-	"github.com/luikyv/mock-bank/internal/oidc"
 	"github.com/luikyv/mock-bank/internal/payment"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 )
@@ -61,11 +60,11 @@ func NewServer(
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	paymentMux := http.NewServeMux()
 
-	jwtMiddleware := jwtutil.Middleware(s.baseURL, s.orgID, s.keystoreHost, s.signer)
-	idempotencyMiddleware := idempotency.Middleware(s.idempotencyService)
-	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantClientCredentials, payment.Scope)
-	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID)
-	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string {
+	jwtMiddleware := middleware.JWT(s.baseURL, s.orgID, s.keystoreHost, s.signer)
+	idempotencyMiddleware := middleware.Idempotency(s.idempotencyService)
+	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, payment.Scope)
+	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID)
+	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) string {
 		var schemaErr *openapi3.SchemaError
 		if errors.As(err, &schemaErr) && schemaErr.SchemaField == "required" {
 			return "PARAMETRO_NAO_INFORMADO"
@@ -119,7 +118,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = clientCredentialsAuthMiddleware(handler)
 	paymentMux.Handle("PATCH /pix/payments/{paymentId}", handler)
 
-	handler = api.FAPIIDMiddleware(nil)(paymentMux)
+	handler = middleware.FAPIID(nil)(paymentMux)
 	mux.Handle("/open-banking/payments/v4/", http.StripPrefix("/open-banking/payments/v4", handler))
 }
 

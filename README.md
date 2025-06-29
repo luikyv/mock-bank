@@ -1,10 +1,10 @@
-app frontend: https://app.mockbank.local
-app backend: https://app.mockbank.local/api
+# mock-bank
 
-mock op: https://auth.mockbank.local
-mock op mTLS: https://matls-auth.mockbank.local
-
-mock backend: https://matls-api.mockbank.local
+- **App Frontend**: https://app.mockbank.local
+- **App Backend**: https://app.mockbank.local/api
+- **Mock OP**: https://auth.mockbank.local
+- **Mock OP mTLS**: https://matls-auth.mockbank.local
+- **Mock Backend**: https://matls-api.mockbank.local
 
 ## TODO
 - Organize sql files.

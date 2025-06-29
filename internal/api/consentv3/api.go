@@ -11,9 +11,9 @@ import (
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/api/middleware"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/errorutil"
-	"github.com/luikyv/mock-bank/internal/oidc"
 	"github.com/luikyv/mock-bank/internal/page"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 )
@@ -35,9 +35,9 @@ func NewServer(host string, service consent.Service, op *provider.Provider) Serv
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	consentMux := http.NewServeMux()
 
-	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantClientCredentials, consent.Scope)
-	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)
-	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string { return "PARAMETRO_INVALIDO" })
+	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, consent.Scope)
+	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)
+	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) string { return "PARAMETRO_INVALIDO" })
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
@@ -47,7 +47,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		}),
 		HandlerMiddlewares: []MiddlewareFunc{
 			swaggerMiddleware,
-			api.FAPIIDMiddleware(nil),
+			middleware.FAPIID(nil),
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))

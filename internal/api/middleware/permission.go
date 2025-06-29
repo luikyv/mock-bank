@@ -1,4 +1,4 @@
-package consent
+package middleware
 
 import (
 	"context"
@@ -6,15 +6,16 @@ import (
 	"net/http"
 
 	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/consent"
 )
 
-func PermissionMiddleware(consentService Service, permissions ...Permission) func(http.Handler) http.Handler {
+func Permission(consentService consent.Service, permissions ...consent.Permission) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			scopes := r.Context().Value(api.CtxKeyScopes).(string)
 			orgID := r.Context().Value(api.CtxKeyOrgID).(string)
 
-			id, _ := IDFromScopes(scopes)
+			id, _ := consent.IDFromScopes(scopes)
 			c, err := consentService.Consent(r.Context(), id, orgID)
 			if err != nil {
 				slog.DebugContext(r.Context(), "the token is not active")
@@ -22,7 +23,7 @@ func PermissionMiddleware(consentService Service, permissions ...Permission) fun
 				return
 			}
 
-			if c.Status != StatusAuthorized {
+			if c.Status != consent.StatusAuthorized {
 				slog.DebugContext(r.Context(), "the consent is not authorized")
 				api.WriteError(w, r, api.NewError("INVALID_STATUS", http.StatusUnauthorized, "the consent is not authorized"))
 				return

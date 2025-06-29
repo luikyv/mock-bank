@@ -22,12 +22,6 @@ const (
 	CtxKeySessionID     ContextKey = "session_id"
 )
 
-const (
-	HeaderCustomerIPAddress  = "X-FAPI-Customer-IP-Address"
-	HeaderCustomerUserAgent  = "X-Customer-User-Agent"
-	HeaderXFAPIInteractionID = "X-FAPI-Interaction-ID"
-)
-
 type Links struct {
 	First string `json:"first,omitempty"`
 	Last  string `json:"last,omitempty"`

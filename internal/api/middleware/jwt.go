@@ -1,4 +1,4 @@
-package jwtutil
+package middleware
 
 import (
 	"bytes"
@@ -15,10 +15,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/jwtutil"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
-func Middleware(baseURL, bankOrgID, keystoreHost string, signer crypto.Signer) func(http.Handler) http.Handler {
+func JWT(baseURL, bankOrgID, keystoreHost string, signer crypto.Signer) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		next = requestMiddlewareHandler(next, baseURL, keystoreHost)
 		next = responseMiddlewareHandler(next, bankOrgID, signer)
@@ -124,7 +125,7 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 
 func responseMiddlewareHandler(next http.Handler, bankOrgID string, signer crypto.Signer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rec := &responseRecorder{
+		rec := &responseBuffer{
 			ResponseWriter: w,
 			Body:           &bytes.Buffer{},
 			StatusCode:     http.StatusOK,
@@ -160,7 +161,7 @@ func responseMiddlewareHandler(next http.Handler, bankOrgID string, signer crypt
 		now := timeutil.Timestamp()
 		respPayload["iat"] = now
 
-		jwsResp, err := Sign(respPayload, signer)
+		jwsResp, err := jwtutil.Sign(respPayload, signer)
 		if err != nil {
 			api.WriteError(w, r, fmt.Errorf("failed to sign jwt: %w", err))
 			return
@@ -172,16 +173,16 @@ func responseMiddlewareHandler(next http.Handler, bankOrgID string, signer crypt
 	})
 }
 
-type responseRecorder struct {
+type responseBuffer struct {
 	http.ResponseWriter
 	Body       *bytes.Buffer
 	StatusCode int
 }
 
-func (rr *responseRecorder) WriteHeader(statusCode int) {
+func (rr *responseBuffer) WriteHeader(statusCode int) {
 	rr.StatusCode = statusCode
 }
 
-func (rr *responseRecorder) Write(b []byte) (int, error) {
+func (rr *responseBuffer) Write(b []byte) (int, error) {
 	return rr.Body.Write(b)
 }

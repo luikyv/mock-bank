@@ -13,14 +13,13 @@ import (
 	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/api/middleware"
 	"github.com/luikyv/mock-bank/internal/autopayment"
 	"github.com/luikyv/mock-bank/internal/bank"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/errorutil"
 	"github.com/luikyv/mock-bank/internal/idempotency"
-	"github.com/luikyv/mock-bank/internal/jwtutil"
-	"github.com/luikyv/mock-bank/internal/oidc"
 	"github.com/luikyv/mock-bank/internal/payment"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 )
@@ -60,11 +59,11 @@ func NewServer(
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	enrollmentMux := http.NewServeMux()
 
-	jwtMiddleware := jwtutil.Middleware(s.baseURL, s.orgID, s.keystoreHost, s.signer)
-	idempotencyMiddleware := idempotency.Middleware(s.idempotencyService)
-	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantClientCredentials, payment.Scope)
-	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, enrollment.ScopeID, enrollment.ScopeConsent, payment.Scope)
-	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string {
+	jwtMiddleware := middleware.JWT(s.baseURL, s.orgID, s.keystoreHost, s.signer)
+	idempotencyMiddleware := middleware.Idempotency(s.idempotencyService)
+	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, payment.Scope)
+	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, enrollment.ScopeID, enrollment.ScopeConsent, payment.Scope)
+	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) string {
 		var schemaErr *openapi3.SchemaError
 		if errors.As(err, &schemaErr) && schemaErr.SchemaField == "required" {
 			return "PARAMETRO_NAO_INFORMADO"
@@ -89,7 +88,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = http.HandlerFunc(wrapper.PostEnrollments)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
-	handler = oidc.CertCNMiddleware(handler)
+	handler = middleware.CertCN(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
 	enrollmentMux.Handle("POST /enrollments", handler)
 
@@ -134,7 +133,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = clientCredentialsAuthMiddleware(handler)
 	enrollmentMux.Handle("PATCH /enrollments/{enrollmentId}", handler)
 
-	handler = api.FAPIIDMiddleware(nil)(enrollmentMux)
+	handler = middleware.FAPIID(nil)(enrollmentMux)
 	mux.Handle("/open-banking/enrollments/v2/", http.StripPrefix("/open-banking/enrollments/v2", handler))
 }
 

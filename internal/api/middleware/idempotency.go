@@ -1,4 +1,4 @@
-package idempotency
+package middleware
 
 import (
 	"bytes"
@@ -10,13 +10,14 @@ import (
 	"slices"
 
 	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/idempotency"
 )
 
 const headerIdempotencyID = "X-Idempotency-Key"
 
 // Middleware ensures that requests with the same idempotency ID
 // are not processed multiple times, returning a cached response if available.
-func Middleware(service Service) func(http.Handler) http.Handler {
+func Idempotency(service idempotency.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			idempotencyID := r.Header.Get(headerIdempotencyID)
@@ -47,7 +48,7 @@ func Middleware(service Service) func(http.Handler) http.Handler {
 				return
 			}
 
-			if !errors.Is(err, ErrNotFound) {
+			if !errors.Is(err, idempotency.ErrNotFound) {
 				api.WriteError(w, r, api.NewError("ERRO_IDEMPOTENCIA", http.StatusUnprocessableEntity, err.Error()))
 				return
 			}
@@ -62,7 +63,7 @@ func Middleware(service Service) func(http.Handler) http.Handler {
 				return
 			}
 
-			err = service.Create(r.Context(), &Record{
+			err = service.Create(r.Context(), &idempotency.Record{
 				ID:         idempotencyID,
 				Request:    base64.RawStdEncoding.EncodeToString(bodyBytes),
 				Response:   recorder.Body.String(),
@@ -76,7 +77,7 @@ func Middleware(service Service) func(http.Handler) http.Handler {
 
 }
 
-func writeIdempotencyResp(w http.ResponseWriter, r *http.Request, rec *Record) {
+func writeIdempotencyResp(w http.ResponseWriter, r *http.Request, rec *idempotency.Record) {
 	if len(rec.Response) == 0 {
 		w.WriteHeader(rec.StatusCode)
 		slog.DebugContext(r.Context(), "idempotency record has no response body", "id", rec.ID)
