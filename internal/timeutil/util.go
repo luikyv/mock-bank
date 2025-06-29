@@ -78,6 +78,11 @@ func (d DateTime) Before(t DateTime) bool {
 	return d.Time.Before(t.Time)
 }
 
+// TODO.
+// func (d DateTime) After(t DateTime) bool {
+// 	return d.Time.After(t.Time)
+// }
+
 func DateTimeNow() DateTime {
 	return NewDateTime(now())
 }

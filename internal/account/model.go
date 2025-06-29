@@ -155,8 +155,14 @@ const (
 )
 
 type TransactionFilter struct {
-	from timeutil.BrazilDate
-	to   timeutil.BrazilDate
+	from         timeutil.BrazilDate
+	to           timeutil.BrazilDate
+	movementType MovementType
+}
+
+func (f TransactionFilter) WithMovementType(mt MovementType) TransactionFilter {
+	f.movementType = mt
+	return f
 }
 
 func NewTransactionFilter(from, to *timeutil.BrazilDate, current bool) (TransactionFilter, error) {

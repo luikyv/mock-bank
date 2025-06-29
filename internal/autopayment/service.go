@@ -100,8 +100,20 @@ func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
 		return errorutil.Format("%w: consent is not awaiting authorization", ErrInvalidConsentStatus)
 	}
 
-	now := timeutil.DateTimeNow()
-	c.AuthorizedAt = &now
+	// Load debtor account if not already loaded.
+	if c.DebtorAccount == nil && c.DebtorAccountID != nil {
+		accID := *c.DebtorAccountID
+		acc, err := s.accountService.Account(ctx, account.Query{ID: accID.String()}, c.OrgID)
+		if err != nil {
+			return err
+		}
+		c.DebtorAccount = acc
+	}
+
+	if c.DebtorAccount != nil && c.DebtorAccount.SubType == account.SubTypeJointSimple {
+		return s.updateConsentStatus(ctx, c, ConsentStatusPartiallyAccepted)
+	}
+
 	return s.updateConsentStatus(ctx, c, ConsentStatusAuthorized)
 }
 
@@ -230,6 +242,10 @@ func (s Service) Create(ctx context.Context, p *Payment) error {
 	c, err := s.Consent(ctx, p.ConsentID.String(), p.OrgID)
 	if err != nil {
 		return err
+	}
+
+	if c.Status == ConsentStatusPartiallyAccepted {
+		return ErrConsentPartiallyAccepted
 	}
 
 	if c.Status != ConsentStatusAuthorized {
@@ -1005,6 +1021,11 @@ func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status Con
 
 	c.Status = status
 	c.StatusUpdatedAt = timeutil.DateTimeNow()
+	if status == ConsentStatusAuthorized {
+		now := timeutil.DateTimeNow()
+		c.AuthorizedAt = &now
+	}
+
 	if err := s.updateConsent(ctx, c); err != nil {
 		return fmt.Errorf("could not update consent status: %w", err)
 	}

@@ -60,7 +60,10 @@ func HandleGrantFunc(
 			return fmt.Errorf("could not fetch payment consent for verifying grant: %w", err)
 		}
 
-		if c.Status != autopayment.ConsentStatusAuthorized {
+		if !slices.Contains([]autopayment.ConsentStatus{
+			autopayment.ConsentStatusAuthorized,
+			autopayment.ConsentStatusPartiallyAccepted,
+		}, c.Status) {
 			return goidc.NewError(goidc.ErrorCodeInvalidGrant, "payment consent is not authorized")
 		}
 
@@ -73,7 +76,10 @@ func HandleGrantFunc(
 			return fmt.Errorf("could not fetch payment consent for verifying grant: %w", err)
 		}
 
-		if c.Status != payment.ConsentStatusAuthorized {
+		if !slices.Contains([]payment.ConsentStatus{
+			payment.ConsentStatusAuthorized,
+			payment.ConsentStatusPartiallyAccepted,
+		}, c.Status) {
 			return goidc.NewError(goidc.ErrorCodeInvalidGrant, "payment consent is not authorized")
 		}
 

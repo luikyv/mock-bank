@@ -31,8 +31,8 @@ type Service struct {
 	version        string
 }
 
-func NewService(db *gorm.DB, userService user.Service, accountService account.Service) Service {
-	return Service{db: db, userService: userService, accountService: accountService, version: "v0"}
+func NewService(db *gorm.DB, userService user.Service, accountService account.Service, webhookService webhook.Service) Service {
+	return Service{db: db, userService: userService, accountService: accountService, webhookService: webhookService, version: "v0"}
 }
 
 func (s Service) WithVersion(version string) Service {
@@ -92,6 +92,20 @@ func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
 	}
 
 	c.ExpiresAt = timeutil.DateTimeNow().Add(60 * time.Minute)
+
+	// Load debtor account if not already loaded.
+	if c.DebtorAccount == nil && c.DebtorAccountID != nil {
+		accID := *c.DebtorAccountID
+		acc, err := s.accountService.Account(ctx, account.Query{ID: accID.String()}, c.OrgID)
+		if err != nil {
+			return err
+		}
+		c.DebtorAccount = acc
+	}
+
+	if c.DebtorAccount != nil && c.DebtorAccount.SubType == account.SubTypeJointSimple {
+		return s.updateConsentStatus(ctx, c, ConsentStatusPartiallyAccepted)
+	}
 	return s.updateConsentStatus(ctx, c, ConsentStatusAuthorized)
 }
 
@@ -158,6 +172,10 @@ func (s Service) CreatePayments(ctx context.Context, payments []*Payment) error 
 	c, err := s.Consent(ctx, consentID.String(), orgID)
 	if err != nil {
 		return err
+	}
+
+	if c.Status == ConsentStatusPartiallyAccepted {
+		return ErrConsentPartiallyAccepted
 	}
 
 	if c.Status != ConsentStatusAuthorized {
@@ -464,7 +482,7 @@ func (s Service) runConsentPreCreationAutomations(_ context.Context, c *Consent)
 func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Consent) error {
 	switch c.Status {
 	case ConsentStatusAwaitingAuthorization:
-		if c.IsExpired() {
+		if timeutil.DateTimeNow().After(c.ExpiresAt.Time) {
 			slog.DebugContext(ctx, "payment consent awaiting authorization for too long, moving to rejected")
 			return s.RejectConsent(ctx, c, ConsentRejectionAuthorizationTimeout, "consent awaiting authorization for too long")
 		}
@@ -486,19 +504,21 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 			return s.RejectConsent(ctx, c, ConsentRejectionAmountAboveLimit, "forced rejection")
 		case "300.08":
 			return s.RejectConsent(ctx, c, ConsentRejectionInvalidQRCode, "forced rejection")
-		default:
-			return nil
 		}
-
+	case ConsentStatusPartiallyAccepted:
+		if timeutil.DateTimeNow().After(c.StatusUpdatedAt.Add(3 * time.Minute).Time) {
+			slog.DebugContext(ctx, "payment consent partially accepted for more than 3 minutes, moving to authorized")
+			return s.updateConsentStatus(ctx, c, ConsentStatusAuthorized)
+		}
 	case ConsentStatusAuthorized:
-		if c.IsExpired() {
+		if timeutil.DateTimeNow().After(c.ExpiresAt.Time) {
 			slog.DebugContext(ctx, "payment consent reached expiration, moving to rejected")
 			return s.RejectConsent(ctx, c, ConsentRejectionConsumptionTimeout, "payment consent authorization reached expiration")
 		}
 		return nil
-	default:
-		return nil
 	}
+
+	return nil
 }
 
 func (s Service) validatePayments(_ context.Context, c *Consent, payments []*Payment) error {

@@ -168,10 +168,6 @@ func (c Consent) URN() string {
 	return ConsentURN(c.ID)
 }
 
-func (c Consent) IsExpired() bool {
-	return timeutil.DateTimeNow().After(c.ExpiresAt.Time)
-}
-
 func (c Consent) PaymentDates() []timeutil.BrazilDate {
 	if c.PaymentDate != nil {
 		return []timeutil.BrazilDate{*c.PaymentDate}

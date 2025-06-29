@@ -14,7 +14,7 @@ import (
 func seedRalphBragg(ctx context.Context, db *gorm.DB) error {
 	cnpj := "50685362006773"
 	testUser := &user.User{
-		ID:        uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		ID:        uuid.MustParse("ff8cd4db-a1c8-4966-a9ca-26ab0b19c6d1"),
 		Username:  "ralph.bragg@gmail.com",
 		Name:      "Ralph Bragg",
 		CPF:       "76109277673",

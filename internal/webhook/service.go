@@ -23,8 +23,6 @@ func NewService(clientService client.Service) Service {
 }
 
 func (s Service) Notify(ctx context.Context, clientID, path string) {
-	slog.DebugContext(ctx, "notifying client", "client_id", clientID, "path", path)
-
 	client, err := s.clientService.Client(ctx, clientID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to get client", "error", err)

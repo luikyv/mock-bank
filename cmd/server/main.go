@@ -143,7 +143,7 @@ func main() {
 	consentService := consent.NewService(db, userService)
 	resourceService := resource.NewService(db)
 	accountService := account.NewService(db, OrgID)
-	paymentService := payment.NewService(db, userService, accountService)
+	paymentService := payment.NewService(db, userService, accountService, webhookService)
 	autoPaymentService := autopayment.NewService(db, userService, accountService, webhookService)
 	enrollmentService := enrollment.NewService(db, userService, accountService, paymentService, autoPaymentService, webhookService)
 

@@ -213,7 +213,8 @@
         "paymentAmount": "1333.00"
     },
     "conditionalResources": {
-        "brazilCpfTemporization": "76109277673"
+        "brazilCpfTemporization": "76109277673",
+        "brazilCpfJointAccount": "87517400444"
     },
     "consent": {},
     "directory": {

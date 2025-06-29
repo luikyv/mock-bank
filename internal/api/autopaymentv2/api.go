@@ -1057,6 +1057,11 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
+	if errors.Is(err, autopayment.ErrConsentPartiallyAccepted) {
+		api.WriteError(w, r, api.NewError("CONSENTIMENTO_PENDENTE_AUTORIZACAO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
 	if errors.As(err, &errorutil.Error{}) {
 		api.WriteError(w, r, api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
 		return

@@ -208,6 +208,10 @@ func (s Service) Transactions(ctx context.Context, accID, orgID string, pag page
 		Where("account_id = ? AND created_at >= ? AND created_at < ? AND (org_id = ? OR org_id = ?)",
 			accID, filter.from.Time, filter.to.Time, orgID, s.mockOrgID)
 
+	if filter.movementType != "" {
+		query = query.Where("movement_type = ?", filter.movementType)
+	}
+
 	var txs []*Transaction
 	if err := query.
 		Limit(pag.Limit()).

@@ -8,6 +8,7 @@ var (
 	ErrClientNotAllowed                  = errorutil.New("access is not allowed to client")
 	ErrConsentAlreadyRejected            = errorutil.New("the consent is already rejected")
 	ErrInvalidConsentStatus              = errorutil.New("invalid consent status")
+	ErrConsentPartiallyAccepted          = errorutil.New("consent is in partially accepted status")
 	ErrInvalidData                       = errorutil.New("invalid data")
 	ErrInvalidEndToEndID                 = errorutil.New("invalid end to end id")
 	ErrCreditorAndDebtorAccountsAreEqual = errorutil.New("creditor and debtor accounts cannot be equal")

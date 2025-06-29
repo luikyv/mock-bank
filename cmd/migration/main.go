@@ -109,6 +109,10 @@ func seedDatabase(ctx context.Context, db *gorm.DB) error {
 		return fmt.Errorf("failed to seed Ralph Bragg: %w", err)
 	}
 
+	if err := seedGabrielNunes(ctx, db); err != nil {
+		return fmt.Errorf("failed to seed Gabriel Nunes: %w", err)
+	}
+
 	if Env == LocalEnvironment {
 		if err := createOAuthClients(ctx, db); err != nil {
 			return fmt.Errorf("failed to create OAuth client: %w", err)

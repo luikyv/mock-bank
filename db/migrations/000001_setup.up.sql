@@ -16,7 +16,7 @@ CREATE TABLE mock_users (
     username TEXT NOT NULL,
     name TEXT NOT NULL,
     cpf TEXT NOT NULL,
-    cnpj TEXT NOT NULL,
+    cnpj TEXT,
     description TEXT,
 
     org_id TEXT NOT NULL,

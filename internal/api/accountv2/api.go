@@ -226,6 +226,10 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 		return nil, err
 	}
 
+	if req.Params.CreditDebitIndicator != nil {
+		filter = filter.WithMovementType(account.MovementType(*req.Params.CreditDebitIndicator))
+	}
+
 	txs, err := s.service.ConsentedTransactions(ctx, req.AccountID, consentID, orgID, pag, filter)
 	if err != nil {
 		return nil, err
@@ -270,6 +274,10 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 	filter, err := account.NewTransactionFilter(req.Params.FromBookingDate, req.Params.ToBookingDate, false)
 	if err != nil {
 		return nil, err
+	}
+
+	if req.Params.CreditDebitIndicator != nil {
+		filter = filter.WithMovementType(account.MovementType(*req.Params.CreditDebitIndicator))
 	}
 
 	txs, err := s.service.ConsentedTransactions(ctx, req.AccountID, consentID, orgID, pag, filter)
