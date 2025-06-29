@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/luikyv/mock-bank/internal/bank"
 	"github.com/luikyv/mock-bank/internal/enrollment"
 
@@ -62,9 +63,15 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	jwtMiddleware := jwtutil.Middleware(s.baseURL, s.orgID, s.keystoreHost, s.signer)
 	idempotencyMiddleware := idempotency.Middleware(s.idempotencyService)
-	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, payment.Scope)
-	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID)
-	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string { return "PARAMETRO_INVALIDO" })
+	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantClientCredentials, payment.Scope)
+	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID)
+	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string {
+		var schemaErr *openapi3.SchemaError
+		if errors.As(err, &schemaErr) && schemaErr.SchemaField == "required" {
+			return "PARAMETRO_NAO_INFORMADO"
+		}
+		return "PARAMETRO_INVALIDO"
+	})
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
@@ -72,10 +79,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 				writeResponseError(w, r, err)
 			},
 		}),
-		HandlerMiddlewares: []MiddlewareFunc{
-			swaggerMiddleware,
-			api.FAPIIDMiddleware(nil),
-		},
+		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
@@ -115,7 +119,8 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = clientCredentialsAuthMiddleware(handler)
 	paymentMux.Handle("PATCH /pix/payments/{paymentId}", handler)
 
-	mux.Handle("/open-banking/payments/v4/", http.StripPrefix("/open-banking/payments/v4", paymentMux))
+	handler = api.FAPIIDMiddleware(nil)(paymentMux)
+	mux.Handle("/open-banking/payments/v4/", http.StripPrefix("/open-banking/payments/v4", handler))
 }
 
 func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsentsRequestObject) (PaymentsPostConsentsResponseObject, error) {
@@ -364,8 +369,6 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 	var payments []*payment.Payment
 	for _, reqPayment := range req.Body.Data {
 		p := &payment.Payment{
-			EndToEndID:                reqPayment.EndToEndID,
-			LocalInstrument:           payment.LocalInstrument(reqPayment.LocalInstrument),
 			Amount:                    reqPayment.Payment.Amount,
 			Currency:                  reqPayment.Payment.Currency,
 			CreditorAccountISBP:       reqPayment.CreditorAccount.Ispb,
@@ -375,7 +378,6 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 			RemittanceInformation:     reqPayment.RemittanceInformation,
 			QRCode:                    reqPayment.QrCode,
 			Proxy:                     reqPayment.Proxy,
-			CNPJInitiator:             reqPayment.CnpjInitiator,
 			TransactionIdentification: reqPayment.TransactionIdentification,
 			IBGETownCode:              reqPayment.IbgeTownCode,
 			ClientID:                  clientID,
@@ -395,8 +397,16 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 			p.EnrollmentID = &id
 		}
 
-		if consentID, ok := consent.IDFromScopes(ctx.Value(api.CtxKeyScopes).(string)); ok {
-			p.ConsentID = uuid.MustParse(consentID)
+		if reqPayment.EndToEndID != nil {
+			p.EndToEndID = *reqPayment.EndToEndID
+		}
+
+		if reqPayment.CnpjInitiator != nil {
+			p.CNPJInitiator = *reqPayment.CnpjInitiator
+		}
+
+		if reqPayment.LocalInstrument != nil {
+			p.LocalInstrument = payment.LocalInstrument(*reqPayment.LocalInstrument)
 		}
 
 		if reqPayment.AuthorisationFlow != nil {

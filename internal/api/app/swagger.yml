@@ -297,7 +297,7 @@ paths:
               required:
                 - data
               properties:
-                data: 
+                data:
                   type: object
                   required:
                     - status

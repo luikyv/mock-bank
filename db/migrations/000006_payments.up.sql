@@ -37,7 +37,7 @@ CREATE TABLE payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     status TEXT NOT NULL,
     status_updated_at TIMESTAMPTZ DEFAULT now(),
-    end_to_end_id TEXT NOT NULL UNIQUE,
+    end_to_end_id TEXT NOT NULL,
     local_instrument TEXT NOT NULL,
     amount TEXT NOT NULL,
     currency TEXT NOT NULL,

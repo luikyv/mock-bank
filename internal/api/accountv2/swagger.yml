@@ -11,7 +11,7 @@ info:
     # Orientações
     A `Role`  do diretório de participantes relacionada à presente API é a `DADOS`.\
     Para todos os `endpoints` desta API é previsto o envio de um `token` através do header `Authorization`.\
-    Este token deverá estar relacionado ao consentimento (`consentId`) mantido na instituição transmissora dos dados, o qual permitirá a pesquisa e retorno, na API em questão, dos 
+    Este token deverá estar relacionado ao consentimento (`consentId`) mantido na instituição transmissora dos dados, o qual permitirá a pesquisa e retorno, na API em questão, dos
     dados relacionados ao `consentId` específico relacionado.\
     Os dados serão devolvidos na consulta desde que o `consentId` relacionado corresponda a um consentimento válido e com o status `AUTHORISED`.\
     É também necessário que o recurso em questão (conta, contrato, etc) esteja disponível na instituição transmissora (ou seja, sem boqueios de qualquer natureza e com todas as autorizações/consentimentos já autorizados).\
@@ -678,7 +678,7 @@ components:
           pattern: '^(\w{3}){1}$'
           maxLength: 3
           description: |
-            Moeda referente ao valor da transação, segundo modelo ISO-4217. p.ex. 'BRL' 
+            Moeda referente ao valor da transação, segundo modelo ISO-4217. p.ex. 'BRL'
             Todos os saldos informados estão representados com a moeda vigente do Brasil
           example: BRL
     AccountOverdraftLimitsData:
@@ -706,8 +706,8 @@ components:
         transactionId:
           type: string
           description: |
-            Código ou identificador único prestado pela instituição que mantém a conta para representar a transação individual. 
-            O ideal é que o `transactionId` seja imutável. 
+            Código ou identificador único prestado pela instituição que mantém a conta para representar a transação individual.
+            O ideal é que o `transactionId` seja imutável.
             No entanto, o `transactionId` deve obedecer, no mínimo, as regras de imutabilidade propostas conforme tabela “Data de imutabilidade por tipo de transação” presente nas orientações desta API.
           maxLength: 100
           minLength: 1
@@ -797,7 +797,7 @@ components:
         - CONJUNTA_SIMPLES
         - CONJUNTA_SOLIDARIA
       description: |
-        Subtipo de conta (vide Enum): 
+        Subtipo de conta (vide Enum):
         Conta individual - possui um único titular
         Conta conjunta simples - onde as movimentações financeiras só podem serem realizadas mediante autorização de TODOS os correntistas da conta.
         Conta conjunta solidária - é a modalidade cujos titulares podem realizar movimentações de forma isolada, isto é, sem que seja necessária a autorização dos demais titulares
@@ -817,7 +817,7 @@ components:
     EnumCompletedAuthorisedPaymentIndicator:
       type: string
       description: |
-        Indicador da transação: 
+        Indicador da transação:
           - Transação efetivada: a transação atinge esse status quando o `transactionId` torna-se imutável;
           - Lançamento futuro: a transação será efetivada em momento futuro, ou seja, o `transactionId` pode mudar;
           - Transação processando: a transação está em processamento, ou seja, o `transactionId` pode mudar.
@@ -829,7 +829,7 @@ components:
     EnumCreditDebitIndicator:
       type: string
       description: |
-        Indicador do tipo de lançamento: 
+        Indicador do tipo de lançamento:
         Débito (no extrato) Em um extrato bancário, os débitos, marcados com a letra “D” ao lado do valor registrado, informam as saídas de dinheiro na conta-corrente.
         Crédito (no extrato) Em um extrato bancário, os créditos, marcados com a letra “C” ao lado do valor registrado, informam as entradas de dinheiro na conta-corrente.
       enum:
@@ -843,15 +843,15 @@ components:
         - PESSOA_JURIDICA
       example: PESSOA_NATURAL
       description: |
-        Identificação do Tipo de Pessoa da pessoa envolvida na transação.   
-        Pessoa Natural - Informar CPF no campo “partieCnpjCpf”.   
+        Identificação do Tipo de Pessoa da pessoa envolvida na transação.
+        Pessoa Natural - Informar CPF no campo “partieCnpjCpf”.
         Pessoa Jurídica - Informar CNPJ no campo “partieCnpjCpf”.
     EnumTransactionTypes:
       type: string
       description: |
-        O campo deve classificar a transação em um dos tipos descritos. 
-        O transmissor deve classificar as transações disponíveis associando-a a um dos itens do Enum listado neste campo. 
-        A opção OUTROS só deve ser utilizada para os casos em que de fato a transação compartilhada não possa ser classificada como um dos itens deste Enum. 
+        O campo deve classificar a transação em um dos tipos descritos.
+        O transmissor deve classificar as transações disponíveis associando-a a um dos itens do Enum listado neste campo.
+        A opção OUTROS só deve ser utilizada para os casos em que de fato a transação compartilhada não possa ser classificada como um dos itens deste Enum.
         Por exemplo no caso de recebimento de pensão alimentícia.
       enum:
         - TED
@@ -1198,8 +1198,8 @@ components:
       in: query
       name: fromBookingDate
       description: |
-        Data inicial de filtragem. O período máximo utilizado no filtro é de 7 dias inclusive (D-6).   
-        [Restrição] Deve obrigatoriamente ser enviado caso o campo toBookingDate seja informado. 
+        Data inicial de filtragem. O período máximo utilizado no filtro é de 7 dias inclusive (D-6).
+        [Restrição] Deve obrigatoriamente ser enviado caso o campo toBookingDate seja informado.
         Caso não seja informado, deve ser assumido o dia atual.
       required: false
       schema:
@@ -1211,8 +1211,8 @@ components:
       in: query
       name: toBookingDate
       description: |
-        Data final de filtragem. O período máximo utilizado no filtro é de 7 dias inclusive (D-6).   
-        [Restrição] Deve obrigatoriamente ser enviado caso o campo fromBookingDate seja informado. 
+        Data final de filtragem. O período máximo utilizado no filtro é de 7 dias inclusive (D-6).
+        [Restrição] Deve obrigatoriamente ser enviado caso o campo fromBookingDate seja informado.
         Caso não seja informado, deve ser assumido o dia atual.
       required: false
       schema:

@@ -53,7 +53,7 @@ build-mockgw:
 	@docker-compose build mockgw
 
 migrations:
-	@ cd cmd/migration && go run main.go
+	@ cd cmd/migration && go run .
 
 # Clone and build the Open Finance Conformance Suite.
 setup-cs:

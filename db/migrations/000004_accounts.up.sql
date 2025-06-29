@@ -46,7 +46,7 @@ CREATE TABLE account_transactions (
     partie_compe_code TEXT,
     partie_number TEXT,
     partie_person_type TEXT,
-    
+
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL

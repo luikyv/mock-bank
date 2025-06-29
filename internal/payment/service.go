@@ -17,6 +17,7 @@ import (
 	"github.com/luikyv/mock-bank/internal/errorutil"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 	"github.com/luikyv/mock-bank/internal/user"
+	"github.com/luikyv/mock-bank/internal/webhook"
 	"gorm.io/gorm"
 )
 
@@ -26,10 +27,17 @@ type Service struct {
 	db             *gorm.DB
 	userService    user.Service
 	accountService account.Service
+	webhookService webhook.Service
+	version        string
 }
 
 func NewService(db *gorm.DB, userService user.Service, accountService account.Service) Service {
-	return Service{db: db, userService: userService, accountService: accountService}
+	return Service{db: db, userService: userService, accountService: accountService, version: "v0"}
+}
+
+func (s Service) WithVersion(version string) Service {
+	s.version = version
+	return s
 }
 
 func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *Account) error {
@@ -131,6 +139,7 @@ func (s Service) EnrollConsent(ctx context.Context, id, orgID string, opts Enrol
 	}
 
 	c.EnrollmentID = &opts.EnrollmentID
+	c.DebtorAccountID = opts.DebtorAccountID
 	c.EnrollmentChallenge = &opts.Challenge
 	c.EnrollmentTransactionLimit = &opts.TransactionLimit
 	c.EnrollmentDailyLimit = &opts.DailyLimit
@@ -195,6 +204,20 @@ func (s Service) Payment(ctx context.Context, id, orgID string) (*Payment, error
 	}
 
 	return p, nil
+}
+
+func (s Service) Payments(ctx context.Context, orgID string, filter *Filter) ([]*Payment, error) {
+	payments, err := s.payments(ctx, orgID, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, p := range payments {
+		if err := s.runPostCreationAutomations(ctx, p); err != nil {
+			return nil, err
+		}
+	}
+	return payments, nil
 }
 
 func (s Service) Cancel(ctx context.Context, id, orgID string, doc consent.Document) (*Payment, error) {
@@ -317,6 +340,10 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *A
 		return ErrCreditorAndDebtorAccountsAreEqual
 	}
 
+	if c.PaymentDate != nil && c.PaymentDate.Before(timeutil.BrazilDateNow()) {
+		return errorutil.Format("%w: payment date must be in the future", ErrInvalidDate)
+	}
+
 	if c.PaymentDate == nil && c.PaymentSchedule == nil {
 		return errorutil.Format("%w: must provide either date or schedule", ErrMissingValue)
 	}
@@ -370,11 +397,11 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *A
 			}
 		}
 
-		if !startDate.After(today) {
-			return errorutil.Format("%w: schedule must be after the current day", ErrInvalidDate)
+		if startDate.Before(today) {
+			return errorutil.Format("%w: schedule cannot start in the past", ErrInvalidDate)
 		}
-		if !lastPaymentDate.Before(twoYearsLater) {
-			return errorutil.Format("%w: schedule exceeds 2-year window", ErrInvalidDate)
+		if lastPaymentDate.After(twoYearsLater) {
+			return errorutil.Format("%w: schedule cannot end more than 2 years from now", ErrInvalidDate)
 		}
 
 	}
@@ -384,11 +411,15 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *A
 		LocalInstrumentDICT,
 		LocalInstrumentQRES,
 	}, c.LocalInstrument) {
-		return errorutil.New("only MANU, DICT or QRES are allowed when using schedule other than single")
+		return errorutil.Format("%w: only MANU, DICT or QRES are allowed when using schedule other than single", ErrInvalidPayment)
 	}
 
 	if c.LocalInstrument == LocalInstrumentMANU && c.Proxy != nil {
-		return errorutil.New("proxy must not be set when using local instrument MANU")
+		return errorutil.Format("%w: proxy must not be set when using local instrument MANU", ErrInvalidPayment)
+	}
+
+	if c.LocalInstrument == LocalInstrumentDICT && c.QRCode != nil {
+		return errorutil.Format("%w: qr code is not allowed when using local instrument DICT", ErrInvalidPayment)
 	}
 
 	if slices.Contains([]LocalInstrument{
@@ -397,14 +428,14 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *A
 		LocalInstrumentQRDN,
 		LocalInstrumentQRES,
 	}, c.LocalInstrument) && c.Proxy == nil {
-		return errorutil.New("proxy must be set when using localInstrument INIC, DICT, QRDN or QRES")
+		return errorutil.Format("%w: proxy must be set when using localInstrument INIC, DICT, QRDN or QRES", ErrInvalidPayment)
 	}
 
 	if slices.Contains([]AccountType{
 		AccountTypeCACC,
 		AccountTypeSVGS,
 	}, c.CreditorAccountType) && c.CreditorAccountIssuer == nil {
-		return errorutil.New("creditor account issuer is required for account types CACC or SVGS")
+		return errorutil.Format("%w: creditor account issuer is required for account types CACC or SVGS", ErrInvalidPayment)
 	}
 
 	if debtorAccount != nil && slices.Contains([]AccountType{
@@ -412,6 +443,10 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *A
 		AccountTypeSVGS,
 	}, debtorAccount.Type) && debtorAccount.Issuer == nil {
 		return errorutil.New("debtor account issuer is required for account types CACC or SVGS")
+	}
+
+	if c.PaymentCurrency != "BRL" {
+		return errorutil.Format("%w: payment currency must be BRL", ErrInvalidData)
 	}
 
 	return nil
@@ -487,6 +522,10 @@ func (s Service) validatePayments(_ context.Context, c *Consent, payments []*Pay
 			return errorutil.New("payment enrollment id is set but authorisation flow is not FIDO")
 		}
 
+		if p.EndToEndID == "" {
+			return errorutil.Format("%w: end to end id is required", ErrMissingValue)
+		}
+
 		endToEndDate, err := ParseEndToEndDate(p.EndToEndID)
 		if err != nil {
 			return errorutil.Format("%w: invalid end to end id date: %w", ErrInvalidEndToEndID, err)
@@ -497,42 +536,6 @@ func (s Service) validatePayments(_ context.Context, c *Consent, payments []*Pay
 			return endToEndDate.BrazilDate().Equal(d)
 		}) {
 			return errorutil.Format("%w: end to end id date doesn't match any of the scheduled dates", ErrInvalidEndToEndID)
-		}
-
-		if p.LocalInstrument != c.LocalInstrument {
-			return errorutil.Format("%w: local instrument does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
-		}
-
-		if p.Amount != c.PaymentAmount {
-			return errorutil.Format("%w: amount does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
-		}
-
-		if p.Currency != c.PaymentCurrency {
-			return errorutil.Format("%w: currency does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
-		}
-
-		if p.CreditorAccountISBP != c.CreditorAccountISBP {
-			return errorutil.Format("%w: creditor account isbp does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
-		}
-
-		if !reflect.DeepEqual(p.CreditorAccountIssuer, c.CreditorAccountIssuer) {
-			return errorutil.Format("%w: creditor account issuer does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
-		}
-
-		if p.CreditorAccountNumber != c.CreditorAccountNumber {
-			return errorutil.Format("%w: creditor account number does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
-		}
-
-		if p.CreditorAccountType != c.CreditorAccountType {
-			return errorutil.Format("%w: creditor account type does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
-		}
-
-		if !reflect.DeepEqual(p.QRCode, c.QRCode) {
-			return errorutil.Format("%w: qr code does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
-		}
-
-		if !reflect.DeepEqual(p.Proxy, c.Proxy) {
-			return errorutil.Format("%w: proxy does not match the value specified in the consent", ErrPaymentDoesNotMatchConsent)
 		}
 
 		if slices.Contains([]LocalInstrument{
@@ -571,18 +574,63 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 
 	switch p.Status {
 	case StatusRCVD:
+		if p.LocalInstrument != c.LocalInstrument {
+			return s.reject(ctx, p, RejectionPaymentConsentMismatch, "local instrument does not match the value specified in the consent")
+		}
+
+		if p.LocalInstrument == LocalInstrumentQRES && p.TransactionIdentification != nil {
+			return s.reject(ctx, p, RejectionInvalidPaymentDetail, "transaction identification is not allowed when using local instrument QRES")
+		}
+
+		if p.Amount != c.PaymentAmount {
+			return s.reject(ctx, p, RejectionPaymentConsentMismatch, "amount does not match the value specified in the consent")
+		}
+
+		if p.Currency != c.PaymentCurrency {
+			return s.reject(ctx, p, RejectionPaymentConsentMismatch, "currency does not match the value specified in the consent")
+		}
+
+		if p.CreditorAccountISBP != c.CreditorAccountISBP {
+			return s.reject(ctx, p, RejectionPaymentConsentMismatch, "creditor account isbp does not match the value specified in the consent")
+		}
+
+		if !reflect.DeepEqual(p.CreditorAccountIssuer, c.CreditorAccountIssuer) {
+			return s.reject(ctx, p, RejectionPaymentConsentMismatch, "creditor account issuer does not match the value specified in the consent")
+		}
+
+		if p.CreditorAccountNumber != c.CreditorAccountNumber {
+			return s.reject(ctx, p, RejectionPaymentConsentMismatch, "creditor account number does not match the value specified in the consent")
+		}
+
+		if p.CreditorAccountType != c.CreditorAccountType {
+			return s.reject(ctx, p, RejectionPaymentConsentMismatch, "creditor account type does not match the value specified in the consent")
+		}
+
+		if !reflect.DeepEqual(p.QRCode, c.QRCode) {
+			return s.reject(ctx, p, RejectionPaymentConsentMismatch, "qr code does not match the value specified in the consent")
+		}
+
+		if !reflect.DeepEqual(p.Proxy, c.Proxy) {
+			return s.reject(ctx, p, RejectionPaymentConsentMismatch, "proxy does not match the value specified in the consent")
+		}
+
 		if c.EnrollmentTransactionLimit != nil && ConvertAmount(p.Amount) > ConvertAmount(*c.EnrollmentTransactionLimit) {
 			return s.reject(ctx, p, RejectionExceedsLimit, "payment amount is greater than the configured transaction limit in the consent")
 		}
 
 		if c.EnrollmentDailyLimit != nil {
 			today := timeutil.BrazilDateNow()
-			_, currentAmount, err := s.currentAmount(ctx, c, &today, &today)
+			payments, err := s.payments(ctx, c.OrgID, &Filter{
+				EnrollmentID: p.EnrollmentID.String(),
+				Statuses:     []Status{StatusACSC, StatusSCHD},
+				From:         &today,
+				To:           &today,
+			})
 			if err != nil {
 				return err
 			}
-			if ConvertAmount(p.Amount)+currentAmount > ConvertAmount(*c.EnrollmentDailyLimit) {
-				return s.reject(ctx, p, RejectionExceedsLimit, "payment amount is greater than the configured daily limit in the consent")
+			if ConvertAmount(p.Amount)+SumPayments(payments) > ConvertAmount(*c.EnrollmentDailyLimit) {
+				return s.reject(ctx, p, RejectionExceedsLimit, "payment amount goes beyond the configured daily limit in the consent")
 			}
 		}
 
@@ -614,7 +662,22 @@ func (s Service) updateStatus(ctx context.Context, p *Payment, status Status) er
 
 	p.Status = status
 	p.StatusUpdatedAt = timeutil.DateTimeNow()
-	return s.update(ctx, p)
+	if err := s.update(ctx, p); err != nil {
+		return fmt.Errorf("could not update payment status: %w", err)
+	}
+
+	if slices.Contains([]Status{
+		StatusPDNG,
+		StatusSCHD,
+		StatusACSC,
+		StatusRJCT,
+		StatusCANC,
+	}, status) {
+		slog.DebugContext(ctx, "notifying client about payment status change")
+		s.webhookService.Notify(ctx, p.ClientID, "/payments/"+s.version+"/pix/payments/"+p.ID.String())
+	}
+
+	return nil
 }
 
 func (s Service) update(ctx context.Context, p *Payment) error {
@@ -627,9 +690,24 @@ func (s Service) update(ctx context.Context, p *Payment) error {
 }
 
 func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status ConsentStatus) error {
+	oldStatus := c.Status
+	slog.DebugContext(ctx, "updating payment consent status", "current_status", oldStatus, "new_status", status)
+
 	c.Status = status
 	c.StatusUpdatedAt = timeutil.DateTimeNow()
-	return s.updateConsent(ctx, c)
+	if err := s.updateConsent(ctx, c); err != nil {
+		return fmt.Errorf("could not update payment consent status: %w", err)
+	}
+
+	if slices.Contains([]ConsentStatus{
+		ConsentStatusRejected,
+		ConsentStatusConsumed,
+	}, status) || (oldStatus == ConsentStatusPartiallyAccepted && status == ConsentStatusAuthorized) {
+		slog.DebugContext(ctx, "notifying client about payment consent status change")
+		s.webhookService.Notify(ctx, c.ClientID, "/payments/"+s.version+"/consents/"+c.URN())
+	}
+
+	return nil
 }
 
 func (s Service) updateConsent(ctx context.Context, c *Consent) error {
@@ -641,32 +719,17 @@ func (s Service) updateConsent(ctx context.Context, c *Consent) error {
 		Updates(c).Error
 }
 
-func (s Service) currentAmount(ctx context.Context, c *Consent, from *timeutil.BrazilDate, to *timeutil.BrazilDate) (int, float64, error) {
-	payments, err := s.payments(ctx, c.OrgID, &Filter{
-		ConsentID: c.ID.String(),
-		Statuses:  []Status{StatusACSC, StatusSCHD},
-		From:      from,
-		To:        to,
-	})
-	if err != nil {
-		return 0, 0.0, nil
-	}
-
-	amount := 0.0
-	for _, p := range payments {
-		amount += ConvertAmount(p.Amount)
-	}
-
-	return len(payments), amount, nil
-}
-
 func (s Service) payments(ctx context.Context, orgID string, opts *Filter) ([]*Payment, error) {
-	query := s.db.WithContext(ctx).
-		Model(&Payment{}).
-		Where("org_id = ?", orgID)
+	if opts == nil {
+		opts = &Filter{}
+	}
 
+	query := s.db.WithContext(ctx).Where("org_id = ?", orgID)
 	if opts.ConsentID != "" {
-		query = query.Where("consent_id = ?", opts.ConsentID)
+		query = query.Where("consent_id = ?", strings.TrimPrefix(opts.ConsentID, ConsentURNPrefix))
+	}
+	if opts.EnrollmentID != "" {
+		query = query.Where("enrollment_id = ?", opts.EnrollmentID)
 	}
 	if opts.Statuses != nil {
 		query = query.Where("status IN ?", opts.Statuses)

@@ -62,14 +62,13 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	jwtMiddleware := jwtutil.Middleware(s.baseURL, s.orgID, s.keystoreHost, s.signer)
 	idempotencyMiddleware := idempotency.Middleware(s.idempotencyService)
-	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, payment.Scope)
-	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, enrollment.ScopeID, enrollment.ScopeConsent, payment.Scope)
+	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantClientCredentials, payment.Scope)
+	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, enrollment.ScopeID, enrollment.ScopeConsent, payment.Scope)
 	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string {
 		var schemaErr *openapi3.SchemaError
 		if errors.As(err, &schemaErr) && schemaErr.SchemaField == "required" {
 			return "PARAMETRO_NAO_INFORMADO"
 		}
-
 		return "PARAMETRO_INVALIDO"
 	})
 
@@ -79,10 +78,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 				writeResponseError(w, r, err)
 			},
 		}),
-		HandlerMiddlewares: []MiddlewareFunc{
-			swaggerMiddleware,
-			api.FAPIIDMiddleware(nil),
-		},
+		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
@@ -138,7 +134,8 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = clientCredentialsAuthMiddleware(handler)
 	enrollmentMux.Handle("PATCH /enrollments/{enrollmentId}", handler)
 
-	mux.Handle("/open-banking/enrollments/v2/", http.StripPrefix("/open-banking/enrollments/v2", enrollmentMux))
+	handler = api.FAPIIDMiddleware(nil)(enrollmentMux)
+	mux.Handle("/open-banking/enrollments/v2/", http.StripPrefix("/open-banking/enrollments/v2", handler))
 }
 
 func (s Server) PostEnrollments(ctx context.Context, req PostEnrollmentsRequestObject) (PostEnrollmentsResponseObject, error) {

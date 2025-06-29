@@ -2,8 +2,8 @@ openapi: 3.0.0
 info:
   title: API Consents - Open Finance Brasil
   description: |
-    API que trata da criação, consulta, renovação e revogação de consentimentos para o Open Finance Brasil Dados cadastrais e transacionais - customer-data.  
-    Não possui segregação entre pessoa natural e pessoa jurídica.    
+    API que trata da criação, consulta, renovação e revogação de consentimentos para o Open Finance Brasil Dados cadastrais e transacionais - customer-data.
+    Não possui segregação entre pessoa natural e pessoa jurídica.
 
     # Orientações importantes
     A API Consents trata exclusivamente dos consentimentos para Dados Cadastrais e Transacionais do Open Finance Brasil.
@@ -132,7 +132,7 @@ info:
       | DADOS | Câmbio               | Dados da Operação             |----------------------------------------------------------| exchanges                     |
       |       |                      |                               | RESOURCES_READ                                           |                               |
       |-------|----------------------|-------------------------------|----------------------------------------------------------|-------------------------------|
-      
+
       ```
     - A instituição transmissora deve validar o preenchimento correto dos agrupamentos acima no momento da geração do consentimento.
     - Caso a instiuição receptora envie permissões não existentes nos agrupamentos especificados na tabela, a transmissora deve rejeitar o pedido da receptora dando retorno HTTP Status Code 400.
@@ -141,7 +141,7 @@ info:
     - Caso o método `DELETE` seja chamado para um consentimento que já se encontra no `STATUS REJECTED` deve se retornar o STATUS CODE 422.
     - Pedidos de renovação de consentimento somente podem alterar a data de validade (conforme as regras definidas em [Orientações – [DC] Consentimento](https://openfinancebrasil.atlassian.net/wiki/spaces/DraftOF/pages/232915037)) e a finalidade do consentimento, e aplica-se somente a consentimentos ativos (status `AUTHORISED`).
     - No caso de criação ou renovação de consentimentos com prazo indeterminado, a receptora não deve enviar o atributo expirationDateTime. Para prazos determinados o campo deve ser enviado.
-    - A renovação de consentimento (`POST /consents/{consentId}/extends`) deve ser possível por apenas um cliente logado. 
+    - A renovação de consentimento (`POST /consents/{consentId}/extends`) deve ser possível por apenas um cliente logado.
     Isso implica que qualquer usuário (`loggedUser`) com permissão para o consentimento Pessoa Jurídica deve ser capaz de finalizar o fluxo de renovação sem redirecionamento. Para consentimentos Pessoa Natural apenas o `loggedUser` criador do consentimento consegue renovar sem redirecionamento.
   version: 3.2.0
   license:
@@ -318,7 +318,7 @@ paths:
       description: |
         Método para obter histórico de extensões de consentimento identificado por consentId.
 
-        IMPORTANTE: A lista do payload de resposta deve ser entregue em ordem decrescente pela data de requisição (`data[].requestDateTime`). 
+        IMPORTANTE: A lista do payload de resposta deve ser entregue em ordem decrescente pela data de requisição (`data[].requestDateTime`).
         Dessa forma, o primeiro item da lista apresentará a mesma data de expiração do consentimento vigente, pois foi a última renovação feita.
       parameters:
         - $ref: '#/components/parameters/ConsentId'
@@ -592,9 +592,9 @@ components:
               description: |
                 Data e hora de expiração da permissão. Reflete a data limite de validade do consentimento.
                 Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC (UTC time format).
-                
+
                 [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada.
-                Em casos de consentimento com prazo indeterminado o campo não deve ser enviado. 
+                Em casos de consentimento com prazo indeterminado o campo não deve ser enviado.
                 Quando preenchido, o valor do campo não pode ultrapassar 12 meses.
               type: string
               maxLength: 20
@@ -615,9 +615,9 @@ components:
               description: |
                 Data e hora de expiração da permissão. Reflete a data limite de validade do consentimento.
                 Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC (UTC time format).
-                
+
                 [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada.
-                Em casos de consentimento com prazo indeterminado o campo não deve ser enviado. 
+                Em casos de consentimento com prazo indeterminado o campo não deve ser enviado.
                 Quando preenchido, o valor do campo não pode ultrapassar 12 meses.
               type: string
               format: date-time
@@ -631,10 +631,10 @@ components:
     EnumRejectedBy:
       type: string
       description: |
-        Informar usuário responsável pela rejeição.   
-        1. USER usuário   
-        2. ASPSP instituição transmissora   
-        3. TPP instituição receptora   
+        Informar usuário responsável pela rejeição.
+        1. USER usuário
+        2. ASPSP instituição transmissora
+        3. TPP instituição receptora
       enum:
         - USER
         - ASPSP
@@ -659,14 +659,14 @@ components:
           properties:
             consentId:
               description: |
-                O consentId é o identificador único do consentimento e deverá ser um URN - Uniform Resource Name.  
-                Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource 
-                Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN 
-                seja um identificador de recurso persistente e independente da localização.  
+                O consentId é o identificador único do consentimento e deverá ser um URN - Uniform Resource Name.
+                Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource
+                Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN
+                seja um identificador de recurso persistente e independente da localização.
                 Considerando a string urn:bancoex:C1DD33123 como exemplo para consentId temos:
                 - o namespace(urn)
-                - o identificador associado ao namespace da instituição transnmissora (bancoex) 
-                - o identificador específico dentro do namespace (C1DD33123).  
+                - o identificador associado ao namespace da instituição transnmissora (bancoex)
+                - o identificador específico dentro do namespace (C1DD33123).
                 Informações mais detalhadas sobre a construção de namespaces devem ser consultadas na [RFC8141](https://tools.ietf.org/html/rfc8141).
               type: string
               pattern: '^urn:[a-zA-Z0-9][a-zA-Z0-9-]{0,31}:[a-zA-Z0-9()+,\-.:=@;$_!*''%\/?#]+$'
@@ -745,9 +745,9 @@ components:
               description: |
                 Data e hora de expiração da permissão. Reflete a data limite de validade do consentimento.
                 Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC (UTC time format).
-                
+
                 [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada.
-                Em casos de consentimento com prazo indeterminado o campo não deve ser enviado. 
+                Em casos de consentimento com prazo indeterminado o campo não deve ser enviado.
                 Quando preenchido, o valor do campo não pode ultrapassar 12 meses.
               type: string
               format: date-time
@@ -774,15 +774,15 @@ components:
           properties:
             consentId:
               description: |
-                O consentId é o identificador único do consentimento e deverá ser um URN - Uniform Resource Name.  
-                Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource 
-                Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN 
-                seja um identificador de recurso persistente e independente da localização.  
+                O consentId é o identificador único do consentimento e deverá ser um URN - Uniform Resource Name.
+                Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource
+                Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN
+                seja um identificador de recurso persistente e independente da localização.
                 Considerando a string urn:bancoex:C1DD33123 como exemplo para consentId temos:
                 - o namespace(urn)
-                - o identificador associado ao namespace da instituição transnmissora (bancoex) 
-                - o identificador específico dentro do namespace (C1DD33123).  
-                Informações mais detalhadas sobre a construção de namespaces devem ser consultadas na [RFC8141](https://tools.ietf.org/html/rfc8141).  
+                - o identificador associado ao namespace da instituição transnmissora (bancoex)
+                - o identificador específico dentro do namespace (C1DD33123).
+                Informações mais detalhadas sobre a construção de namespaces devem ser consultadas na [RFC8141](https://tools.ietf.org/html/rfc8141).
               type: string
               pattern: '^urn:[a-zA-Z0-9][a-zA-Z0-9-]{0,31}:[a-zA-Z0-9()+,\-.:=@;$_!*''%\/?#]+$'
               maxLength: 256
@@ -857,9 +857,9 @@ components:
               description: |
                 Data e hora de expiração da permissão. Reflete a data limite de validade do consentimento.
                 Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC (UTC time format).
-                
+
                 [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada.
-                Em casos de consentimento com prazo indeterminado o campo não deve ser enviado. 
+                Em casos de consentimento com prazo indeterminado o campo não deve ser enviado.
                 Quando preenchido, o valor do campo não pode ultrapassar 12 meses.
               type: string
               format: date-time
@@ -882,20 +882,20 @@ components:
             - status
             - statusUpdateDateTime
             - permissions
-          x-regulatory-required: 
+          x-regulatory-required:
             - permissions
             - expirationDateTime​
           properties:
             consentId:
               description: |
-                O consentId é o identificador único do consentimento e deverá ser um URN - Uniform Resource Name.  
-                Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource 
-                Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN 
-                seja um identificador de recurso persistente e independente da localização.  
+                O consentId é o identificador único do consentimento e deverá ser um URN - Uniform Resource Name.
+                Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource
+                Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN
+                seja um identificador de recurso persistente e independente da localização.
                 Considerando a string urn:bancoex:C1DD33123 como exemplo para consentId temos:
                 - o namespace(urn)
-                - o identificador associado ao namespace da instituição transnmissora (bancoex) 
-                - o identificador específico dentro do namespace (C1DD33123).  
+                - o identificador associado ao namespace da instituição transnmissora (bancoex)
+                - o identificador específico dentro do namespace (C1DD33123).
                 Informações mais detalhadas sobre a construção de namespaces devem ser consultadas na [RFC8141](https://tools.ietf.org/html/rfc8141).
               type: string
               pattern: '^urn:[a-zA-Z0-9][a-zA-Z0-9-]{0,31}:[a-zA-Z0-9()+,\-.:=@;$_!*''%\/?#]+$'
@@ -972,7 +972,7 @@ components:
                 - RESOURCES_READ
             expirationDateTime:
               description: |
-                Data e hora de expiração da permissão. Reflete a data limite de validade do consentimento. Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC(UTC time format).  
+                Data e hora de expiração da permissão. Reflete a data limite de validade do consentimento. Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC(UTC time format).
 
                 [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada. Em casos de consentimento com prazo indeterminado o campo não deve ser preenchido.
               type: string
@@ -1000,11 +1000,11 @@ components:
                       description: |
                         Define o código da razão pela qual o consentimento foi rejeitado.
 
-                        - CONSENT_EXPIRED – consentimento que ultrapassou o tempo limite para autorização.   
-                        - CUSTOMER_MANUALLY_REJECTED – cliente efetuou a rejeição do consentimento manualmente através de interação nas instituições participantes.   
-                        - CUSTOMER_MANUALLY_REVOKED – cliente efetuou a revogação após a autorização do consentimento.   
-                        - CONSENT_MAX_DATE_REACHED – consentimento que ultrapassou o tempo limite de compartilhamento.   
-                        - CONSENT_TECHNICAL_ISSUE – consentimento que foi rejeitado devido a um problema técnico que impossibilita seu uso pela instituição receptora, por exemplo: falha associada a troca do AuthCode pelo AccessToken, durante o processo de Hybrid Flow.   
+                        - CONSENT_EXPIRED – consentimento que ultrapassou o tempo limite para autorização.
+                        - CUSTOMER_MANUALLY_REJECTED – cliente efetuou a rejeição do consentimento manualmente através de interação nas instituições participantes.
+                        - CUSTOMER_MANUALLY_REVOKED – cliente efetuou a revogação após a autorização do consentimento.
+                        - CONSENT_MAX_DATE_REACHED – consentimento que ultrapassou o tempo limite de compartilhamento.
+                        - CONSENT_TECHNICAL_ISSUE – consentimento que foi rejeitado devido a um problema técnico que impossibilita seu uso pela instituição receptora, por exemplo: falha associada a troca do AuthCode pelo AccessToken, durante o processo de Hybrid Flow.
                         - INTERNAL_SECURITY_REASON – consentimento que foi rejeitado devido as políticas de segurança aplicada pela instituição transmissora.
                       enum:
                         - CONSENT_EXPIRED
@@ -1277,7 +1277,7 @@ components:
     LoggedUserExtensions:
       type: object
       description: |
-        Usuário (pessoa natural) que encontra-se logado na instituição receptora e que iniciará o processo de consentimento para compartilhamento de dados.  
+        Usuário (pessoa natural) que encontra-se logado na instituição receptora e que iniciará o processo de consentimento para compartilhamento de dados.
         Deve ser armazenado como novo usuário logado responsável pela renovação do consentimento atual.
       required:
         - document
@@ -1336,8 +1336,8 @@ components:
     BusinessEntityExtensions:
       type: object
       description: |
-        Titular, pessoa jurídica a quem se referem os dados que são objeto de compartilhamento.  
-        Deve ser informado apenas para casos de consentimento pessoa jurídica.  
+        Titular, pessoa jurídica a quem se referem os dados que são objeto de compartilhamento.
+        Deve ser informado apenas para casos de consentimento pessoa jurídica.
         Não precisa ser armazenado separadamente. Para fins de renovação de consentimento, será utilizado apenas para verificação do consentimento vigente, pois é um atributo imutável.
       required:
         - document
@@ -1387,10 +1387,10 @@ components:
       name: consentId
       in: path
       description: |
-        O consentId é o identificador único do consentimento e deverá ser um URN - Uniform Resource Name.  
-        Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource 
-        Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN 
-        seja um identificador de recurso persistente e independente da localização.  
+        O consentId é o identificador único do consentimento e deverá ser um URN - Uniform Resource Name.
+        Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource
+        Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN
+        seja um identificador de recurso persistente e independente da localização.
         Considerando a string urn:bancoex:C1DD33123 como exemplo para consentId temos:
         - o namespace(urn)
         - o identificador associado ao namespace da instituição transnmissora (bancoex)
@@ -1668,7 +1668,7 @@ components:
       headers:
         x-fapi-interaction-id:
           description: |
-            Um UUID RFC4122 usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.         
+            Um UUID RFC4122 usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.
           schema:
             type: string
             pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
@@ -1685,7 +1685,7 @@ components:
       headers:
         x-fapi-interaction-id:
           description: |
-            Um UUID RFC4122 usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.          
+            Um UUID RFC4122 usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.
           schema:
             type: string
             pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
@@ -1702,7 +1702,7 @@ components:
       headers:
         x-fapi-interaction-id:
           description: |
-            Um UUID RFC4122 usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.        
+            Um UUID RFC4122 usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.
           schema:
             type: string
             pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
@@ -1719,7 +1719,7 @@ components:
       headers:
         x-fapi-interaction-id:
           description: |
-            Um UUID RFC4122 usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.        
+            Um UUID RFC4122 usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.
           schema:
             type: string
             pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
@@ -1736,7 +1736,7 @@ components:
       headers:
         x-fapi-interaction-id:
           description: |
-            Um UUID RFC4122 usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.        
+            Um UUID RFC4122 usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.
           schema:
             type: string
             pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'

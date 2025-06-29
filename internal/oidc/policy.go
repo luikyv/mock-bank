@@ -330,14 +330,15 @@ func grantPaymentStep(
 	accountService account.Service,
 ) goidc.AuthnFunc {
 	type Page struct {
-		BaseURL        string
-		CallbackID     string
-		UserCPF        string
-		BusinessCNPJ   string
-		Account        *account.Account
-		Accounts       []*account.Account
-		OverdraftLimit bool
-		Nonce          string
+		BaseURL                 string
+		CallbackID              string
+		UserCPF                 string
+		BusinessCNPJ            string
+		Account                 *account.Account
+		Accounts                []*account.Account
+		OverdraftLimit          bool
+		Nonce                   string
+		OverdraftLimitIsEnabled bool
 	}
 
 	renderPaymentPage := func(w http.ResponseWriter, r *http.Request, as *goidc.AuthnSession) (goidc.AuthnStatus, error) {
@@ -411,6 +412,8 @@ func grantPaymentStep(
 			return goidc.StatusFailure, errors.New("consent not granted")
 		}
 
+		accountID := uuid.MustParse(r.PostFormValue(formParamAccountID))
+		c.DebtorAccountID = &accountID
 		slog.InfoContext(r.Context(), "authorizing payment consent", "consent_id", c.ID)
 		if err := paymentService.AuthorizeConsent(r.Context(), c); err != nil {
 			return goidc.StatusFailure, err
@@ -680,7 +683,7 @@ func grantEnrollmentStep(
 			return goidc.StatusFailure, errors.New("enrollment not granted")
 		}
 
-		slog.InfoContext(r.Context(), "authorizing enrollment", "enrollment_id", enrollmentID)
+		slog.InfoContext(r.Context(), "allowing enrollment", "enrollment_id", enrollmentID)
 
 		accountID := uuid.MustParse(r.PostFormValue(formParamAccountID))
 		e.DebtorAccountID = &accountID
@@ -725,6 +728,7 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template, name string, dat
 	}
 
 	w.WriteHeader(http.StatusOK)
+	// TODO: What happens when an error occurs?
 	if err := tmpl.ExecuteTemplate(w, name, data); err != nil {
 		return goidc.StatusFailure, fmt.Errorf("could not render template: %w", err)
 	}

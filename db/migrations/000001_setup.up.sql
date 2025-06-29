@@ -6,7 +6,7 @@ CREATE TABLE sessions (
     username TEXT NOT NULL,
     organizations JSONB NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
-    code_verifier TEXT,     
+    code_verifier TEXT,
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );

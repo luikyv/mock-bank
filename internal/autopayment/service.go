@@ -29,14 +29,20 @@ type Service struct {
 	userService    user.Service
 	accountService account.Service
 	webhookService webhook.Service
+	version        string
 }
 
 func NewService(db *gorm.DB, userService user.Service, accountService account.Service, webhookService webhook.Service) Service {
-	return Service{db: db, userService: userService, accountService: accountService, webhookService: webhookService}
+	return Service{db: db, userService: userService, accountService: accountService, webhookService: webhookService, version: "v0"}
 }
 
 func (s Service) WithTx(tx *gorm.DB) Service {
 	return NewService(tx, s.userService, s.accountService, s.webhookService)
+}
+
+func (s Service) WithVersion(version string) Service {
+	s.version = version
+	return s
 }
 
 func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payment.Account) error {
@@ -122,6 +128,7 @@ func (s Service) EnrollConsent(ctx context.Context, id, orgID string, opts payme
 	}
 
 	c.EnrollmentID = &opts.EnrollmentID
+	c.DebtorAccountID = opts.DebtorAccountID
 	c.EnrollmentChallenge = &opts.Challenge
 	c.EnrollmentTransactionLimit = &opts.TransactionLimit
 	c.EnrollmentDailyLimit = &opts.DailyLimit
@@ -472,11 +479,14 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 
 		if sweeping := c.Configuration.Sweeping; sweeping != nil {
 			if totalAllowedAmount := sweeping.TotalAllowedAmount; totalAllowedAmount != nil {
-				_, currentTotalAmount, err := s.currentAmount(ctx, c, nil, nil)
+				payments, err := s.payments(ctx, c.OrgID, &Filter{
+					ConsentID: c.ID.String(),
+					Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
+				})
 				if err != nil {
 					return err
 				}
-				if currentTotalAmount > payment.ConvertAmount(*totalAllowedAmount) {
+				if payment.SumPayments(payments) >= payment.ConvertAmount(*totalAllowedAmount) {
 					return s.updateConsentStatus(ctx, c, ConsentStatusConsumed)
 				}
 			}
@@ -683,7 +693,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 				return s.reject(ctx, p, RejectionTransactionValueLimitExceeded, "payment amount is less than the configured minimum variable amount in the consent")
 			}
 
-			lastPayment, err := s.payment(ctx, Query{
+			lastestSuccessfulPayment, err := s.payment(ctx, Query{
 				ConsentID: c.ID.String(),
 				Statuses:  []payment.Status{payment.StatusSCHD, payment.StatusACSC},
 				Order:     "date DESC",
@@ -692,17 +702,19 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 				return err
 			}
 
-			// Skip interval validation if the last payment was the initial one.
-			if lastPayment.Reference != nil && *lastPayment.Reference != "zero" {
-				if automatic.Interval == IntervalWeekly && lastPayment.Date.StartOfWeek().Equal(p.Date.StartOfWeek()) {
+			// Skip interval validation if the lastest successful payment was the initial one
+			// which means the current payment is the first of the series.
+			if lastestSuccessfulPayment.Reference != nil && *lastestSuccessfulPayment.Reference != "zero" {
+				// TODO: Validate reference against the date.
+				if automatic.Interval == IntervalWeekly && lastestSuccessfulPayment.Date.StartOfWeek().Equal(p.Date.StartOfWeek()) {
 					return s.reject(ctx, p, RejectionOutOfAllowedPeriod, "payment cannot be scheduled more than once a week")
 				}
 
-				if automatic.Interval == IntervalMonthly && lastPayment.Date.StartOfMonth().Equal(p.Date.StartOfMonth()) {
+				if automatic.Interval == IntervalMonthly && lastestSuccessfulPayment.Date.StartOfMonth().Equal(p.Date.StartOfMonth()) {
 					return s.reject(ctx, p, RejectionOutOfAllowedPeriod, "payment cannot be scheduled more than once a month")
 				}
 
-				if automatic.Interval == IntervalAnnually && lastPayment.Date.StartOfYear().Equal(p.Date.StartOfYear()) {
+				if automatic.Interval == IntervalAnnually && lastestSuccessfulPayment.Date.StartOfYear().Equal(p.Date.StartOfYear()) {
 					return s.reject(ctx, p, RejectionOutOfAllowedPeriod, "payment cannot be scheduled more than once a year")
 				}
 				// TODO: Implement the other intervals.
@@ -715,11 +727,14 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 			}
 
 			if sweeping.TotalAllowedAmount != nil {
-				_, currentTotalAmount, err := s.currentAmount(ctx, c, nil, nil)
+				payments, err := s.payments(ctx, c.OrgID, &Filter{
+					ConsentID: c.ID.String(),
+					Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
+				})
 				if err != nil {
 					return err
 				}
-				if currentTotalAmount+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*sweeping.TotalAllowedAmount) {
+				if payment.SumPayments(payments)+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*sweeping.TotalAllowedAmount) {
 					return s.reject(ctx, p, RejectionTotalConsentValueLimitExceeded, "sweeping payment amount is greater than the configured total allowed amount in the consent")
 				}
 			}
@@ -727,14 +742,19 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 			if periodicLimits := sweeping.PeriodicLimits; periodicLimits != nil {
 				if dayLimit := periodicLimits.Day; dayLimit != nil {
 					today := timeutil.BrazilDateNow()
-					numberOfPayments, currentAmount, err := s.currentAmount(ctx, c, &today, &today)
+					payments, err := s.payments(ctx, c.OrgID, &Filter{
+						ConsentID: c.ID.String(),
+						Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
+						From:      &today,
+						To:        &today,
+					})
 					if err != nil {
 						return err
 					}
-					if dayLimit.Quantity != nil && numberOfPayments+1 > *dayLimit.Quantity {
+					if dayLimit.Quantity != nil && len(payments)+1 > *dayLimit.Quantity {
 						return s.reject(ctx, p, RejectionPeriodQuantityLimitExceeded, "sweeping payment amount is greater than the configured daily limit quantity in the consent")
 					}
-					if dayLimit.TransactionLimit != nil && currentAmount+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*dayLimit.TransactionLimit) {
+					if dayLimit.TransactionLimit != nil && payment.SumPayments(payments)+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*dayLimit.TransactionLimit) {
 						return s.reject(ctx, p, RejectionPeriodValueLimitExceeded, "sweeping payment amount is greater than the configured daily limit amount in the consent")
 					}
 				}
@@ -743,14 +763,19 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 					today := timeutil.BrazilDateNow()
 					startOfWeek := today.StartOfWeek()
 					endOfWeek := today.EndOfWeek()
-					numberOfPayments, currentAmount, err := s.currentAmount(ctx, c, &startOfWeek, &endOfWeek)
+					payments, err := s.payments(ctx, c.OrgID, &Filter{
+						ConsentID: c.ID.String(),
+						Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
+						From:      &startOfWeek,
+						To:        &endOfWeek,
+					})
 					if err != nil {
 						return err
 					}
-					if weekLimit.Quantity != nil && numberOfPayments+1 > *weekLimit.Quantity {
+					if weekLimit.Quantity != nil && len(payments)+1 > *weekLimit.Quantity {
 						return s.reject(ctx, p, RejectionPeriodQuantityLimitExceeded, "sweeping payment amount is greater than the configured weekly limit quantity in the consent")
 					}
-					if weekLimit.TransactionLimit != nil && currentAmount+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*weekLimit.TransactionLimit) {
+					if weekLimit.TransactionLimit != nil && payment.SumPayments(payments)+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*weekLimit.TransactionLimit) {
 						return s.reject(ctx, p, RejectionPeriodValueLimitExceeded, "sweeping payment amount is greater than the configured weekly limit amount in the consent")
 					}
 				}
@@ -759,14 +784,19 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 					today := timeutil.BrazilDateNow()
 					startOfMonth := today.StartOfMonth()
 					endOfMonth := today.EndOfMonth()
-					numberOfPayments, currentAmount, err := s.currentAmount(ctx, c, &startOfMonth, &endOfMonth)
+					payments, err := s.payments(ctx, c.OrgID, &Filter{
+						ConsentID: c.ID.String(),
+						Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
+						From:      &startOfMonth,
+						To:        &endOfMonth,
+					})
 					if err != nil {
 						return err
 					}
-					if monthLimit.Quantity != nil && numberOfPayments+1 > *monthLimit.Quantity {
+					if monthLimit.Quantity != nil && len(payments)+1 > *monthLimit.Quantity {
 						return s.reject(ctx, p, RejectionPeriodQuantityLimitExceeded, "sweeping payment amount is greater than the configured monthly limit quantity in the consent")
 					}
-					if monthLimit.TransactionLimit != nil && currentAmount+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*monthLimit.TransactionLimit) {
+					if monthLimit.TransactionLimit != nil && payment.SumPayments(payments)+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*monthLimit.TransactionLimit) {
 						return s.reject(ctx, p, RejectionPeriodValueLimitExceeded, "sweeping payment amount is greater than the configured monthly limit amount in the consent")
 					}
 				}
@@ -775,14 +805,19 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 					today := timeutil.BrazilDateNow()
 					startOfYear := today.StartOfYear()
 					endOfYear := today.EndOfYear()
-					numberOfPayments, currentAmount, err := s.currentAmount(ctx, c, &startOfYear, &endOfYear)
+					payments, err := s.payments(ctx, c.OrgID, &Filter{
+						ConsentID: c.ID.String(),
+						Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
+						From:      &startOfYear,
+						To:        &endOfYear,
+					})
 					if err != nil {
 						return err
 					}
-					if yearLimit.Quantity != nil && numberOfPayments+1 > *yearLimit.Quantity {
+					if yearLimit.Quantity != nil && len(payments)+1 > *yearLimit.Quantity {
 						return s.reject(ctx, p, RejectionPeriodQuantityLimitExceeded, "sweeping payment amount is greater than the configured yearly limit quantity in the consent")
 					}
-					if yearLimit.TransactionLimit != nil && currentAmount+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*yearLimit.TransactionLimit) {
+					if yearLimit.TransactionLimit != nil && payment.SumPayments(payments)+payment.ConvertAmount(p.Amount) > payment.ConvertAmount(*yearLimit.TransactionLimit) {
 						return s.reject(ctx, p, RejectionPeriodValueLimitExceeded, "sweeping payment amount is greater than the configured yearly limit amount in the consent")
 					}
 				}
@@ -794,12 +829,18 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 		}
 
 		if c.EnrollmentDailyLimit != nil {
-			_, currentAmount, err := s.currentAmount(ctx, c, nil, nil)
+			today := timeutil.BrazilDateNow()
+			payments, err := s.payments(ctx, c.OrgID, &Filter{
+				EnrollmentID: p.EnrollmentID.String(),
+				Statuses:     []payment.Status{payment.StatusACSC, payment.StatusSCHD},
+				From:         &today,
+				To:           &today,
+			})
 			if err != nil {
 				return err
 			}
-			if payment.ConvertAmount(p.Amount)+currentAmount > payment.ConvertAmount(*c.EnrollmentDailyLimit) {
-				return s.reject(ctx, p, RejectionTransactionValueLimitExceeded, "payment amount is greater than the configured daily limit in the consent")
+			if payment.ConvertAmount(p.Amount)+payment.SumPayments(payments) > payment.ConvertAmount(*c.EnrollmentDailyLimit) {
+				return s.reject(ctx, p, RejectionTransactionValueLimitExceeded, "payment amount goes beyond the configured daily limit in the consent")
 			}
 		}
 
@@ -881,25 +922,6 @@ func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCod
 	return s.updateStatus(ctx, p, payment.StatusRJCT)
 }
 
-func (s Service) currentAmount(ctx context.Context, c *Consent, from *timeutil.BrazilDate, to *timeutil.BrazilDate) (int, float64, error) {
-	payments, err := s.payments(ctx, c.OrgID, &Filter{
-		ConsentID: c.ID.String(),
-		Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
-		From:      from,
-		To:        to,
-	})
-	if err != nil {
-		return 0, 0.0, nil
-	}
-
-	amount := 0.0
-	for _, p := range payments {
-		amount += payment.ConvertAmount(p.Amount)
-	}
-
-	return len(payments), amount, nil
-}
-
 func (s Service) payments(ctx context.Context, orgID string, opts *Filter) ([]*Payment, error) {
 	if opts == nil {
 		opts = &Filter{}
@@ -951,6 +973,18 @@ func (s Service) cancel(ctx context.Context, p *Payment, from payment.CancelledF
 func (s Service) updateStatus(ctx context.Context, p *Payment, status payment.Status) error {
 	slog.DebugContext(ctx, "updating payment status", "current_status", p.Status, "new_status", status)
 
+	p.Status = status
+	p.StatusUpdatedAt = timeutil.DateTimeNow()
+	p.UpdatedAt = timeutil.DateTimeNow()
+	err := s.db.WithContext(ctx).
+		Model(&Payment{}).
+		Omit("ID", "CreatedAt", "OrgID").
+		Where("id = ? AND org_id = ?", p.ID, p.OrgID).
+		Updates(p).Error
+	if err != nil {
+		return fmt.Errorf("could not update payment status: %w", err)
+	}
+
 	if slices.Contains([]payment.Status{
 		payment.StatusPDNG,
 		payment.StatusSCHD,
@@ -958,31 +992,45 @@ func (s Service) updateStatus(ctx context.Context, p *Payment, status payment.St
 		payment.StatusRJCT,
 		payment.StatusCANC,
 	}, status) {
-		// TODO. Implement this.
-		defer s.webhookService.Notify(ctx, p.ClientID, "")
+		slog.DebugContext(ctx, "notifying client about recurring payment status change")
+		s.webhookService.Notify(ctx, p.ClientID, "/automatic-payments/"+s.version+"/pix/recurring-payments/"+p.ID.String())
 	}
 
-	p.Status = status
-	p.StatusUpdatedAt = timeutil.DateTimeNow()
-	p.UpdatedAt = timeutil.DateTimeNow()
-	return s.db.WithContext(ctx).
-		Model(&Payment{}).
-		Omit("ID", "CreatedAt", "OrgID").
-		Where("id = ? AND org_id = ?", p.ID, p.OrgID).
-		Updates(p).Error
+	return nil
 }
 
 func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status ConsentStatus) error {
+	oldStatus := c.Status
+	slog.DebugContext(ctx, "updating recurring payment consent status", "current_status", oldStatus, "new_status", status)
+
 	c.Status = status
 	c.StatusUpdatedAt = timeutil.DateTimeNow()
-	return s.updateConsent(ctx, c)
+	if err := s.updateConsent(ctx, c); err != nil {
+		return fmt.Errorf("could not update consent status: %w", err)
+	}
+
+	if slices.Contains([]ConsentStatus{
+		ConsentStatusRejected,
+		ConsentStatusRevoked,
+		ConsentStatusConsumed,
+	}, status) || (oldStatus == ConsentStatusPartiallyAccepted && status == ConsentStatusAuthorized) {
+		slog.DebugContext(ctx, "notifying client about recurring payment consent status change")
+		s.webhookService.Notify(ctx, c.ClientID, "/automatic-payments/"+s.version+"/recurring-consents/"+c.URN())
+	}
+
+	return nil
 }
 
 func (s Service) updateConsent(ctx context.Context, c *Consent) error {
 	c.UpdatedAt = timeutil.DateTimeNow()
-	return s.db.WithContext(ctx).
+	err := s.db.WithContext(ctx).
 		Model(&Consent{}).
 		Omit("ID", "CreatedAt", "OrgID").
 		Where("id = ? AND org_id = ?", c.ID, c.OrgID).
 		Updates(c).Error
+	if err != nil {
+		return fmt.Errorf("could not update consent: %w", err)
+	}
+
+	return nil
 }

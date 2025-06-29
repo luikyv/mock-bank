@@ -126,10 +126,7 @@
       "discoveryUrl": "https://auth.mockbank.local/.well-known/openid-configuration"
     },
     "resource": {
-        "resourceUrl": "https://matls-api.mockbank.local/open-banking/payments/v3/pix/payments",
-        "consentUrl": "https://matls-api.mockbank.local/open-banking/payments/v3/consents",
-        "enrollmentsUrl": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments",
-        "webhookWaitTime": "5",
+        "consentUrl": "https://matls-api.mockbank.local/open-banking/payments/v4/consents",
         "brazilPaymentConsent": {
             "data": {
                 "loggedUser": {
@@ -167,6 +164,7 @@
                 }
             }
         },
+        "brazilOrganizationId": "00000000-0000-0000-0000-000000000000",
         "brazilQrdnPaymentConsent": {
             "data": {
                 "loggedUser": {
@@ -206,21 +204,18 @@
                 }
             }
         },
-        "brazilCpf": "76109277673",
-        "brazilOrganizationId": "00000000-0000-0000-0000-000000000000",
+        "brazilQrdnCnpj": "43142666000197",
         "loggedUserIdentification": "76109277673",
         "debtorAccountIspb": "12345678",
         "debtorAccountIssuer": "1774",
         "debtorAccountNumber": "94088392",
         "debtorAccountType": "CACC",
-        "paymentAmount": "100.00"
+        "paymentAmount": "1333.00"
     },
     "conditionalResources": {
-        "brazilCpfJointAccount": "87517400444"
+        "brazilCpfTemporization": "76109277673"
     },
-    "consent": {
-        "productType": "personal"
-    },
+    "consent": {},
     "directory": {
       "keystore": "https://keystore.local/",
       "discoveryUrl": "https://directory.local/.well-known/openid-configuration",

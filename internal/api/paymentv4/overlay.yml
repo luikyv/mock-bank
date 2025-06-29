@@ -38,6 +38,9 @@ actions:
     x-go-type-import:
       path: github.com/luikyv/mock-bank/internal/payment
 
+- target: $.components.schemas.CreatePixPayment.properties.data.items.required
+  remove: true
+
 - target: $.components.responses[*].headers.x-fapi-interaction-id
   remove: true
 

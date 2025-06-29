@@ -19,7 +19,7 @@ import (
 const (
 	CredentialRegistrationTimeout = 300 * time.Second
 	URNPrefix                     = "urn:mockbank:enrollment:"
-	defaultDailyLimit             = "199.00"
+	defaultDailyLimit             = "500.00"
 	defaultTransactionLimit       = "100.00"
 )
 

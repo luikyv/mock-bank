@@ -35,8 +35,8 @@ func NewServer(host string, service consent.Service, op *provider.Provider) Serv
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	consentMux := http.NewServeMux()
 
-	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, consent.Scope)
-	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, consent.ScopeID)
+	clientCredentialsAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantClientCredentials, consent.Scope)
+	authCodeAuthMiddleware := oidc.AuthMiddleware(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)
 	swaggerMiddleware, _ := api.SwaggerMiddleware(GetSwagger, func(err error) string { return "PARAMETRO_INVALIDO" })
 
 	wrapper := ServerInterfaceWrapper{

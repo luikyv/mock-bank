@@ -169,7 +169,11 @@ func main() {
 	slog.Info("starting mock bank")
 
 	if Env == LocalEnvironment {
-		go pollRecurringPayments(ctx, autoPaymentService, time.NewTicker(time.Second*15))
+		go pollRecurringPayments(ctx, autoPaymentService, time.NewTicker(time.Second*10))
+		go func() {
+			time.Sleep(time.Second * 5)
+			pollPayments(ctx, paymentService, time.NewTicker(time.Second*10))
+		}()
 
 		if err := http.ListenAndServe(":"+Port, handler); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
@@ -221,6 +225,14 @@ func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sql.DB from gorm DB: %w", err)
+	}
+	if err := sqlDB.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	slog.Info("successfully connected to database")
@@ -510,6 +522,27 @@ func pollRecurringPayments(ctx context.Context, service autopayment.Service, tic
 				payment.StatusSCHD,
 			}}); err != nil {
 				slog.ErrorContext(ctx, "error polling the recurring payments", "error", err)
+			}
+		}
+	}
+}
+
+func pollPayments(ctx context.Context, service payment.Service, ticker *time.Ticker) {
+	for {
+		select {
+		case <-ctx.Done():
+			slog.InfoContext(ctx, "finished polling payments")
+			return
+		case <-ticker.C:
+			slog.InfoContext(ctx, "polling payments")
+			if _, err := service.Payments(ctx, OrgID, &payment.Filter{Statuses: []payment.Status{
+				payment.StatusRCVD,
+				payment.StatusACCP,
+				payment.StatusACPD,
+				payment.StatusPDNG,
+				payment.StatusSCHD,
+			}}); err != nil {
+				slog.ErrorContext(ctx, "error polling the payments", "error", err)
 			}
 		}
 	}

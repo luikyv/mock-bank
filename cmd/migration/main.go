@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"time"
@@ -17,13 +16,10 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	migratepostgres "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
-	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/client"
 	"github.com/luikyv/mock-bank/internal/oidc"
 	"github.com/luikyv/mock-bank/internal/timeutil"
-	"github.com/luikyv/mock-bank/internal/user"
 	gormpostgres "gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -54,7 +50,8 @@ func main() {
 	slog.Info("secrets manager client created")
 	db, err := dbConnection(ctx, secretsClient)
 	if err != nil {
-		log.Fatalf("failed connecting to database: %v\n", err)
+		slog.Error("failed connecting to database", "error", err)
+		os.Exit(1)
 	}
 
 	// Migrations.
@@ -64,14 +61,16 @@ func main() {
 	}
 	slog.Info("running database migrations")
 	if err := runMigrations(db, migrationsPath); err != nil {
-		log.Fatalf("failed to run migrations: %v\n", err)
+		slog.Error("failed to run migrations", "error", err)
+		os.Exit(1)
 	}
 	slog.Info("migrations completed successfully")
 
 	// Seed database.
 	slog.Info("seeding database")
 	if err := seedDatabase(ctx, db); err != nil {
-		log.Fatalf("failed to seed database: %v\n", err)
+		slog.Error("failed to seed database", "error", err)
+		os.Exit(1)
 	}
 	slog.Info("database seeding completed successfully")
 }
@@ -92,7 +91,7 @@ func runMigrations(db *gorm.DB, migrationsPath string) error {
 		return fmt.Errorf("failed to create migrate instance: %w", err)
 	}
 
-	slog.Info("running golang-migrate migrations")
+	slog.Info("running migrations")
 	if err := m.Up(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
 			slog.Info("no migrations to run")
@@ -114,44 +113,6 @@ func seedDatabase(ctx context.Context, db *gorm.DB) error {
 		if err := createOAuthClients(ctx, db); err != nil {
 			return fmt.Errorf("failed to create OAuth client: %w", err)
 		}
-	}
-
-	return nil
-}
-
-func seedRalphBragg(ctx context.Context, db *gorm.DB) error {
-	cnpj := "50685362006773"
-	testUser := &user.User{
-		ID:        uuid.MustParse("11111111-1111-1111-1111-111111111111"),
-		Username:  "ralph.bragg@gmail.com",
-		Name:      "Ralph Bragg",
-		CPF:       "76109277673",
-		CNPJ:      &cnpj,
-		UpdatedAt: timeutil.DateTimeNow(),
-		OrgID:     OrgID,
-	}
-
-	if err := db.WithContext(ctx).Omit("CreatedAt").Save(testUser).Error; err != nil {
-		return fmt.Errorf("failed to create test user: %w", err)
-	}
-
-	testAccount := &account.Account{
-		ID:                          uuid.MustParse("291e5a29-49ed-401f-a583-193caa7aceee"),
-		UserID:                      testUser.ID,
-		Number:                      "94088392",
-		Type:                        account.TypeCheckingAccount,
-		SubType:                     account.SubTypeIndividual,
-		AvailableAmount:             "100000000.04",
-		BlockedAmount:               "12345.01",
-		AutomaticallyInvestedAmount: "15000.00",
-		OverdraftLimitContracted:    "99.99",
-		OverdraftLimitUsed:          "10000.99",
-		OverdraftLimitUnarranged:    "99.99",
-		OrgID:                       OrgID,
-	}
-
-	if err := db.WithContext(ctx).Omit("CreatedAt").Save(testAccount).Error; err != nil {
-		return fmt.Errorf("failed to create test account: %w", err)
 	}
 
 	return nil
@@ -205,7 +166,8 @@ func awsConfig(ctx context.Context) *aws.Config {
 
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
-		log.Fatalf("unable to load aws config, %v\n", err)
+		slog.Error("unable to load aws config", "error", err)
+		os.Exit(1)
 	}
 
 	if Env == LocalEnvironment {
@@ -255,6 +217,14 @@ func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sql.DB from gorm DB: %w", err)
+	}
+	if err := sqlDB.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	slog.Info("successfully connected to database")

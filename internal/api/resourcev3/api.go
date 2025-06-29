@@ -56,7 +56,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	handler = http.HandlerFunc(wrapper.ResourcesGetResources)
 	handler = consent.PermissionMiddleware(s.consentService, consent.PermissionResourcesRead)(handler)
-	handler = oidc.AuthMiddleware(s.op, goidc.ScopeOpenID, consent.ScopeID)(handler)
+	handler = oidc.AuthMiddleware(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)(handler)
 	resourceMux.Handle("GET /resources", handler)
 
 	mux.Handle("/open-banking/resources/v3/", http.StripPrefix("/open-banking/resources/v3", resourceMux))

@@ -63,6 +63,10 @@ func (Payment) TableName() string {
 	return "recurring_payments"
 }
 
+func (p Payment) PaymentAmount() string {
+	return p.Amount
+}
+
 type Consent struct {
 	ID                         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Status                     ConsentStatus
@@ -286,10 +290,11 @@ type Query struct {
 }
 
 type Filter struct {
-	ConsentID string
-	Statuses  []payment.Status
-	From      *timeutil.BrazilDate
-	To        *timeutil.BrazilDate
+	ConsentID    string
+	EnrollmentID string
+	Statuses     []payment.Status
+	From         *timeutil.BrazilDate
+	To           *timeutil.BrazilDate
 }
 
 // URLQuery returns a URL query string with the filter parameters.

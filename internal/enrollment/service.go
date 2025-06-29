@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ type Service struct {
 	paymentService     payment.Service
 	autopaymentService autopayment.Service
 	webhookService     webhook.Service
+	version            string
 }
 
 func NewService(
@@ -46,7 +48,13 @@ func NewService(
 		paymentService:     paymentService,
 		autopaymentService: autopaymentService,
 		webhookService:     webhookService,
+		version:            "v0",
 	}
+}
+
+func (s Service) WithVersion(version string) Service {
+	s.version = version
+	return s
 }
 
 func (s Service) Create(ctx context.Context, e *Enrollment, debtorAcc *payment.Account) error {
@@ -216,6 +224,7 @@ func (s Service) InitAuthorization(
 	challenge := generateChallenge()
 	enrollmentOpts := payment.EnrollmentOptions{
 		EnrollmentID:           e.ID,
+		DebtorAccountID:        e.DebtorAccountID,
 		UserIdentification:     e.UserIdentification,
 		BusinessIdentification: e.BusinessIdentification,
 		Challenge:              challenge,
@@ -414,7 +423,15 @@ func (s Service) runPostCreationAutomations(ctx context.Context, e *Enrollment) 
 func (s Service) updateStatus(ctx context.Context, e *Enrollment, status Status) error {
 	e.Status = status
 	e.StatusUpdatedAt = timeutil.DateTimeNow()
-	return s.update(ctx, e)
+	if err := s.update(ctx, e); err != nil {
+		return fmt.Errorf("could not update enrollment status: %w", err)
+	}
+
+	if slices.Contains([]Status{StatusRejected, StatusRevoked}, status) {
+		s.webhookService.Notify(ctx, e.ClientID, "/enrollments/"+s.version+"/enrollments/"+e.URN())
+	}
+
+	return nil
 }
 
 func (s Service) update(ctx context.Context, e *Enrollment) error {

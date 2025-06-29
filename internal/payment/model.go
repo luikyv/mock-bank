@@ -55,6 +55,10 @@ func (Payment) TableName() string {
 	return "payments"
 }
 
+func (p Payment) PaymentAmount() string {
+	return p.Amount
+}
+
 type Status string
 
 const (
@@ -341,6 +345,7 @@ type EnrollmentOptions struct {
 	EnrollmentID           uuid.UUID
 	UserIdentification     string
 	BusinessIdentification *string
+	DebtorAccountID        *uuid.UUID
 	Challenge              string
 	TransactionLimit       string
 	DailyLimit             string
@@ -368,8 +373,9 @@ func parseWeekday(weekDay DayOfWeek) time.Weekday {
 }
 
 type Filter struct {
-	ConsentID string
-	Statuses  []Status
-	From      *timeutil.BrazilDate
-	To        *timeutil.BrazilDate
+	ConsentID    string
+	EnrollmentID string
+	Statuses     []Status
+	From         *timeutil.BrazilDate
+	To           *timeutil.BrazilDate
 }

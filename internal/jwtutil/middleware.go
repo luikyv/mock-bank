@@ -90,8 +90,12 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 			return
 		}
 
+		if jwtClaims.Issuer != clientOrgID {
+			api.WriteError(w, r, api.NewError("FORBIDDEN", http.StatusForbidden, "iss claim does not match the client org id"))
+			return
+		}
+
 		if err := jwtClaims.Validate(jwt.Expected{
-			Issuer:      clientOrgID,
 			AnyAudience: []string{baseURL + r.URL.Path},
 		}); err != nil {
 			slog.InfoContext(r.Context(), "invalid jwt claims", slog.String("error", err.Error()))

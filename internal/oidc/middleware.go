@@ -16,7 +16,7 @@ func CertCNMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cert, err := ClientCert(r)
 		if err != nil {
-			slog.ErrorContext(r.Context(), "could not get client certificate", "error", err.Error())
+			slog.ErrorContext(r.Context(), "could not get client certificate", "error", err)
 			api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid certificate: could not get client certificate").Pagination(true))
 			return
 		}
@@ -28,14 +28,14 @@ func CertCNMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func AuthMiddleware(op *provider.Provider, scopes ...goidc.Scope) func(http.Handler) http.Handler {
+func AuthMiddleware(op *provider.Provider, grantType goidc.GrantType, scopes ...goidc.Scope) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
 			tokenInfo, err := op.TokenInfoFromRequest(w, r)
 			if err != nil {
-				slog.InfoContext(r.Context(), "the token is not active", "error", err.Error())
+				slog.InfoContext(ctx, "the token is not active", "error", err)
 				api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(true))
 				return
 			}
@@ -46,9 +46,26 @@ func AuthMiddleware(op *provider.Provider, scopes ...goidc.Scope) func(http.Hand
 			ctx = context.WithValue(ctx, api.CtxKeyOrgID, tokenInfo.AdditionalTokenClaims[OrgIDKey])
 			r = r.WithContext(ctx)
 
+			switch grantType {
+			case goidc.GrantClientCredentials:
+				// Client credentials tokens are issued for the client itself, so the subject must be the client ID.
+				if tokenInfo.Subject != tokenInfo.ClientID {
+					slog.InfoContext(ctx, "invalid token grant type, client credentials is required", "sub", tokenInfo.Subject, "client_id", tokenInfo.ClientID)
+					api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token grant type, client credentials is required").Pagination(true))
+					return
+				}
+			case goidc.GrantAuthorizationCode:
+				// Authorization code tokens are issued for a user, so the subject must not be the client ID.
+				if tokenInfo.Subject == tokenInfo.ClientID {
+					slog.InfoContext(ctx, "invalid token grant type, authorization code is required", "sub", tokenInfo.Subject, "client_id", tokenInfo.ClientID)
+					api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token grant type, authorization code is required").Pagination(true))
+					return
+				}
+			}
+
 			tokenScopes := strings.Split(tokenInfo.Scopes, " ")
 			if !areScopesValid(scopes, tokenScopes) {
-				slog.InfoContext(r.Context(), "invalid scopes", "token_scopes", tokenInfo.Scopes)
+				slog.InfoContext(ctx, "invalid scopes", "token_scopes", tokenInfo.Scopes)
 				api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "token missing scopes").Pagination(true))
 				return
 			}
@@ -56,7 +73,6 @@ func AuthMiddleware(op *provider.Provider, scopes ...goidc.Scope) func(http.Hand
 			next.ServeHTTP(w, r)
 		})
 	}
-
 }
 
 // areScopesValid verifies every scope in requiredScopes has a match among scopes.
