@@ -156,6 +156,29 @@
           </ul>
         </div>
         {{ end }}
+
+        {{ if .Loans }}
+        <div class="section">
+          <div class="section-header" id="loanSectionToggle">
+            <h3>Loans</h3>
+            <label class="checkbox">
+              <input type="checkbox" id="loansToggle" checked />
+              Enable All
+            </label>
+          </div>
+          <ul id="loansList" class="accounts-list show">
+            {{ range .Loans }}
+            <li>
+              <label class="checkbox">
+                <input type="checkbox" name="loans" value="{{ .ID }}" checked class="loan-checkbox" />
+                Contract: {{ .Number }}, Amount: {{ .Amount }} {{ .Currency }}
+              </label>
+            </li>
+            {{ end }}
+          </ul>
+        </div>
+        {{ end }}
+
         <input type="hidden" name="consent" value="true" />
         <button type="submit" class="consent-button">Consent and Continue</button>
       </form>
@@ -187,19 +210,49 @@
         master.indeterminate = !all && !none;
       }
 
+      function toggleLoanList() {
+        document.getElementById("loansList").classList.toggle("show");
+      }
+
+      function toggleAllLoans() {
+        const master = document.getElementById("loansToggle");
+        const boxes = document.querySelectorAll(".loan-checkbox");
+        boxes.forEach((cb) => (cb.checked = master.checked));
+        master.indeterminate = false;
+      }
+
+      function updateLoansToggle() {
+        const master = document.getElementById("loansToggle");
+        const boxes = Array.from(document.querySelectorAll(".loan-checkbox"));
+        const all = boxes.every((cb) => cb.checked);
+        const none = boxes.every((cb) => !cb.checked);
+        master.checked = all;
+        master.indeterminate = !all && !none;
+      }
+
       document.addEventListener("DOMContentLoaded", () => {
         updateAccountsToggle();
+        updateLoansToggle();
 
         document.getElementById("accountSectionToggle")?.addEventListener("click", toggleAccountList);
+        document.getElementById("loanSectionToggle")?.addEventListener("click", toggleLoanList);
 
         document.getElementById("accountsToggle")?.addEventListener("click", (e) => {
           e.stopPropagation();
           toggleAllAccounts();
         });
+        document.getElementById("loansToggle")?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          toggleAllLoans();
+        });
+
         document.querySelectorAll(".account-checkbox").forEach((cb) => cb.addEventListener("change", updateAccountsToggle));
+        document.querySelectorAll(".loan-checkbox").forEach((cb) => cb.addEventListener("change", updateLoansToggle));
 
         // prevent label click from toggling list
-        document.querySelector(".section-header label.checkbox")?.addEventListener("click", (e) => e.stopPropagation());
+        document.querySelectorAll(".section-header label.checkbox").forEach((label) =>
+          label.addEventListener("click", (e) => e.stopPropagation())
+        );
       });
     </script>
   </body>

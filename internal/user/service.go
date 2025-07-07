@@ -7,7 +7,9 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/luikyv/mock-bank/internal/page"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -21,8 +23,14 @@ func NewService(db *gorm.DB, mockOrgID string) Service {
 }
 
 func (s Service) Create(ctx context.Context, u *User) error {
+	u.CreatedAt = timeutil.DateTimeNow()
+	u.UpdatedAt = timeutil.DateTimeNow()
 	if err := s.db.WithContext(ctx).Create(u).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrAlreadyExists
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return ErrAlreadyExists
 		}
 		return err
@@ -31,6 +39,7 @@ func (s Service) Create(ctx context.Context, u *User) error {
 }
 
 func (s Service) Update(ctx context.Context, u *User) error {
+	u.UpdatedAt = timeutil.DateTimeNow()
 	tx := s.db.WithContext(ctx).
 		Model(&User{}).
 		Omit("ID", "CreatedAt", "OrgID").
@@ -38,6 +47,10 @@ func (s Service) Update(ctx context.Context, u *User) error {
 		Updates(u)
 	if err := tx.Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrAlreadyExists
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return ErrAlreadyExists
 		}
 		return err
@@ -48,7 +61,7 @@ func (s Service) Update(ctx context.Context, u *User) error {
 
 func (s Service) User(ctx context.Context, query Query, orgID string) (*User, error) {
 	u := &User{}
-	dbQuery := s.db.WithContext(ctx).Where("org_id = ? OR org_id = ?", orgID, s.mockOrgID)
+	dbQuery := s.db.WithContext(ctx).Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID)
 	if query.ID != "" {
 		dbQuery = dbQuery.Where("id = ?", query.ID)
 	}
@@ -57,6 +70,9 @@ func (s Service) User(ctx context.Context, query Query, orgID string) (*User, er
 	}
 	if query.Username != "" {
 		dbQuery = dbQuery.Where("username = ?", query.Username)
+	}
+	if query.CNPJ != "" {
+		dbQuery = dbQuery.Where("cnpj = ?", query.CNPJ)
 	}
 
 	if err := dbQuery.First(u).Error; err != nil {
@@ -69,7 +85,7 @@ func (s Service) User(ctx context.Context, query Query, orgID string) (*User, er
 }
 
 func (s Service) Users(ctx context.Context, orgID string, pag page.Pagination) (page.Page[*User], error) {
-	query := s.db.WithContext(ctx).Model(&User{}).Where("org_id = ? OR org_id = ?", orgID, s.mockOrgID)
+	query := s.db.WithContext(ctx).Model(&User{}).Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID)
 
 	var users []*User
 	if err := query.
@@ -92,7 +108,9 @@ func (s Service) Delete(ctx context.Context, id uuid.UUID, orgID string) error {
 	return s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).Delete(&User{}).Error
 }
 
-func (s Service) UserBusiness(ctx context.Context, userID, cnpj, orgID string) (*User, error) {
+// Business retrieves and returns the business user entity associated with the specified user ID and CNPJ.
+// It performs access control validation to ensure the user has permission to access the requested business.
+func (s Service) Business(ctx context.Context, userID, cnpj, orgID string) (*User, error) {
 	business, err := s.User(ctx, Query{CNPJ: cnpj}, orgID)
 	if err != nil {
 		return nil, err
@@ -115,8 +133,8 @@ func (s Service) UserBusiness(ctx context.Context, userID, cnpj, orgID string) (
 	return business, nil
 }
 
-func (s Service) BindUserToBusiness(ctx context.Context, userID, businessUserID uuid.UUID, orgID string) error {
-	business, err := s.User(ctx, Query{ID: businessUserID.String()}, orgID)
+func (s Service) BindUserToBusiness(ctx context.Context, userID, businessID uuid.UUID, orgID string) error {
+	business, err := s.User(ctx, Query{ID: businessID.String()}, orgID)
 	if err != nil {
 		return err
 	}

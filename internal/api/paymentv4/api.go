@@ -9,28 +9,36 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/luikyv/mock-bank/internal/bank"
 	"github.com/luikyv/mock-bank/internal/enrollment"
 
 	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
-	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/api"
 	"github.com/luikyv/mock-bank/internal/api/middleware"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/errorutil"
 	"github.com/luikyv/mock-bank/internal/idempotency"
+	"github.com/luikyv/mock-bank/internal/jwtutil"
 	"github.com/luikyv/mock-bank/internal/payment"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 var _ StrictServerInterface = Server{}
 
+type BankConfig interface {
+	Host() string
+	ISPB() string
+	IBGETownCode() string
+	AccountBranch() string
+}
+
 type Server struct {
+	config             BankConfig
 	baseURL            string
 	service            payment.Service
 	idempotencyService idempotency.Service
+	jwtService         jwtutil.Service
 	op                 *provider.Provider
 	keystoreHost       string
 	orgID              string
@@ -38,18 +46,22 @@ type Server struct {
 }
 
 func NewServer(
-	host string,
+	config BankConfig,
 	service payment.Service,
 	idempotencyService idempotency.Service,
+	jwtService jwtutil.Service,
 	op *provider.Provider,
 	keystoreHost string,
 	orgID string,
 	signer crypto.Signer,
 ) Server {
+	service = service.WithVersion("v4")
 	return Server{
-		baseURL:            host + "/open-banking/payments/v4",
+		config:             config,
+		baseURL:            config.Host() + "/open-banking/payments/v4",
 		service:            service,
 		idempotencyService: idempotencyService,
+		jwtService:         jwtService,
 		op:                 op,
 		keystoreHost:       keystoreHost,
 		orgID:              orgID,
@@ -60,7 +72,7 @@ func NewServer(
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	paymentMux := http.NewServeMux()
 
-	jwtMiddleware := middleware.JWT(s.baseURL, s.orgID, s.keystoreHost, s.signer)
+	jwtMiddleware := middleware.JWT(s.baseURL, s.orgID, s.keystoreHost, s.signer, s.jwtService)
 	idempotencyMiddleware := middleware.Idempotency(s.idempotencyService)
 	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, payment.Scope)
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID)
@@ -118,7 +130,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = clientCredentialsAuthMiddleware(handler)
 	paymentMux.Handle("PATCH /pix/payments/{paymentId}", handler)
 
-	handler = middleware.FAPIID(nil)(paymentMux)
+	handler = middleware.FAPIID()(paymentMux)
 	mux.Handle("/open-banking/payments/v4/", http.StripPrefix("/open-banking/payments/v4", handler))
 }
 
@@ -253,9 +265,9 @@ func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsen
 	}
 
 	if c.DebtorAccount != nil {
-		branch := account.DefaultBranch
+		branch := s.config.AccountBranch()
 		resp.Data.DebtorAccount = &ConsentsDebtorAccount{
-			Ispb:        bank.ISPB,
+			Ispb:        s.config.ISPB(),
 			Issuer:      &branch,
 			Number:      c.DebtorAccount.Number,
 			AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(c.DebtorAccount.Type)),
@@ -342,9 +354,9 @@ func (s Server) PaymentsGetConsentsConsentID(ctx context.Context, req PaymentsGe
 	}
 
 	if c.DebtorAccount != nil {
-		branch := account.DefaultBranch
+		branch := s.config.AccountBranch()
 		resp.Data.DebtorAccount = &ConsentsDebtorAccount{
-			Ispb:        bank.ISPB,
+			Ispb:        s.config.ISPB(),
 			Issuer:      &branch,
 			Number:      c.DebtorAccount.Number,
 			AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(c.DebtorAccount.Type)),
@@ -420,7 +432,7 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 		return nil, err
 	}
 
-	branch := account.DefaultBranch
+	branch := s.config.AccountBranch()
 	resp := ResponseCreatePixPayment{
 		Links: *api.NewLinks(s.baseURL + "/pix/payments/" + payments[0].ID.String()),
 		Meta:  *api.NewMeta(),
@@ -476,7 +488,7 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 			TransactionIdentification: p.TransactionIdentification,
 			DebtorAccount: DebtorAccount{
 				AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(p.DebtorAccount.Type)),
-				Ispb:        bank.ISPB,
+				Ispb:        s.config.ISPB(),
 				Issuer:      &branch,
 				Number:      p.DebtorAccount.Number,
 			},
@@ -522,7 +534,7 @@ func (s Server) PaymentsGetPixPaymentsPaymentID(ctx context.Context, req Payment
 		return nil, err
 	}
 
-	branch := account.DefaultBranch
+	branch := s.config.AccountBranch()
 	resp := ResponsePixPayment{
 		Data: ResponsePixPaymentData{
 			PaymentID:        p.ID.String(),
@@ -552,7 +564,7 @@ func (s Server) PaymentsGetPixPaymentsPaymentID(ctx context.Context, req Payment
 			TransactionIdentification: p.TransactionIdentification,
 			DebtorAccount: DebtorAccount{
 				AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(p.DebtorAccount.Type)),
-				Ispb:        bank.ISPB,
+				Ispb:        s.config.ISPB(),
 				Issuer:      &branch,
 				Number:      p.DebtorAccount.Number,
 			},
@@ -592,7 +604,7 @@ func (s Server) PaymentsPatchPixPaymentsPaymentID(ctx context.Context, req Payme
 		return nil, err
 	}
 
-	branch := account.DefaultBranch
+	branch := s.config.AccountBranch()
 	resp := ResponsePatchPixPayment{
 		Data: ResponsePatchPixPaymentData{
 			PaymentID:        p.ID.String(),
@@ -622,7 +634,7 @@ func (s Server) PaymentsPatchPixPaymentsPaymentID(ctx context.Context, req Payme
 			TransactionIdentification: p.TransactionIdentification,
 			DebtorAccount: DebtorAccount{
 				AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(p.DebtorAccount.Type)),
-				Ispb:        bank.ISPB,
+				Ispb:        s.config.ISPB(),
 				Issuer:      &branch,
 				Number:      p.DebtorAccount.Number,
 			},

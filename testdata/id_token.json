@@ -1,6 +1,8 @@
 {
+  "aud": "mockbank",
+  "iss": "https://directory.local",
+  "nonce": "gXGldLyaaty",
   "sub": "admin",
-  "txn": "q0RwM_vzkv39zoa0nTJDDaJm_VHpHLzSheB7waKB-tT",
   "trust_framework_profile": {
     "basic_information": {
       "status": "Active",
@@ -22,7 +24,5 @@
     "super_user": true,
     "system_user": true
   },
-  "nonce": "gXGldLyaaty",
-  "aud": "mockbank",
-  "iss": "https://directory.local"
+  "txn": "q0RwM_vzkv39zoa0nTJDDaJm_VHpHLzSheB7waKB-tT"
 }

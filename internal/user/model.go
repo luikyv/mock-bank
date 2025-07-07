@@ -14,6 +14,7 @@ type User struct {
 	Description *string
 
 	OrgID     string
+	CrossOrg  bool
 	CreatedAt timeutil.DateTime
 	UpdatedAt timeutil.DateTime
 }

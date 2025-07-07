@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/luikyv/mock-bank/internal/api/middleware"
-	"github.com/luikyv/mock-bank/internal/bank"
 
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
@@ -21,16 +20,35 @@ import (
 
 var _ StrictServerInterface = Server{}
 
+type BankConfig interface {
+	Host() string
+	Brand() string
+	CNPJ() string
+	ISPB() string
+	IBGETownCode() string
+	Currency() string
+	AccountCompeCode() string
+	AccountBranch() string
+	AccountCheckDigit() string
+}
+
 type Server struct {
+	config         BankConfig
 	baseURL        string
 	service        account.Service
 	consentService consent.Service
 	op             *provider.Provider
 }
 
-func NewServer(host string, service account.Service, consentService consent.Service, op *provider.Provider) Server {
+func NewServer(
+	config BankConfig,
+	service account.Service,
+	consentService consent.Service,
+	op *provider.Provider,
+) Server {
 	return Server{
-		baseURL:        host + "/open-banking/accounts/v2",
+		config:         config,
+		baseURL:        config.Host() + "/open-banking/accounts/v2",
 		service:        service,
 		consentService: consentService,
 		op:             op,
@@ -49,10 +67,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 				writeResponseError(w, r, err, !strings.Contains(r.URL.Path, "/transactions-current"))
 			},
 		}),
-		HandlerMiddlewares: []MiddlewareFunc{
-			swaggerMiddleware,
-			middleware.FAPIID(nil),
-		},
+		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
@@ -90,7 +105,8 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = authCodeAuthMiddleware(handler)
 	accountMux.Handle("GET /accounts/{accountId}/transactions-current", handler)
 
-	mux.Handle("/open-banking/accounts/v2/", http.StripPrefix("/open-banking/accounts/v2", accountMux))
+	handler = middleware.FAPIID()(accountMux)
+	mux.Handle("/open-banking/accounts/v2/", http.StripPrefix("/open-banking/accounts/v2", handler))
 }
 
 func (s Server) AccountsGetAccounts(ctx context.Context, req AccountsGetAccountsRequestObject) (AccountsGetAccountsResponseObject, error) {
@@ -108,15 +124,15 @@ func (s Server) AccountsGetAccounts(ctx context.Context, req AccountsGetAccounts
 		Meta:  *api.NewPaginatedMeta(accs),
 		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts", accs),
 	}
-	defaultBranch := account.DefaultBranch
+	defaultBranch := s.config.AccountBranch()
 	for _, acc := range accs.Records {
 		resp.Data = append(resp.Data, AccountData{
 			AccountID:   acc.ID.String(),
 			BranchCode:  &defaultBranch,
-			BrandName:   bank.Brand,
-			CheckDigit:  account.DefaultCheckDigit,
-			CompanyCnpj: bank.CNPJ,
-			CompeCode:   account.DefaultCompeCode,
+			BrandName:   s.config.Brand(),
+			CheckDigit:  s.config.AccountCheckDigit(),
+			CompanyCnpj: s.config.CNPJ(),
+			CompeCode:   s.config.AccountCompeCode(),
 			Number:      acc.Number,
 			Type:        EnumAccountType(acc.Type),
 		})
@@ -134,13 +150,13 @@ func (s Server) AccountsGetAccountsAccountID(ctx context.Context, req AccountsGe
 		return nil, err
 	}
 
-	defaultBranch := account.DefaultBranch
+	defaultBranch := s.config.AccountBranch()
 	resp := ResponseAccountIdentification{
 		Data: AccountIdentificationData{
 			BranchCode: &defaultBranch,
-			CheckDigit: account.DefaultCheckDigit,
-			CompeCode:  account.DefaultCompeCode,
-			Currency:   bank.Currency,
+			CheckDigit: s.config.AccountCheckDigit(),
+			CompeCode:  s.config.AccountCompeCode(),
+			Currency:   s.config.Currency(),
 			Number:     acc.Number,
 			Subtype:    EnumAccountSubType(acc.SubType),
 			Type:       EnumAccountType(acc.Type),
@@ -164,15 +180,15 @@ func (s Server) AccountsGetAccountsAccountIDBalances(ctx context.Context, req Ac
 		Data: AccountBalancesData{
 			AutomaticallyInvestedAmount: AccountBalancesDataAutomaticallyInvestedAmount{
 				Amount:   acc.AvailableAmount,
-				Currency: bank.Currency,
+				Currency: s.config.Currency(),
 			},
 			AvailableAmount: AccountBalancesDataAvailableAmount{
 				Amount:   acc.AvailableAmount,
-				Currency: bank.Currency,
+				Currency: s.config.Currency(),
 			},
 			BlockedAmount: AccountBalancesDataBlockedAmount{
 				Amount:   acc.BlockedAmount,
-				Currency: bank.Currency,
+				Currency: s.config.Currency(),
 			},
 			UpdateDateTime: acc.UpdatedAt,
 		},
@@ -198,19 +214,19 @@ func (s Server) AccountsGetAccountsAccountIDOverdraftLimits(ctx context.Context,
 	if acc.OverdraftLimitContracted != "" {
 		resp.Data.OverdraftContractedLimit = &AccountOverdraftLimitsDataOverdraftContractedLimit{
 			Amount:   acc.OverdraftLimitContracted,
-			Currency: bank.Currency,
+			Currency: s.config.Currency(),
 		}
 	}
 	if acc.OverdraftLimitUsed != "" {
 		resp.Data.OverdraftUsedLimit = &AccountOverdraftLimitsDataOverdraftUsedLimit{
 			Amount:   acc.OverdraftLimitUsed,
-			Currency: bank.Currency,
+			Currency: s.config.Currency(),
 		}
 	}
 	if acc.OverdraftLimitUnarranged != "" {
 		resp.Data.UnarrangedOverdraftAmount = &AccountOverdraftLimitsDataUnarrangedOverdraftAmount{
 			Amount:   acc.OverdraftLimitUnarranged,
-			Currency: bank.Currency,
+			Currency: s.config.Currency(),
 		}
 	}
 
@@ -251,7 +267,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 			PartieNumber:                   tx.PartieNumber,
 			TransactionAmount: AccountTransactionsDataAmount{
 				Amount:   tx.Amount,
-				Currency: bank.Currency,
+				Currency: s.config.Currency(),
 			},
 			TransactionDateTime: tx.CreatedAt.Format(timeutil.DateTimeMillisFormat),
 			TransactionID:       tx.ID,
@@ -301,7 +317,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 			PartieNumber:                   tx.PartieNumber,
 			TransactionAmount: AccountTransactionsDataAmount{
 				Amount:   tx.Amount,
-				Currency: bank.Currency,
+				Currency: s.config.Currency(),
 			},
 			TransactionDateTime: tx.CreatedAt.Format(timeutil.DateTimeMillisFormat),
 			TransactionID:       tx.ID,

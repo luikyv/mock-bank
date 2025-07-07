@@ -91,7 +91,7 @@ func (s Service) Create(ctx context.Context, e *Enrollment, debtorAcc *payment.A
 		return err
 	}
 
-	if acc.UserID != e.OwnerID {
+	if acc.OwnerID != e.OwnerID {
 		return ErrUserDoesntMatchAccount
 	}
 
@@ -402,17 +402,17 @@ func (s Service) validate(_ context.Context, e *Enrollment, debtorAccount *payme
 func (s Service) runPostCreationAutomations(ctx context.Context, e *Enrollment) error {
 	switch e.Status {
 	case StatusAwaitingRiskSignals:
-		if timeutil.DateTimeNow().After(e.CreatedAt.Add(5 * time.Minute).Time) {
+		if timeutil.DateTimeNow().After(e.CreatedAt.Add(5 * time.Minute)) {
 			reason := RejectionReasonAwaitingRiskSignals
 			return s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.CancelledFromHolder})
 		}
 	case StatusAwaitingAccountHolderValidation:
-		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(15 * time.Minute).Time) {
+		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(15 * time.Minute)) {
 			reason := RejectionReasonAwaitingAccountHolderValidation
 			return s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.CancelledFromHolder})
 		}
 	case StatusAwaitingEnrollment:
-		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(CredentialRegistrationTimeout).Time) {
+		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(CredentialRegistrationTimeout)) {
 			reason := RejectionReasonAwaitingEnrollment
 			return s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.CancelledFromHolder})
 		}

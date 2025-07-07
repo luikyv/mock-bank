@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/luikyv/mock-bank/internal/page"
@@ -43,7 +44,7 @@ func (s Service) Authorize(ctx context.Context, accIDs []string, consentID, orgI
 			if err := txService.createConsent(ctx, &ConsentAccount{
 				ConsentID: uuid.MustParse(consentID),
 				AccountID: uuid.MustParse(accID),
-				UserID:    acc.UserID,
+				OwnerID:   acc.OwnerID,
 				Status:    status,
 				OrgID:     orgID,
 			}); err != nil {
@@ -113,27 +114,8 @@ func (s Service) UpdateConsent(ctx context.Context, consentID, accountID uuid.UU
 	return nil
 }
 
-func (s Service) ConsentedAccount(ctx context.Context, accountID, consentID, orgID string) (*Account, error) {
-	consentAcc := &ConsentAccount{}
-	if err := s.db.WithContext(ctx).
-		Preload("Account").
-		Where(`account_id = ? AND consent_id = ? AND org_id = ?`, accountID, consentID, orgID).
-		First(consentAcc).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotAllowed
-		}
-		return nil, err
-	}
-
-	if consentAcc.Status != resource.StatusAvailable {
-		return nil, ErrJointAccountPendingAuthorization
-	}
-
-	return consentAcc.Account, nil
-}
-
 func (s Service) Account(ctx context.Context, query Query, orgID string) (*Account, error) {
-	dbQuery := s.db.WithContext(ctx).Where("org_id = ? OR org_id = ?", orgID, s.mockOrgID)
+	dbQuery := s.db.WithContext(ctx).Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID)
 	if query.ID != "" {
 		dbQuery = dbQuery.Where("id = ?", query.ID)
 	}
@@ -151,8 +133,10 @@ func (s Service) Account(ctx context.Context, query Query, orgID string) (*Accou
 	return acc, nil
 }
 
-func (s Service) Accounts(ctx context.Context, userID, orgID string, pag page.Pagination) (page.Page[*Account], error) {
-	query := s.db.WithContext(ctx).Where("user_id = ? AND (org_id = ? OR org_id = ?)", userID, orgID, s.mockOrgID)
+func (s Service) Accounts(ctx context.Context, ownerID, orgID string, pag page.Pagination) (page.Page[*Account], error) {
+	query := s.db.WithContext(ctx).
+		Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID).
+		Where("owner_id = ?", ownerID)
 
 	var accounts []*Account
 	if err := query.
@@ -171,11 +155,42 @@ func (s Service) Accounts(ctx context.Context, userID, orgID string, pag page.Pa
 	return page.New(accounts, pag, int(total)), nil
 }
 
+func (s Service) ConsentedAccount(ctx context.Context, accountID, consentID, orgID string) (*Account, error) {
+	consentAcc := &ConsentAccount{}
+	if err := s.db.WithContext(ctx).
+		Preload("Account").
+		Where(`account_id = ? AND consent_id = ? AND org_id = ?`, accountID, consentID, orgID).
+		First(consentAcc).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotAllowed
+		}
+		return nil, fmt.Errorf("could not fetch consent account: %w", err)
+	}
+
+	if err := s.runConsentPostCreationAutomations(ctx, consentAcc); err != nil {
+		return nil, err
+	}
+
+	if consentAcc.Status == resource.StatusPendingAuthorization {
+		return nil, ErrJointAccountPendingAuthorization
+	}
+
+	if consentAcc.Status != resource.StatusAvailable {
+		return nil, ErrNotAllowed
+	}
+
+	return consentAcc.Account, nil
+}
+
 func (s Service) ConsentedAccounts(ctx context.Context, consentID, orgID string, pag page.Pagination) (page.Page[*Account], error) {
 	query := s.db.WithContext(ctx).
 		Model(&ConsentAccount{}).
 		Preload("Account").
-		Where(`org_id = ? AND consent_id = ? AND status = ?`, orgID, consentID, resource.StatusAvailable)
+		Where(`org_id = ? AND consent_id = ?`, orgID, consentID).
+		// Only return accounts that are available or accounts that are pending authorization
+		// and were updated more than 3 minutes ago.
+		Where("status = ? OR (status = ? AND updated_at < ?)",
+			resource.StatusAvailable, resource.StatusPendingAuthorization, timeutil.DateTimeNow().Add(-3*time.Minute))
 
 	var consentAccs []*ConsentAccount
 	if err := query.
@@ -183,16 +198,19 @@ func (s Service) ConsentedAccounts(ctx context.Context, consentID, orgID string,
 		Offset(pag.Offset()).
 		Order("created_at DESC").
 		Find(&consentAccs).Error; err != nil {
-		return page.Page[*Account]{}, fmt.Errorf("could not find consented accounts: %w", err)
+		return page.Page[*Account]{}, fmt.Errorf("failed to find consented accounts: %w", err)
 	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*Account]{}, fmt.Errorf("count failed: %w", err)
+		return page.Page[*Account]{}, fmt.Errorf("failed to count consented accounts: %w", err)
 	}
 
 	var accs []*Account
 	for _, consentAcc := range consentAccs {
+		if err := s.runConsentPostCreationAutomations(ctx, consentAcc); err != nil {
+			return page.Page[*Account]{}, err
+		}
 		accs = append(accs, consentAcc.Account)
 	}
 	return page.New(accs, pag, int(total)), nil
@@ -205,8 +223,8 @@ func (s Service) Delete(ctx context.Context, id uuid.UUID, orgID string) error {
 func (s Service) Transactions(ctx context.Context, accID, orgID string, pag page.Pagination, filter TransactionFilter) (page.Page[*Transaction], error) {
 	query := s.db.WithContext(ctx).
 		Model(&Transaction{}).
-		Where("account_id = ? AND created_at >= ? AND created_at < ? AND (org_id = ? OR org_id = ?)",
-			accID, filter.from.Time, filter.to.Time, orgID, s.mockOrgID)
+		Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID).
+		Where("account_id = ? AND created_at >= ? AND created_at <= ?", accID, filter.from.Time, filter.to.Time)
 
 	if filter.movementType != "" {
 		query = query.Where("movement_type = ?", filter.movementType)
@@ -230,33 +248,11 @@ func (s Service) Transactions(ctx context.Context, accID, orgID string, pag page
 }
 
 func (s Service) ConsentedTransactions(ctx context.Context, accID, consentID, orgID string, pag page.Pagination, filter TransactionFilter) (page.Page[*Transaction], error) {
-	var txs []*Transaction
-
-	query := s.db.WithContext(ctx).Model(&Transaction{}).
-		Joins("JOIN consent_accounts ON consent_accounts.account_id = account_transactions.account_id").
-		Where(`
-			account_transactions.account_id = ? AND
-			account_transactions.org_id = ? AND
-			account_transactions.created_at >= ? AND
-			account_transactions.created_at < ? AND
-			consent_accounts.consent_id = ? AND
-			consent_accounts.status = ?`,
-			accID, orgID, filter.from.Time, filter.to.Time, consentID, resource.StatusAvailable)
-
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("account_transactions.created_at DESC").
-		Find(&txs).Error; err != nil {
+	if _, err := s.ConsentedAccount(ctx, accID, consentID, orgID); err != nil {
 		return page.Page[*Transaction]{}, err
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*Transaction]{}, err
-	}
-
-	return page.New(txs, pag, int(total)), nil
+	return s.Transactions(ctx, accID, orgID, pag, filter)
 }
 
 func (s Service) createConsent(ctx context.Context, consentAcc *ConsentAccount) error {
@@ -264,4 +260,14 @@ func (s Service) createConsent(ctx context.Context, consentAcc *ConsentAccount) 
 	consentAcc.CreatedAt = now
 	consentAcc.UpdatedAt = now
 	return s.db.WithContext(ctx).Create(consentAcc).Error
+}
+
+func (s Service) runConsentPostCreationAutomations(ctx context.Context, consentAcc *ConsentAccount) error {
+	// Allow access to joint account if consent is pending authorization for more than 3 minutes.
+	if consentAcc.Status == resource.StatusPendingAuthorization &&
+		timeutil.DateTimeNow().After(consentAcc.UpdatedAt.Add(3*time.Minute)) {
+		consentAcc.Status = resource.StatusAvailable
+		return s.UpdateConsent(ctx, consentAcc.ConsentID, consentAcc.AccountID, consentAcc.OrgID, resource.StatusAvailable)
+	}
+	return nil
 }

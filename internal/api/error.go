@@ -47,7 +47,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
-	slog.InfoContext(r.Context(), "returning error", "error", err)
+	slog.InfoContext(r.Context(), "returning error", "error", err, "status_code", apiErr.statusCode)
 	description := apiErr.description
 	if len(description) > 2048 {
 		description = description[:2048]

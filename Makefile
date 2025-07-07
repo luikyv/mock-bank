@@ -1,8 +1,8 @@
 .PHONY: keys
 
-DSN="postgres://admin:pass@localhost:5432/mockbank?sslmode=disable"
 ORG_ID="00000000-0000-0000-0000-000000000000"
 SOFTWARE_ID="11111111-1111-1111-1111-111111111111"
+CS_VERSION="3de7a6d5bccbea655519cd4f3e632bf01f9247d9"
 
 # Set up the development environment by downloading dependencies installing
 # pre-commit hooks, generating keys, and setting up the Open Finance
@@ -57,9 +57,9 @@ migrations:
 
 # Clone and build the Open Finance Conformance Suite.
 setup-cs:
-	@if [ ! -d "conformance-suite" ]; then \
+	@if [ ! -d "conformance/suite" ]; then \
 	  echo "Cloning open finance conformance suite repository..."; \
-	  git clone --branch master --single-branch --depth=1 https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance-suite; \
+	  git clone --branch $(CS_VERSION) --single-branch --depth=1 https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance/suite; \
 	fi
 
 	@make build-cs
@@ -67,3 +67,17 @@ setup-cs:
 # Build the Conformance Suite JAR file.
 build-cs:
 	@docker compose run cs-builder
+
+test:
+	@go test ./internal/...
+
+test-coverage:
+	@go test -coverprofile=coverage.out ./internal/...
+	@go tool cover -html="coverage.out" -o coverage.html
+	@echo "Total Coverage: `go tool cover -func=coverage.out | grep total | grep -Eo '[0-9]+\.[0-9]+'` %"
+
+cs-tests:
+	@python3 conformance/suite/scripts/run-test-plan.py \
+		consents_test-plan_v3-2 ./conformance/phase2_consents_v3-config.json \
+		--expected-failures-file ./conformance/expected_failures.json \
+		--export-dir ./conformance/results

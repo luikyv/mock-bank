@@ -109,10 +109,6 @@ func seedDatabase(ctx context.Context, db *gorm.DB) error {
 		return fmt.Errorf("failed to seed Ralph Bragg: %w", err)
 	}
 
-	if err := seedGabrielNunes(ctx, db); err != nil {
-		return fmt.Errorf("failed to seed Gabriel Nunes: %w", err)
-	}
-
 	if Env == LocalEnvironment {
 		if err := createOAuthClients(ctx, db); err != nil {
 			return fmt.Errorf("failed to create OAuth client: %w", err)
@@ -131,29 +127,27 @@ func createOAuthClients(ctx context.Context, db *gorm.DB) error {
 			GrantTypes:           []goidc.GrantType{"authorization_code", "client_credentials", "implicit", "refresh_token"},
 			ResponseTypes:        []goidc.ResponseType{"code id_token"},
 			PublicJWKSURI:        "https://keystore.local/00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111/application.jwks",
-			ScopeIDs:             "openid consents consent resources accounts payments recurring-payments recurring-consent enrollment nrp-consents",
+			ScopeIDs:             "openid consents consent resources accounts loans payments recurring-payments recurring-consent enrollment nrp-consents",
 			IDTokenKeyEncAlg:     "RSA-OAEP",
 			IDTokenContentEncAlg: "A256GCM",
 			TokenAuthnMethod:     goidc.ClientAuthnPrivateKeyJWT,
 			TokenAuthnSigAlg:     goidc.PS256,
 			CustomAttributes: map[string]any{
-				oidc.OrgIDKey: OrgID,
-				oidc.SoftwareOriginURIsKey: []string{
-					"https://localhost.emobix.co.uk:8443/test/a/mockbank",
-				},
+				oidc.OrgIDKey:       OrgID,
+				oidc.OriginURIsKey:  []string{"https://mockbank.local"},
+				oidc.WebhookURIsKey: []string{"https://localhost.emobix.co.uk:8443/test-mtls/a/mockbank"},
 			},
 		},
 	}
 
 	clientEntity := &client.Client{
-		ID:   oidcClient.ID,
-		Data: *oidcClient,
-		Name: oidcClient.Name,
-		OriginURIs: []string{
-			"https://mockbank.local",
-		},
-		OrgID:     OrgID,
-		UpdatedAt: timeutil.DateTimeNow(),
+		ID:          oidcClient.ID,
+		Data:        *oidcClient,
+		Name:        oidcClient.Name,
+		OriginURIs:  []string{"https://mockbank.local"},
+		WebhookURIs: []string{"https://localhost.emobix.co.uk:8443/test-mtls/a/mockbank"},
+		OrgID:       OrgID,
+		UpdatedAt:   timeutil.DateTimeNow(),
 	}
 
 	return db.WithContext(ctx).Omit("CreatedAt").Save(clientEntity).Error
@@ -234,4 +228,8 @@ func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, err
 	slog.Info("successfully connected to database")
 
 	return db, nil
+}
+
+func pointerOf[T any](value T) *T {
+	return &value
 }

@@ -2,6 +2,7 @@ package autopayment
 
 import (
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
@@ -20,6 +21,10 @@ var (
 		return strings.HasPrefix(requestedScope, "recurring-consent:")
 	})
 	Scope = goidc.NewScope("recurring-payments")
+)
+
+var (
+	scheduleDelay = 5 * time.Minute
 )
 
 type Payment struct {

@@ -77,8 +77,8 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 	return c, s.runPostCreationAutomations(ctx, c)
 }
 
-func (s Service) Consents(ctx context.Context, userID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Consent], error) {
-	query := s.db.WithContext(ctx).Model(&Consent{}).Where("user_id = ? AND org_id = ?", userID, orgID)
+func (s Service) Consents(ctx context.Context, ownerID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Consent], error) {
+	query := s.db.WithContext(ctx).Model(&Consent{}).Where("owner_id = ? AND org_id = ?", ownerID, orgID)
 
 	var consents []*Consent
 	if err := query.
@@ -130,12 +130,12 @@ func (s Service) Delete(ctx context.Context, id, orgID string) error {
 func (s Service) runPostCreationAutomations(ctx context.Context, c *Consent) error {
 	switch c.Status {
 	case StatusAwaitingAuthorization:
-		if timeutil.DateTimeNow().After(c.CreatedAt.Add(3600 * time.Second).Time) {
+		if timeutil.DateTimeNow().After(c.CreatedAt.Add(3600 * time.Second)) {
 			slog.DebugContext(ctx, "consent awaiting authorization for too long, moving to rejected")
 			return s.reject(ctx, c, RejectedByUser, RejectionReasonConsentExpired)
 		}
 	case StatusAuthorized:
-		if c.ExpiresAt != nil && timeutil.DateTimeNow().After(c.ExpiresAt.Time) {
+		if c.ExpiresAt != nil && timeutil.DateTimeNow().After(*c.ExpiresAt) {
 			slog.DebugContext(ctx, "consent reached expiration, moving to rejected")
 			return s.reject(ctx, c, RejectedByASPSP, RejectionReasonConsentMaxDateReached)
 		}

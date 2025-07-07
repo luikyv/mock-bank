@@ -66,7 +66,7 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 			return goidc.WrapError(goidc.ErrorCodeInvalidClientMetadata, "invalid software statement signature", err)
 		}
 
-		if claims.IssuedAt == nil || timeutil.DateTimeNow().After(claims.IssuedAt.Time().Add(5*time.Minute)) {
+		if claims.IssuedAt == nil || timeutil.DateTimeNow().After(timeutil.NewDateTime(claims.IssuedAt.Time()).Add(5*time.Minute)) {
 			return goidc.NewError(goidc.ErrorCodeInvalidClientMetadata, "invalid software statement iat claim")
 		}
 
@@ -127,11 +127,11 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 			OrgIDKey:      ss.OrgID,
 			SoftwareIDKey: ss.SoftwareID,
 		}
+		if ss.SoftwareOriginURIs != nil {
+			c.SetCustomAttribute(OriginURIsKey, ss.SoftwareOriginURIs)
+		}
 		if webhookURIs := c.CustomAttribute(WebhookURIsKey); webhookURIs != nil {
 			c.SetCustomAttribute(WebhookURIsKey, webhookURIs)
-		}
-		if originURIs := c.CustomAttribute(SoftwareOriginURIsKey); originURIs != nil {
-			c.SetCustomAttribute(SoftwareOriginURIsKey, originURIs)
 		}
 		return nil
 	}

@@ -43,10 +43,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 				writeResponseError(w, r, err)
 			},
 		}),
-		HandlerMiddlewares: []MiddlewareFunc{
-			swaggerMiddleware,
-			middleware.FAPIID(nil),
-		},
+		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, middleware.FAPIID()},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},

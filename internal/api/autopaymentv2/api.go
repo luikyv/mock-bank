@@ -11,25 +11,33 @@ import (
 	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
-	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/api"
 	"github.com/luikyv/mock-bank/internal/api/middleware"
 	"github.com/luikyv/mock-bank/internal/autopayment"
-	"github.com/luikyv/mock-bank/internal/bank"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/errorutil"
 	"github.com/luikyv/mock-bank/internal/idempotency"
+	"github.com/luikyv/mock-bank/internal/jwtutil"
 	"github.com/luikyv/mock-bank/internal/payment"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 var _ StrictServerInterface = Server{}
 
+type BankConfig interface {
+	Host() string
+	ISPB() string
+	IBGETownCode() string
+	AccountBranch() string
+}
+
 type Server struct {
+	config             BankConfig
 	baseURL            string
 	service            autopayment.Service
 	idempotencyService idempotency.Service
+	jwtService         jwtutil.Service
 	op                 *provider.Provider
 	keystoreHost       string
 	orgID              string
@@ -37,9 +45,10 @@ type Server struct {
 }
 
 func NewServer(
-	host string,
+	config BankConfig,
 	service autopayment.Service,
 	idempotencyService idempotency.Service,
+	jwtService jwtutil.Service,
 	op *provider.Provider,
 	keystoreHost string,
 	orgID string,
@@ -47,9 +56,11 @@ func NewServer(
 ) Server {
 	service = service.WithVersion("v2")
 	return Server{
-		baseURL:            host + "/open-banking/automatic-payments/v2",
+		config:             config,
+		baseURL:            config.Host() + "/open-banking/automatic-payments/v2",
 		service:            service,
 		idempotencyService: idempotencyService,
+		jwtService:         jwtService,
 		op:                 op,
 		keystoreHost:       keystoreHost,
 		orgID:              orgID,
@@ -60,7 +71,7 @@ func NewServer(
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	autoPaymentMux := http.NewServeMux()
 
-	jwtMiddleware := middleware.JWT(s.baseURL, s.orgID, s.keystoreHost, s.signer)
+	jwtMiddleware := middleware.JWT(s.baseURL, s.orgID, s.keystoreHost, s.signer, s.jwtService)
 	idempotencyMiddleware := middleware.Idempotency(s.idempotencyService)
 	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, autopayment.Scope)
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID)
@@ -130,7 +141,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = clientCredentialsAuthMiddleware(handler)
 	autoPaymentMux.Handle("PATCH /pix/recurring-payments/{recurringPaymentId}", handler)
 
-	handler = middleware.FAPIID(nil)(autoPaymentMux)
+	handler = middleware.FAPIID()(autoPaymentMux)
 	mux.Handle("/open-banking/automatic-payments/v2/", http.StripPrefix("/open-banking/automatic-payments/v2", handler))
 }
 
@@ -251,14 +262,14 @@ func (s Server) AutomaticPaymentsPostRecurringConsents(ctx context.Context, req 
 	}
 
 	if c.DebtorAccount != nil {
-		branch := account.DefaultBranch
+		branch := s.config.AccountBranch()
 		resp.Data.DebtorAccount = &struct {
 			AccountType EnumAccountTypeConsents "json:\"accountType\""
 			Ispb        string                  "json:\"ispb\""
 			Issuer      *string                 "json:\"issuer,omitempty\""
 			Number      string                  "json:\"number\""
 		}{
-			Ispb:        bank.ISPB,
+			Ispb:        s.config.ISPB(),
 			Issuer:      &branch,
 			Number:      c.DebtorAccount.Number,
 			AccountType: EnumAccountTypeConsents(payment.ConvertAccountType(c.DebtorAccount.Type)),
@@ -360,8 +371,8 @@ func (s Server) AutomaticPaymentsGetRecurringConsentsConsentID(ctx context.Conte
 	}
 
 	if c.DebtorAccount != nil {
-		branch := account.DefaultBranch
-		ibgeTownCode := bank.IBGETownCode
+		branch := s.config.AccountBranch()
+		ibgeTownCode := s.config.IBGETownCode()
 		resp.Data.DebtorAccount = &struct {
 			AccountType  EnumAccountTypeConsents "json:\"accountType\""
 			IbgeTownCode *string                 "json:\"ibgeTownCode,omitempty\""
@@ -369,7 +380,7 @@ func (s Server) AutomaticPaymentsGetRecurringConsentsConsentID(ctx context.Conte
 			Issuer       *string                 "json:\"issuer,omitempty\""
 			Number       string                  "json:\"number\""
 		}{
-			Ispb:         bank.ISPB,
+			Ispb:         s.config.ISPB(),
 			IbgeTownCode: &ibgeTownCode,
 			Issuer:       &branch,
 			Number:       c.DebtorAccount.Number,
@@ -530,14 +541,14 @@ func (s Server) AutomaticPaymentsPatchRecurringConsentsConsentID(ctx context.Con
 	}
 
 	if c.DebtorAccount != nil {
-		branch := account.DefaultBranch
+		branch := s.config.AccountBranch()
 		resp.Data.DebtorAccount = &struct {
 			AccountType EnumAccountTypeConsents "json:\"accountType\""
 			Ispb        string                  "json:\"ispb\""
 			Issuer      *string                 "json:\"issuer,omitempty\""
 			Number      string                  "json:\"number\""
 		}{
-			Ispb:        bank.ISPB,
+			Ispb:        s.config.ISPB(),
 			Issuer:      &branch,
 			Number:      c.DebtorAccount.Number,
 			AccountType: EnumAccountTypeConsents(payment.ConvertAccountType(c.DebtorAccount.Type)),
@@ -683,11 +694,11 @@ func (s Server) AutomaticPaymentsPostPixRecurringPayments(ctx context.Context, r
 	}
 
 	if p.DebtorAccount != nil {
-		branch := account.DefaultBranch
+		branch := s.config.AccountBranch()
 		resp.Data.DebtorAccount = &DebtorAccount{
 			AccountType: EnumAccountTypeConsents(payment.ConvertAccountType(p.DebtorAccount.Type)),
 			Issuer:      &branch,
-			Ispb:        bank.ISPB,
+			Ispb:        s.config.ISPB(),
 			Number:      p.DebtorAccount.Number,
 		}
 	}
@@ -780,11 +791,11 @@ func (s Server) AutomaticPaymentsGetPixRecurringPaymentsPaymentID(ctx context.Co
 	}
 
 	if p.DebtorAccount != nil {
-		branch := account.DefaultBranch
+		branch := s.config.AccountBranch()
 		resp.Data.DebtorAccount = &DebtorAccount{
 			AccountType: EnumAccountTypeConsents(payment.ConvertAccountType(p.DebtorAccount.Type)),
 			Issuer:      &branch,
-			Ispb:        bank.ISPB,
+			Ispb:        s.config.ISPB(),
 			Number:      p.DebtorAccount.Number,
 		}
 	}
@@ -954,11 +965,11 @@ func (s Server) AutomaticPaymentsPatchPixRecurringPaymentsPaymentID(ctx context.
 	}
 
 	if p.DebtorAccount != nil {
-		branch := account.DefaultBranch
+		branch := s.config.AccountBranch()
 		resp.Data.DebtorAccount = &DebtorAccount{
 			AccountType: EnumAccountTypeConsents(payment.ConvertAccountType(p.DebtorAccount.Type)),
 			Issuer:      &branch,
-			Ispb:        bank.ISPB,
+			Ispb:        s.config.ISPB(),
 			Number:      p.DebtorAccount.Number,
 		}
 	}

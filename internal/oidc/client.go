@@ -27,7 +27,7 @@ func (cm ClientManager) Save(ctx context.Context, oidcClient *goidc.Client) erro
 	if webhookURIs, ok := oidcClient.CustomAttribute(WebhookURIsKey).([]string); ok {
 		c.WebhookURIs = webhookURIs
 	}
-	if originURIs, ok := oidcClient.CustomAttribute(SoftwareOriginURIsKey).([]string); ok {
+	if originURIs, ok := oidcClient.CustomAttribute(OriginURIsKey).([]string); ok {
 		c.OriginURIs = originURIs
 	}
 	return cm.service.Save(ctx, c)

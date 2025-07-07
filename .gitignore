@@ -25,7 +25,8 @@ go.work.sum
 .env
 
 .DS_Store
-conformance-suite/
+conformance/suite/
+conformance/results/
 keys/
 lambda.zip
 playground/

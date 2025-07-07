@@ -11,25 +11,33 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
-	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/api"
 	"github.com/luikyv/mock-bank/internal/api/middleware"
 	"github.com/luikyv/mock-bank/internal/autopayment"
-	"github.com/luikyv/mock-bank/internal/bank"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/errorutil"
 	"github.com/luikyv/mock-bank/internal/idempotency"
+	"github.com/luikyv/mock-bank/internal/jwtutil"
 	"github.com/luikyv/mock-bank/internal/payment"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 var _ StrictServerInterface = Server{}
 
+type BankConfig interface {
+	Host() string
+	ISPB() string
+	IBGETownCode() string
+	AccountBranch() string
+}
+
 type Server struct {
+	config             BankConfig
 	baseURL            string
 	service            enrollment.Service
 	idempotencyService idempotency.Service
+	jwtService         jwtutil.Service
 	op                 *provider.Provider
 	keystoreHost       string
 	orgID              string
@@ -37,18 +45,22 @@ type Server struct {
 }
 
 func NewServer(
-	host string,
+	config BankConfig,
 	service enrollment.Service,
 	idempotencyService idempotency.Service,
+	jwtService jwtutil.Service,
 	op *provider.Provider,
 	keystoreHost string,
 	orgID string,
 	signer crypto.Signer,
 ) Server {
+	service = service.WithVersion("v2")
 	return Server{
-		baseURL:            host + "/open-banking/enrollments/v2",
+		config:             config,
+		baseURL:            config.Host() + "/open-banking/enrollments/v2",
 		service:            service,
 		idempotencyService: idempotencyService,
+		jwtService:         jwtService,
 		op:                 op,
 		keystoreHost:       keystoreHost,
 		orgID:              orgID,
@@ -59,7 +71,7 @@ func NewServer(
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	enrollmentMux := http.NewServeMux()
 
-	jwtMiddleware := middleware.JWT(s.baseURL, s.orgID, s.keystoreHost, s.signer)
+	jwtMiddleware := middleware.JWT(s.baseURL, s.orgID, s.keystoreHost, s.signer, s.jwtService)
 	idempotencyMiddleware := middleware.Idempotency(s.idempotencyService)
 	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, payment.Scope)
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, enrollment.ScopeID, enrollment.ScopeConsent, payment.Scope)
@@ -133,7 +145,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = clientCredentialsAuthMiddleware(handler)
 	enrollmentMux.Handle("PATCH /enrollments/{enrollmentId}", handler)
 
-	handler = middleware.FAPIID(nil)(enrollmentMux)
+	handler = middleware.FAPIID()(enrollmentMux)
 	mux.Handle("/open-banking/enrollments/v2/", http.StripPrefix("/open-banking/enrollments/v2", handler))
 }
 
@@ -223,9 +235,9 @@ func (s Server) PostEnrollments(ctx context.Context, req PostEnrollmentsRequestO
 	}
 
 	if e.DebtorAccount != nil {
-		branch := account.DefaultBranch
+		branch := s.config.AccountBranch()
 		resp.Data.DebtorAccount = &DebtorAccount{
-			Ispb:        bank.ISPB,
+			Ispb:        s.config.ISPB(),
 			Issuer:      &branch,
 			Number:      e.DebtorAccount.Number,
 			AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(e.DebtorAccount.Type)),
@@ -314,14 +326,14 @@ func (s Server) GetEnrollment(ctx context.Context, req GetEnrollmentRequestObjec
 	}
 
 	if e.DebtorAccount != nil {
-		branch := account.DefaultBranch
+		branch := s.config.AccountBranch()
 		resp.Data.DebtorAccount = &struct {
 			AccountType EnumAccountPaymentsType "json:\"accountType\""
 			Ispb        string                  "json:\"ispb\""
 			Issuer      *string                 "json:\"issuer,omitempty\""
 			Number      string                  "json:\"number\""
 		}{
-			Ispb:        bank.ISPB,
+			Ispb:        s.config.ISPB(),
 			Issuer:      &branch,
 			Number:      e.DebtorAccount.Number,
 			AccountType: EnumAccountPaymentsType(payment.ConvertAccountType(e.DebtorAccount.Type)),

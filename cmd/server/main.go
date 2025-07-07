@@ -21,13 +21,18 @@ import (
 	"github.com/luikyv/mock-bank/internal/api/autopaymentv2"
 	"github.com/luikyv/mock-bank/internal/api/consentv3"
 	"github.com/luikyv/mock-bank/internal/api/enrollmentv2"
+	"github.com/luikyv/mock-bank/internal/api/loanv2"
 	oidcapi "github.com/luikyv/mock-bank/internal/api/oidc"
 	"github.com/luikyv/mock-bank/internal/api/paymentv4"
 	"github.com/luikyv/mock-bank/internal/api/resourcev3"
 	"github.com/luikyv/mock-bank/internal/client"
+	"github.com/luikyv/mock-bank/internal/creditop"
 	"github.com/luikyv/mock-bank/internal/directory"
 	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/idempotency"
+	"github.com/luikyv/mock-bank/internal/jwtutil"
+	"github.com/luikyv/mock-bank/internal/page"
+	"github.com/luikyv/mock-bank/internal/schedule"
 	"github.com/luikyv/mock-bank/internal/session"
 	"github.com/luikyv/mock-bank/internal/webhook"
 
@@ -57,7 +62,15 @@ import (
 type Environment string
 
 const (
-	LocalEnvironment Environment = "LOCAL"
+	LocalEnvironment  Environment = "LOCAL"
+	Brand             string      = "MockBank"
+	CNPJ              string      = "00000000000000"
+	ISPB              string      = "00000000"
+	IBGETownCode      string      = "0000000"
+	Currency          string      = "BRL"
+	AccountCompeCode  string      = "001"
+	AccountBranch     string      = "0001"
+	AccountCheckDigit string      = "1"
 )
 
 var (
@@ -84,7 +97,7 @@ var (
 	// DirectoryClientMTLSCertSSMParamName and DirectoryClientMTLSKeySSMParamName are the parameters used for mutual TLS connection with the directory.
 	DirectoryClientMTLSCertSSMParamName = getEnv("DIRECTORY_CLIENT_MTLS_CERT_SSM_PARAM", "/mockbank/directory-client-transport-cert")
 	DirectoryClientMTLSKeySSMParamName  = getEnv("DIRECTORY_CLIENT_MTLS_KEY_SSM_PARAM", "/mockbank/directory-client-transport-key")
-	// OrgSigningKeySSMParamName is the parameter used by Mock Bank to sign responses.
+	// OrgSigningKeySSMParamName is the parameter used by Mock Bank to sign API responses.
 	OrgSigningKeySSMParamName = getEnv("ORG_SIGNING_KEY_SSM_PARAM", "/mockbank/org-signing-key")
 	AWSEndpoint               = getEnv("AWS_ENDPOINT_URL", "http://localhost:4566")
 )
@@ -97,6 +110,18 @@ func main() {
 	slog.Info("setting up mock bank", "env", Env)
 	http.DefaultClient = httpClient()
 	awsConfig := awsConfig(ctx)
+	bankConfig := BankConfig{
+		host:              APIMTLSHost,
+		orgID:             OrgID,
+		brand:             Brand,
+		cnpj:              CNPJ,
+		ispb:              ISPB,
+		ibgeTownCode:      IBGETownCode,
+		currency:          Currency,
+		accountCompeCode:  AccountCompeCode,
+		accountBranch:     AccountBranch,
+		accountCheckDigit: AccountCheckDigit,
+	}
 
 	// Database.
 	slog.Info("creating secrets manager client")
@@ -138,17 +163,20 @@ func main() {
 	sessionService := session.NewService(db, directoryService)
 	clientService := client.NewService(db)
 	idempotencyService := idempotency.NewService(db)
+	scheduleService := schedule.NewService(db)
+	jwtService := jwtutil.NewService(db)
 	webhookService := webhook.NewService(clientService)
 	userService := user.NewService(db, OrgID)
 	consentService := consent.NewService(db, userService)
 	resourceService := resource.NewService(db)
 	accountService := account.NewService(db, OrgID)
-	paymentService := payment.NewService(db, userService, accountService, webhookService)
-	autoPaymentService := autopayment.NewService(db, userService, accountService, webhookService)
+	creditOpService := creditop.NewService(db, OrgID)
+	paymentService := payment.NewService(db, userService, accountService, webhookService, scheduleService)
+	autoPaymentService := autopayment.NewService(db, bankConfig, userService, accountService, webhookService, scheduleService)
 	enrollmentService := enrollment.NewService(db, userService, accountService, paymentService, autoPaymentService, webhookService)
 
 	op, err := openidProvider(db, opSigner, clientService, userService, consentService, accountService,
-		paymentService, autoPaymentService, enrollmentService)
+		creditOpService, paymentService, autoPaymentService, enrollmentService)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -157,23 +185,20 @@ func main() {
 	mux := http.NewServeMux()
 
 	oidcapi.NewServer(AuthHost, op).RegisterRoutes(mux)
-	app.NewServer(APPHost, sessionService, userService, consentService, resourceService, accountService).RegisterRoutes(mux)
+	app.NewServer(bankConfig, APPHost, sessionService, userService, consentService, resourceService, accountService).RegisterRoutes(mux)
 	consentv3.NewServer(APIMTLSHost, consentService, op).RegisterRoutes(mux)
 	resourcev3.NewServer(APIMTLSHost, resourceService, consentService, op).RegisterRoutes(mux)
-	accountv2.NewServer(APIMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
-	paymentv4.NewServer(APIMTLSHost, paymentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
-	autopaymentv2.NewServer(APIMTLSHost, autoPaymentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
-	enrollmentv2.NewServer(APIMTLSHost, enrollmentService, idempotencyService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
+	accountv2.NewServer(bankConfig, accountService, consentService, op).RegisterRoutes(mux)
+	loanv2.NewServer(bankConfig, creditOpService, consentService, op).RegisterRoutes(mux)
+	paymentv4.NewServer(bankConfig, paymentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
+	autopaymentv2.NewServer(bankConfig, autoPaymentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
+	enrollmentv2.NewServer(bankConfig, enrollmentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 
 	handler := middleware(mux)
 	slog.Info("starting mock bank")
 
 	if Env == LocalEnvironment {
-		go pollRecurringPayments(ctx, autoPaymentService, time.NewTicker(time.Second*10))
-		go func() {
-			time.Sleep(time.Second * 5)
-			pollPayments(ctx, paymentService, time.NewTicker(time.Second*10))
-		}()
+		go pollResources(ctx, scheduleService, paymentService, autoPaymentService, time.NewTicker(time.Second*10))
 
 		if err := http.ListenAndServe(":"+Port, handler); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
@@ -183,6 +208,59 @@ func main() {
 
 	lambdaAdapter := httpadapter.NewV2(handler)
 	lambda.Start(lambdaAdapter.ProxyWithContext)
+}
+
+type BankConfig struct {
+	host              string
+	orgID             string
+	brand             string
+	cnpj              string
+	ispb              string
+	ibgeTownCode      string
+	currency          string
+	accountCompeCode  string
+	accountBranch     string
+	accountCheckDigit string
+}
+
+func (bc BankConfig) Host() string {
+	return bc.host
+}
+
+func (bc BankConfig) OrgID() string {
+	return bc.orgID
+}
+
+func (bc BankConfig) Brand() string {
+	return bc.brand
+}
+
+func (bc BankConfig) CNPJ() string {
+	return bc.cnpj
+}
+
+func (bc BankConfig) ISPB() string {
+	return bc.ispb
+}
+
+func (bc BankConfig) IBGETownCode() string {
+	return bc.ibgeTownCode
+}
+
+func (bc BankConfig) Currency() string {
+	return bc.currency
+}
+
+func (bc BankConfig) AccountCompeCode() string {
+	return bc.accountCompeCode
+}
+
+func (bc BankConfig) AccountBranch() string {
+	return bc.accountBranch
+}
+
+func (bc BankConfig) AccountCheckDigit() string {
+	return bc.accountCheckDigit
 }
 
 func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, error) {
@@ -313,6 +391,7 @@ func openidProvider(
 	userService user.Service,
 	consentService consent.Service,
 	accountService account.Service,
+	creditOpService creditop.Service,
 	paymentService payment.Service,
 	autoPaymentService autopayment.Service,
 	enrollmentService enrollment.Service,
@@ -324,7 +403,7 @@ func openidProvider(
 		// customer.Scope,
 		account.Scope,
 		// creditcard.Scope,
-		// ScopeLoans,
+		creditop.ScopeLoans,
 		// ScopeFinancings,
 		// ScopeUnarrangedAccountsOverdraft,
 		// ScopeInvoiceFinancings,
@@ -386,7 +465,7 @@ func openidProvider(
 		provider.WithIDTokenSignatureAlgs(goidc.PS256),
 		provider.WithIDTokenEncryption(goidc.RSA_OAEP),
 		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(op, consentService, paymentService, autoPaymentService, enrollmentService)),
-		provider.WithPolicies(oidc.Policies(AuthHost, userService, consentService, accountService, paymentService, autoPaymentService, enrollmentService)...),
+		provider.WithPolicies(oidc.Policies(AuthHost, userService, consentService, accountService, creditOpService, paymentService, autoPaymentService, enrollmentService)...),
 		provider.WithNotifyErrorFunc(oidc.LogError),
 		provider.WithDCR(oidc.DCRFunc(oidc.DCRConfig{
 			Scopes:       scopes,
@@ -506,43 +585,37 @@ func middleware(next http.Handler) http.Handler {
 	})
 }
 
-func pollRecurringPayments(ctx context.Context, service autopayment.Service, ticker *time.Ticker) {
+func pollResources(
+	ctx context.Context,
+	scheduleService schedule.Service,
+	paymentService payment.Service,
+	autoPaymentService autopayment.Service,
+	ticker *time.Ticker,
+) {
 	for {
 		select {
 		case <-ctx.Done():
-			slog.InfoContext(ctx, "finished polling recurring payments")
+			slog.InfoContext(ctx, "finished polling resources")
 			return
 		case <-ticker.C:
-			slog.InfoContext(ctx, "polling recurring payments")
-			if _, err := service.Payments(ctx, OrgID, &autopayment.Filter{Statuses: []payment.Status{
-				payment.StatusRCVD,
-				payment.StatusACCP,
-				payment.StatusACPD,
-				payment.StatusPDNG,
-				payment.StatusSCHD,
-			}}); err != nil {
-				slog.ErrorContext(ctx, "error polling the recurring payments", "error", err)
+			slog.InfoContext(ctx, "polling resources")
+			schedules, err := scheduleService.Schedules(ctx, page.NewPagination(nil, nil))
+			if err != nil {
+				slog.ErrorContext(ctx, "error fetching schedules", "error", err)
+				continue
 			}
-		}
-	}
-}
-
-func pollPayments(ctx context.Context, service payment.Service, ticker *time.Ticker) {
-	for {
-		select {
-		case <-ctx.Done():
-			slog.InfoContext(ctx, "finished polling payments")
-			return
-		case <-ticker.C:
-			slog.InfoContext(ctx, "polling payments")
-			if _, err := service.Payments(ctx, OrgID, &payment.Filter{Statuses: []payment.Status{
-				payment.StatusRCVD,
-				payment.StatusACCP,
-				payment.StatusACPD,
-				payment.StatusPDNG,
-				payment.StatusSCHD,
-			}}); err != nil {
-				slog.ErrorContext(ctx, "error polling the payments", "error", err)
+			for _, s := range schedules.Records {
+				switch s.TaskType {
+				case schedule.TaskTypePaymentConsent:
+					_, _ = paymentService.Consent(ctx, s.ID.String(), s.OrgID)
+				case schedule.TaskTypePayment:
+					_, _ = paymentService.Payment(ctx, s.ID.String(), s.OrgID)
+				case schedule.TaskTypeAutoPaymentConsent:
+					_, _ = autoPaymentService.Consent(ctx, s.ID.String(), s.OrgID)
+				case schedule.TaskTypeAutoPayment:
+					_, _ = autoPaymentService.Payment(ctx, s.ID.String(), s.OrgID)
+				}
+				scheduleService.Unschedule(ctx, s.ID.String(), s.OrgID)
 			}
 		}
 	}

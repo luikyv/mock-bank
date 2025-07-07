@@ -14,7 +14,7 @@ func URN(id uuid.UUID) string {
 }
 
 func IDFromScopes(scopes string) (string, bool) {
-	for _, s := range strings.Split(scopes, " ") {
+	for s := range strings.SplitSeq(scopes, " ") {
 		if ScopeID.Matches(s) {
 			return strings.TrimPrefix(s, "consent:"+URNPrefix), true
 		}
@@ -83,7 +83,7 @@ func validateExtension(c *Consent, ext *Extension) error {
 		return ErrInvalidExpiration
 	}
 
-	if c.ExpiresAt != nil && !ext.ExpiresAt.After(c.ExpiresAt.Time) {
+	if c.ExpiresAt != nil && !ext.ExpiresAt.After(*c.ExpiresAt) {
 		return ErrInvalidExpiration
 	}
 

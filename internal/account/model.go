@@ -14,11 +14,8 @@ import (
 )
 
 const (
-	DefaultCompeCode    string = "001"
-	DefaultBranch       string = "0001"
-	DefaultCheckDigit   string = "1"
-	TransactionIDLength int    = 80
-	letterBytes                = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	TransactionIDLength int = 80
+	letterBytes             = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 )
 
 var (
@@ -28,7 +25,7 @@ var (
 type ConsentAccount struct {
 	ConsentID uuid.UUID
 	AccountID uuid.UUID
-	UserID    uuid.UUID
+	OwnerID   uuid.UUID
 	Status    resource.Status
 	Account   *Account
 
@@ -43,7 +40,7 @@ func (ConsentAccount) TableName() string {
 
 type Account struct {
 	ID                          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	UserID                      uuid.UUID
+	OwnerID                     uuid.UUID
 	Number                      string
 	Type                        Type
 	SubType                     SubType `gorm:"column:subtype"`
@@ -55,6 +52,7 @@ type Account struct {
 	OverdraftLimitUnarranged    string
 
 	OrgID     string
+	CrossOrg  bool
 	CreatedAt timeutil.DateTime
 	UpdatedAt timeutil.DateTime
 }

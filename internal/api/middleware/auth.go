@@ -14,6 +14,14 @@ import (
 )
 
 func Auth(op *provider.Provider, grantType goidc.GrantType, scopes ...goidc.Scope) func(http.Handler) http.Handler {
+	return AuthWithOptions(op, grantType, nil, scopes...)
+}
+
+func AuthWithOptions(op *provider.Provider, grantType goidc.GrantType, opts *Options, scopes ...goidc.Scope) func(http.Handler) http.Handler {
+	if opts == nil {
+		opts = &Options{}
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -21,7 +29,7 @@ func Auth(op *provider.Provider, grantType goidc.GrantType, scopes ...goidc.Scop
 			tokenInfo, err := op.TokenInfoFromRequest(w, r)
 			if err != nil {
 				slog.InfoContext(ctx, "the token is not active", "error", err)
-				api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(true))
+				api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token").Pagination(opts.ErrorPagination))
 				return
 			}
 
@@ -36,14 +44,14 @@ func Auth(op *provider.Provider, grantType goidc.GrantType, scopes ...goidc.Scop
 				// Client credentials tokens are issued for the client itself, so the subject must be the client ID.
 				if tokenInfo.Subject != tokenInfo.ClientID {
 					slog.InfoContext(ctx, "invalid token grant type, client credentials is required", "sub", tokenInfo.Subject, "client_id", tokenInfo.ClientID)
-					api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token grant type, client credentials is required").Pagination(true))
+					api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token grant type, client credentials is required").Pagination(opts.ErrorPagination))
 					return
 				}
 			case goidc.GrantAuthorizationCode:
 				// Authorization code tokens are issued for a user, so the subject must not be the client ID.
 				if tokenInfo.Subject == tokenInfo.ClientID {
 					slog.InfoContext(ctx, "invalid token grant type, authorization code is required", "sub", tokenInfo.Subject, "client_id", tokenInfo.ClientID)
-					api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token grant type, authorization code is required").Pagination(true))
+					api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token grant type, authorization code is required").Pagination(opts.ErrorPagination))
 					return
 				}
 			}

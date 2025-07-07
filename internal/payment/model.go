@@ -11,11 +11,16 @@ import (
 )
 
 const (
-	ConsentURNPrefix = "urn:mockbank:consent:"
+	ConsentURNPrefix   = "urn:mockbank:consent:"
+	endToEndTimeFormat = "200601021504" // yyyyMMddHHmm.
 )
 
 var (
 	Scope = goidc.NewScope("payments")
+)
+
+var (
+	scheduleDelay = 5 * time.Minute
 )
 
 type Payment struct {

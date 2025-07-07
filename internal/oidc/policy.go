@@ -10,8 +10,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/luikyv/mock-bank/internal/creditop"
 	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/page"
+	"github.com/luikyv/mock-bank/internal/resource"
 	"github.com/luikyv/mock-bank/templates"
 
 	"github.com/luikyv/go-oidc/pkg/goidc"
@@ -36,6 +38,7 @@ const (
 	formParamLogin          = "login"
 	formParamConsent        = "consent"
 	formParamAccountIDs     = "accounts"
+	formParamLoanIDs        = "loans"
 	formParamAccountID      = "account"
 	formParamOverdraftLimit = "use_overdraft_limit"
 
@@ -45,11 +48,13 @@ const (
 // TODO: Validate that the resources (accounts, ...) sent belong to the user.
 // TODO: For auto payments: Mesmo se enviado pela ITP, o usuário pagador pode alterar durante a autorização do consentimento.
 
+// TODO: Pass the template as a parameter.
 func Policies(
 	baseURL string,
 	userService user.Service,
 	consentService consent.Service,
 	accountService account.Service,
+	creditOpService creditop.Service,
 	paymentService payment.Service,
 	autoPaymentService autopayment.Service,
 	enrollmentService enrollment.Service,
@@ -125,7 +130,8 @@ func Policies(
 			},
 			goidc.NewAuthnStep("setup", validateConsentStep(consentService)),
 			goidc.NewAuthnStep("login", loginStep(baseURL, tmpl, userService)),
-			goidc.NewAuthnStep("consent", grantConsentStep(baseURL, tmpl, userService, consentService, accountService)),
+			goidc.NewAuthnStep("consent", grantConsentStep(baseURL, tmpl, userService, consentService,
+				accountService, creditOpService)),
 			goidc.NewAuthnStep("finish", grantAuthorizationStep()),
 		),
 	}
@@ -216,6 +222,7 @@ func grantConsentStep(
 	userService user.Service,
 	consentService consent.Service,
 	accountService account.Service,
+	creditOpService creditop.Service,
 ) goidc.AuthnFunc {
 	type Page struct {
 		BaseURL      string
@@ -223,6 +230,7 @@ func grantConsentStep(
 		UserCPF      string
 		BusinessCNPJ string
 		Accounts     []*account.Account
+		Loans        []*creditop.Contract
 		Nonce        string
 	}
 
@@ -244,6 +252,15 @@ func grantConsentStep(
 				return goidc.StatusFailure, fmt.Errorf("could not load the user accounts")
 			}
 			consentPage.Accounts = accs.Records
+		}
+		if c.Permissions.HasLoanPermissions() {
+			slog.InfoContext(r.Context(), "rendering consent page with loans")
+			loans, err := creditOpService.Contracts(r.Context(), userID, orgID, resource.TypeLoan, page.NewPagination(nil, nil))
+			if err != nil {
+				slog.ErrorContext(r.Context(), "could not load the user loans", "error", err)
+				return goidc.StatusFailure, fmt.Errorf("could not load the user loans")
+			}
+			consentPage.Loans = loans.Records
 		}
 
 		return renderPage(w, tmpl, "consent", consentPage)
@@ -267,7 +284,7 @@ func grantConsentStep(
 
 			if c.BusinessIdentification != nil {
 				userID := as.StoredParameter(sessionParamUserID).(string)
-				business, err := userService.UserBusiness(r.Context(), userID, *c.BusinessIdentification, orgID)
+				business, err := userService.Business(r.Context(), userID, *c.BusinessIdentification, orgID)
 				if err != nil {
 					slog.InfoContext(r.Context(), "could not fetch the business", "error", err)
 					_ = consentService.Reject(r.Context(), consentID, orgID, consent.RejectedByASPSP, consent.RejectionReasonInternalSecurityReason)
@@ -295,6 +312,14 @@ func grantConsentStep(
 			slog.InfoContext(r.Context(), "authorizing accounts", "accounts", accountIDs)
 			if err := accountService.Authorize(r.Context(), accountIDs, c.ID.String(), orgID); err != nil {
 				slog.InfoContext(r.Context(), "could not authorize accounts", "error", err)
+				return goidc.StatusFailure, err
+			}
+		}
+		if c.Permissions.HasLoanPermissions() {
+			loanIDs := r.Form[formParamLoanIDs]
+			slog.InfoContext(r.Context(), "authorizing loans", "loans", loanIDs)
+			if err := creditOpService.AuthorizeContracts(r.Context(), loanIDs, c.ID.String(), orgID, resource.TypeLoan); err != nil {
+				slog.InfoContext(r.Context(), "could not authorize loans", "error", err)
 				return goidc.StatusFailure, err
 			}
 		}
@@ -394,7 +419,7 @@ func grantPaymentStep(
 
 			if c.BusinessIdentification != nil {
 				userID := as.StoredParameter(sessionParamUserID).(string)
-				business, err := userService.UserBusiness(r.Context(), userID, *c.BusinessIdentification, orgID)
+				business, err := userService.Business(r.Context(), userID, *c.BusinessIdentification, orgID)
 				if err != nil {
 					slog.InfoContext(r.Context(), "could not fetch the business", "error", err)
 					_ = paymentService.RejectConsent(r.Context(), c, payment.ConsentRejectionNotProvided, "user has no access to the business")
@@ -517,7 +542,7 @@ func grantAutoPaymentStep(
 
 			if c.BusinessIdentification != nil {
 				userID := as.StoredParameter(sessionParamUserID).(string)
-				business, err := userService.UserBusiness(r.Context(), userID, *c.BusinessIdentification, orgID)
+				business, err := userService.Business(r.Context(), userID, *c.BusinessIdentification, orgID)
 				if err != nil {
 					slog.InfoContext(r.Context(), "could not fetch the business", "error", err)
 					_ = paymentService.RejectConsent(r.Context(), c, autopayment.ConsentRejection{
@@ -652,7 +677,7 @@ func grantEnrollmentStep(
 
 			if e.BusinessIdentification != nil {
 				userID := as.StoredParameter(sessionParamUserID).(string)
-				business, err := userService.UserBusiness(r.Context(), userID, *e.BusinessIdentification, orgID)
+				business, err := userService.Business(r.Context(), userID, *e.BusinessIdentification, orgID)
 				if err != nil {
 					slog.InfoContext(r.Context(), "could not fetch the business", "error", err)
 					info := "user has no access to the business"

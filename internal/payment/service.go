@@ -15,24 +15,37 @@ import (
 	"github.com/luikyv/mock-bank/internal/api"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/errorutil"
+	"github.com/luikyv/mock-bank/internal/schedule"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 	"github.com/luikyv/mock-bank/internal/user"
 	"github.com/luikyv/mock-bank/internal/webhook"
 	"gorm.io/gorm"
 )
 
-const endToEndTimeFormat = "200601021504" // yyyyMMddHHmm.
-
 type Service struct {
-	db             *gorm.DB
-	userService    user.Service
-	accountService account.Service
-	webhookService webhook.Service
-	version        string
+	db              *gorm.DB
+	userService     user.Service
+	accountService  account.Service
+	webhookService  webhook.Service
+	scheduleService schedule.Service
+	version         string
 }
 
-func NewService(db *gorm.DB, userService user.Service, accountService account.Service, webhookService webhook.Service) Service {
-	return Service{db: db, userService: userService, accountService: accountService, webhookService: webhookService, version: "v0"}
+func NewService(
+	db *gorm.DB,
+	userService user.Service,
+	accountService account.Service,
+	webhookService webhook.Service,
+	scheduleService schedule.Service,
+) Service {
+	return Service{
+		db:              db,
+		userService:     userService,
+		accountService:  accountService,
+		webhookService:  webhookService,
+		scheduleService: scheduleService,
+		version:         "v0",
+	}
 }
 
 func (s Service) WithVersion(version string) Service {
@@ -72,7 +85,7 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *Accou
 		return err
 	}
 
-	if acc.UserID != c.OwnerID {
+	if acc.OwnerID != c.OwnerID {
 		return ErrUserDoesntMatchAccount
 	}
 
@@ -82,7 +95,11 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *Accou
 		return err
 	}
 
-	return s.db.WithContext(ctx).Create(c).Error
+	if err := s.db.WithContext(ctx).Create(c).Error; err != nil {
+		return fmt.Errorf("could not create consent: %w", err)
+	}
+
+	return nil
 }
 
 func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
@@ -95,8 +112,7 @@ func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
 
 	// Load debtor account if not already loaded.
 	if c.DebtorAccount == nil && c.DebtorAccountID != nil {
-		accID := *c.DebtorAccountID
-		acc, err := s.accountService.Account(ctx, account.Query{ID: accID.String()}, c.OrgID)
+		acc, err := s.accountService.Account(ctx, account.Query{ID: c.DebtorAccountID.String()}, c.OrgID)
 		if err != nil {
 			return err
 		}
@@ -104,7 +120,11 @@ func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
 	}
 
 	if c.DebtorAccount != nil && c.DebtorAccount.SubType == account.SubTypeJointSimple {
-		return s.updateConsentStatus(ctx, c, ConsentStatusPartiallyAccepted)
+		if err := s.updateConsentStatus(ctx, c, ConsentStatusPartiallyAccepted); err != nil {
+			return err
+		}
+		s.scheduleConsent(ctx, c, timeutil.DateTimeNow().Add(scheduleDelay))
+		return nil
 	}
 	return s.updateConsentStatus(ctx, c, ConsentStatusAuthorized)
 }
@@ -160,6 +180,28 @@ func (s Service) EnrollConsent(ctx context.Context, id, orgID string, opts Enrol
 	return s.updateConsent(ctx, c)
 }
 
+func (s Service) RejectConsentByID(ctx context.Context, id, orgID string, code ConsentRejectionReasonCode, detail string) (*Consent, error) {
+	c, err := s.Consent(ctx, id, orgID)
+	if err != nil {
+		return nil, err
+	}
+	return c, s.RejectConsent(ctx, c, code, detail)
+}
+
+func (s Service) RejectConsent(ctx context.Context, c *Consent, code ConsentRejectionReasonCode, detail string) error {
+	if c.Status == ConsentStatusRejected {
+		return ErrConsentAlreadyRejected
+	}
+
+	c.Rejection = &ConsentRejection{Code: code, Detail: detail}
+	if err := s.updateConsentStatus(ctx, c, ConsentStatusRejected); err != nil {
+		return err
+	}
+	s.unscheduleConsent(ctx, c)
+	s.notifyConsentStatusChange(ctx, c)
+	return nil
+}
+
 func (s Service) CreatePayments(ctx context.Context, payments []*Payment) error {
 
 	firstPayment := payments[0]
@@ -182,7 +224,7 @@ func (s Service) CreatePayments(ctx context.Context, payments []*Payment) error 
 		return errorutil.Format("%w: payment consent is not in authorized status", ErrInvalidConsentStatus)
 	}
 
-	if err := s.updateConsentStatus(ctx, c, ConsentStatusConsumed); err != nil {
+	if err := s.consumeConsent(ctx, c); err != nil {
 		return err
 	}
 
@@ -201,7 +243,11 @@ func (s Service) CreatePayments(ctx context.Context, payments []*Payment) error 
 			return err
 		}
 	}
-	return s.db.Create(&payments).Error
+	if err := s.db.Create(&payments).Error; err != nil {
+		return fmt.Errorf("could not create payments: %w", err)
+	}
+
+	return nil
 }
 
 func (s Service) Payment(ctx context.Context, id, orgID string) (*Payment, error) {
@@ -301,56 +347,6 @@ func (s Service) CancelAll(ctx context.Context, consentID, orgID string, doc con
 	}
 
 	return cancelled, nil
-}
-
-func (s Service) RejectConsentByID(ctx context.Context, id, orgID string, code ConsentRejectionReasonCode, detail string) (*Consent, error) {
-	c, err := s.Consent(ctx, id, orgID)
-	if err != nil {
-		return nil, err
-	}
-	return c, s.RejectConsent(ctx, c, code, detail)
-}
-
-func (s Service) RejectConsent(ctx context.Context, c *Consent, code ConsentRejectionReasonCode, detail string) error {
-	if c.Status == ConsentStatusRejected {
-		return ErrConsentAlreadyRejected
-	}
-
-	c.Rejection = &ConsentRejection{
-		Code:   code,
-		Detail: detail,
-	}
-	return s.updateConsentStatus(ctx, c, ConsentStatusRejected)
-}
-
-func (s Service) cancel(ctx context.Context, p *Payment, from CancelledFrom, by string) error {
-	if !slices.Contains([]Status{StatusPDNG, StatusSCHD}, p.Status) {
-		return errorutil.Format("%w: payment with status %s cannot be cancelled, only payments with status PDNG or SCHD can be cancelled", ErrCancelNotAllowed, p.Status)
-	}
-
-	if p.Status == StatusSCHD && !timeutil.BrazilDateNow().Before(p.Date) {
-		return errorutil.Format("%w: scheduled payments can only be cancelled until 23:59 (BRT) of the day before the payment date (%s)", ErrCancelNotAllowed, p.Date.String())
-	}
-
-	reason := CancellationReasonPending
-	if p.Status == StatusSCHD {
-		reason = CancellationReasonScheduled
-	}
-	p.Cancellation = &Cancellation{
-		At:     timeutil.DateTimeNow(),
-		Reason: reason,
-		From:   from,
-		By:     by,
-	}
-	return s.updateStatus(ctx, p, StatusCANC)
-}
-
-func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCode, detail string) error {
-	p.Rejection = &Rejection{
-		Code:   code,
-		Detail: detail,
-	}
-	return s.updateStatus(ctx, p, StatusRJCT)
 }
 
 func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *Account) error {
@@ -470,19 +466,28 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *A
 	return nil
 }
 
-func (s Service) runConsentPreCreationAutomations(_ context.Context, c *Consent) error {
+func (s Service) runConsentPreCreationAutomations(ctx context.Context, c *Consent) error {
 	switch c.PaymentAmount {
 	case "10422.00":
 		return ErrInvalidPayment
-	default:
-		return nil
 	}
+
+	s.scheduleConsent(ctx, c, timeutil.DateTimeNow().Add(scheduleDelay))
+	return nil
 }
 
 func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Consent) error {
+	slog.DebugContext(ctx, "evaluating payment consent automations", "status", c.Status, "amount", c.PaymentAmount)
+
+	now := timeutil.DateTimeNow()
+	if now.Before(c.UpdatedAt.Add(5 * time.Second)) {
+		slog.DebugContext(ctx, "payment consent was updated less than 5 secs ago, skipping transitions", "updated_at", c.UpdatedAt.String())
+		return nil
+	}
+
 	switch c.Status {
 	case ConsentStatusAwaitingAuthorization:
-		if timeutil.DateTimeNow().After(c.ExpiresAt.Time) {
+		if timeutil.DateTimeNow().After(c.ExpiresAt) {
 			slog.DebugContext(ctx, "payment consent awaiting authorization for too long, moving to rejected")
 			return s.RejectConsent(ctx, c, ConsentRejectionAuthorizationTimeout, "consent awaiting authorization for too long")
 		}
@@ -506,12 +511,17 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 			return s.RejectConsent(ctx, c, ConsentRejectionInvalidQRCode, "forced rejection")
 		}
 	case ConsentStatusPartiallyAccepted:
-		if timeutil.DateTimeNow().After(c.StatusUpdatedAt.Add(3 * time.Minute).Time) {
+		if timeutil.DateTimeNow().After(c.StatusUpdatedAt.Add(3 * time.Minute)) {
 			slog.DebugContext(ctx, "payment consent partially accepted for more than 3 minutes, moving to authorized")
-			return s.updateConsentStatus(ctx, c, ConsentStatusAuthorized)
+			if err := s.updateConsentStatus(ctx, c, ConsentStatusAuthorized); err != nil {
+				return err
+			}
+			s.unscheduleConsent(ctx, c)
+			s.notifyConsentStatusChange(ctx, c)
+			return nil
 		}
 	case ConsentStatusAuthorized:
-		if timeutil.DateTimeNow().After(c.ExpiresAt.Time) {
+		if timeutil.DateTimeNow().After(c.ExpiresAt) {
 			slog.DebugContext(ctx, "payment consent reached expiration, moving to rejected")
 			return s.RejectConsent(ctx, c, ConsentRejectionConsumptionTimeout, "payment consent authorization reached expiration")
 		}
@@ -519,6 +529,55 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 	}
 
 	return nil
+}
+
+func (s Service) consumeConsent(ctx context.Context, c *Consent) error {
+	if err := s.updateConsentStatus(ctx, c, ConsentStatusConsumed); err != nil {
+		return err
+	}
+
+	s.unscheduleConsent(ctx, c)
+	s.notifyConsentStatusChange(ctx, c)
+	return nil
+}
+
+func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status ConsentStatus) error {
+	oldStatus := c.Status
+	slog.DebugContext(ctx, "updating payment consent status", "current_status", oldStatus, "new_status", status)
+
+	c.Status = status
+	c.StatusUpdatedAt = timeutil.DateTimeNow()
+	if err := s.updateConsent(ctx, c); err != nil {
+		return fmt.Errorf("could not update payment consent status: %w", err)
+	}
+	return nil
+}
+
+func (s Service) updateConsent(ctx context.Context, c *Consent) error {
+	c.UpdatedAt = timeutil.DateTimeNow()
+	return s.db.WithContext(ctx).
+		Model(&Consent{}).
+		Omit("ID", "CreatedAt", "OrgID").
+		Where("id = ? AND org_id = ?", c.ID, c.OrgID).
+		Updates(c).Error
+}
+
+func (s Service) notifyConsentStatusChange(ctx context.Context, c *Consent) {
+	slog.DebugContext(ctx, "notifying client about payment consent status change", "status", c.Status)
+	s.webhookService.Notify(ctx, c.ClientID, "/payments/"+s.version+"/consents/"+c.URN())
+}
+
+func (s Service) scheduleConsent(ctx context.Context, c *Consent, nextRunAt timeutil.DateTime) {
+	s.scheduleService.Schedule(ctx, &schedule.Schedule{
+		ID:        c.ID,
+		OrgID:     c.OrgID,
+		TaskType:  schedule.TaskTypePaymentConsent,
+		NextRunAt: nextRunAt,
+	})
+}
+
+func (s Service) unscheduleConsent(ctx context.Context, c *Consent) {
+	s.scheduleService.Unschedule(ctx, c.ID.String(), c.OrgID)
 }
 
 func (s Service) validatePayments(_ context.Context, c *Consent, payments []*Payment) error {
@@ -569,23 +628,24 @@ func (s Service) validatePayments(_ context.Context, c *Consent, payments []*Pay
 	return nil
 }
 
-func (s Service) runPreCreationAutomations(_ context.Context, p *Payment) error {
+func (s Service) runPreCreationAutomations(ctx context.Context, p *Payment) error {
 	switch p.Amount {
-	case "20422.01":
+	case "10422.00":
 		return ErrInvalidPayment
-	default:
-		return nil
 	}
+
+	s.schedule(ctx, p, timeutil.DateTimeNow().Add(scheduleDelay))
+	return nil
 }
 
 func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) error {
+	slog.DebugContext(ctx, "evaluating payment automations", "status", p.Status, "amount", p.Amount)
+
 	now := timeutil.DateTimeNow()
 	if now.Before(p.UpdatedAt.Add(5 * time.Second)) {
 		slog.DebugContext(ctx, "payment was updated less than 5 secs ago, skipping transitions", "updated_at", p.UpdatedAt.String())
 		return nil
 	}
-
-	slog.DebugContext(ctx, "evaluating payment automations", "status", p.Status, "amount", p.Amount)
 
 	c, err := s.Consent(ctx, p.ConsentID.String(), p.OrgID)
 	if err != nil {
@@ -654,26 +714,89 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 			}
 		}
 
-		return s.updateStatus(ctx, p, StatusACCP)
+		if err := s.updateStatus(ctx, p, StatusACCP); err != nil {
+			return err
+		}
+		s.schedule(ctx, p, now.Add(scheduleDelay))
+		return nil
 
 	case StatusACCP:
 		today := timeutil.BrazilDateNow()
 		if p.Date.After(today) {
-			return s.updateStatus(ctx, p, StatusSCHD)
+			if err := s.updateStatus(ctx, p, StatusSCHD); err != nil {
+				return err
+			}
+			s.schedule(ctx, p, p.Date.DateTime())
+			s.notifyStatusChange(ctx, p)
+			return nil
 		}
-		return s.updateStatus(ctx, p, StatusACPD)
+
+		if err := s.updateStatus(ctx, p, StatusACPD); err != nil {
+			return err
+		}
+		s.schedule(ctx, p, now.Add(scheduleDelay))
+		return nil
 
 	case StatusSCHD:
 		today := timeutil.BrazilDateNow()
 		if p.Date.After(today) {
 			return nil
 		}
-		return s.updateStatus(ctx, p, StatusACPD)
+
+		if err := s.updateStatus(ctx, p, StatusACPD); err != nil {
+			return err
+		}
+		s.schedule(ctx, p, now.Add(scheduleDelay))
+		return nil
 
 	case StatusACPD:
-		return s.updateStatus(ctx, p, StatusACSC)
+		if err := s.updateStatus(ctx, p, StatusACSC); err != nil {
+			return err
+		}
+		s.unschedule(ctx, p)
+		s.notifyStatusChange(ctx, p)
+		return nil
+	default:
+		return nil
+	}
+}
+
+func (s Service) cancel(ctx context.Context, p *Payment, from CancelledFrom, by string) error {
+	if !slices.Contains([]Status{StatusPDNG, StatusSCHD}, p.Status) {
+		return errorutil.Format("%w: payment with status %s cannot be cancelled, only payments with status PDNG or SCHD can be cancelled", ErrCancelNotAllowed, p.Status)
 	}
 
+	if p.Status == StatusSCHD && !timeutil.BrazilDateNow().Before(p.Date) {
+		return errorutil.Format("%w: scheduled payments can only be cancelled until 23:59 (BRT) of the day before the payment date (%s)", ErrCancelNotAllowed, p.Date.String())
+	}
+
+	reason := CancellationReasonPending
+	if p.Status == StatusSCHD {
+		reason = CancellationReasonScheduled
+	}
+	p.Cancellation = &Cancellation{
+		At:     timeutil.DateTimeNow(),
+		Reason: reason,
+		From:   from,
+		By:     by,
+	}
+	if err := s.updateStatus(ctx, p, StatusCANC); err != nil {
+		return err
+	}
+
+	s.unschedule(ctx, p)
+	s.notifyStatusChange(ctx, p)
+	return nil
+}
+
+func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCode, detail string) error {
+	p.Rejection = &Rejection{Code: code, Detail: detail}
+	if err := s.updateStatus(ctx, p, StatusRJCT); err != nil {
+		return err
+	}
+
+	s.unschedule(ctx, p)
+	s.notifyStatusChange(ctx, p)
 	return nil
 }
 
@@ -682,22 +805,7 @@ func (s Service) updateStatus(ctx context.Context, p *Payment, status Status) er
 
 	p.Status = status
 	p.StatusUpdatedAt = timeutil.DateTimeNow()
-	if err := s.update(ctx, p); err != nil {
-		return fmt.Errorf("could not update payment status: %w", err)
-	}
-
-	if slices.Contains([]Status{
-		StatusPDNG,
-		StatusSCHD,
-		StatusACSC,
-		StatusRJCT,
-		StatusCANC,
-	}, status) {
-		slog.DebugContext(ctx, "notifying client about payment status change")
-		s.webhookService.Notify(ctx, p.ClientID, "/payments/"+s.version+"/pix/payments/"+p.ID.String())
-	}
-
-	return nil
+	return s.update(ctx, p)
 }
 
 func (s Service) update(ctx context.Context, p *Payment) error {
@@ -707,36 +815,6 @@ func (s Service) update(ctx context.Context, p *Payment) error {
 		Omit("ID", "CreatedAt", "OrgID").
 		Where("id = ? AND org_id = ?", p.ID, p.OrgID).
 		Updates(p).Error
-}
-
-func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status ConsentStatus) error {
-	oldStatus := c.Status
-	slog.DebugContext(ctx, "updating payment consent status", "current_status", oldStatus, "new_status", status)
-
-	c.Status = status
-	c.StatusUpdatedAt = timeutil.DateTimeNow()
-	if err := s.updateConsent(ctx, c); err != nil {
-		return fmt.Errorf("could not update payment consent status: %w", err)
-	}
-
-	if slices.Contains([]ConsentStatus{
-		ConsentStatusRejected,
-		ConsentStatusConsumed,
-	}, status) || (oldStatus == ConsentStatusPartiallyAccepted && status == ConsentStatusAuthorized) {
-		slog.DebugContext(ctx, "notifying client about payment consent status change")
-		s.webhookService.Notify(ctx, c.ClientID, "/payments/"+s.version+"/consents/"+c.URN())
-	}
-
-	return nil
-}
-
-func (s Service) updateConsent(ctx context.Context, c *Consent) error {
-	c.UpdatedAt = timeutil.DateTimeNow()
-	return s.db.WithContext(ctx).
-		Model(&Consent{}).
-		Omit("ID", "CreatedAt", "OrgID").
-		Where("id = ? AND org_id = ?", c.ID, c.OrgID).
-		Updates(c).Error
 }
 
 func (s Service) payments(ctx context.Context, orgID string, opts *Filter) ([]*Payment, error) {
@@ -767,4 +845,22 @@ func (s Service) payments(ctx context.Context, orgID string, opts *Filter) ([]*P
 	}
 
 	return payments, nil
+}
+
+func (s Service) schedule(ctx context.Context, p *Payment, nextRunAt timeutil.DateTime) {
+	s.scheduleService.Schedule(ctx, &schedule.Schedule{
+		ID:        p.ID,
+		OrgID:     p.OrgID,
+		TaskType:  schedule.TaskTypePayment,
+		NextRunAt: nextRunAt,
+	})
+}
+
+func (s Service) unschedule(ctx context.Context, p *Payment) {
+	s.scheduleService.Unschedule(ctx, p.ID.String(), p.OrgID)
+}
+
+func (s Service) notifyStatusChange(ctx context.Context, p *Payment) {
+	slog.DebugContext(ctx, "notifying client about payment status change", "status", p.Status)
+	s.webhookService.Notify(ctx, p.ClientID, "/payments/"+s.version+"/pix/payments/"+p.ID.String())
 }

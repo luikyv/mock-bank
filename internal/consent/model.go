@@ -111,6 +111,12 @@ func (p Permissions) HasAccountPermissions() bool {
 	})
 }
 
+func (p Permissions) HasLoanPermissions() bool {
+	return slices.ContainsFunc(p, func(permission Permission) bool {
+		return strings.HasPrefix(string(permission), "LOANS_")
+	})
+}
+
 var (
 	PermissionGroupPersonalRegistrationData = []Permission{
 		PermissionCustomersPersonalIdentificationsRead,

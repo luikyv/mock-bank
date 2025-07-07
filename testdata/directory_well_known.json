@@ -1,12 +1,15 @@
 {
-    "issuer": "https://directory.local",
-    "jwks_uri": "https://directory.local/jwks",
-    "token_endpoint": "https://directory.local/token",
-    "authorization_endpoint": "https://directory.local/authorize",
-	"pushed_authorization_request_endpoint": "https://directory.local/par",
-    "id_token_signing_alg_values_supported": ["RS256", "ES256"],
-    "mtls_endpoint_aliases": {
-        "token_endpoint": "https://matls-directory.local/token",
-        "pushed_authorization_request_endpoint": "https://matls-directory.local/par"
-    }
+  "authorization_endpoint": "https://directory.local/authorize",
+  "id_token_signing_alg_values_supported": [
+    "RS256",
+    "ES256"
+  ],
+  "issuer": "https://directory.local",
+  "jwks_uri": "https://directory.local/jwks",
+  "mtls_endpoint_aliases": {
+    "pushed_authorization_request_endpoint": "https://matls-directory.local/par",
+    "token_endpoint": "https://matls-directory.local/token"
+  },
+  "pushed_authorization_request_endpoint": "https://directory.local/par",
+  "token_endpoint": "https://directory.local/token"
 }

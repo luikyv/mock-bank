@@ -12,7 +12,7 @@ COPY . .
 
 RUN go mod download
 
-RUN go build -o main ./cmd/lambda
+RUN go build -o main ./cmd/server
 
 # Step 2: Run Stage.
 FROM alpine:latest

@@ -78,10 +78,13 @@ func (d DateTime) Before(t DateTime) bool {
 	return d.Time.Before(t.Time)
 }
 
-// TODO.
-// func (d DateTime) After(t DateTime) bool {
-// 	return d.Time.After(t.Time)
-// }
+func (d DateTime) After(t DateTime) bool {
+	return d.Time.After(t.Time)
+}
+
+func (d DateTime) AddDate(years int, months int, days int) DateTime {
+	return NewDateTime(d.Time.AddDate(years, months, days))
+}
 
 func DateTimeNow() DateTime {
 	return NewDateTime(now())
@@ -97,10 +100,12 @@ type BrazilDate struct {
 	time.Time
 }
 
+func (d BrazilDate) DateTime() DateTime {
+	return NewDateTime(d.Time)
+}
+
 func (d BrazilDate) AddDate(years int, months int, days int) BrazilDate {
-	return BrazilDate{
-		Time: d.Time.AddDate(years, months, days),
-	}
+	return NewBrazilDate(d.Time.AddDate(years, months, days))
 }
 
 func (d BrazilDate) Equal(t BrazilDate) bool {

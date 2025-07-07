@@ -21,6 +21,7 @@ type Type string
 
 const (
 	TypeAccount Type = "ACCOUNT"
+	TypeLoan    Type = "LOAN"
 )
 
 type Resource struct {
@@ -39,6 +40,6 @@ func (Resource) TableName() string {
 }
 
 type Filter struct {
-	UserID    string
+	OwnerID   string
 	ConsentID string
 }

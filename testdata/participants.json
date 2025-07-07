@@ -1,194 +1,216 @@
 [
-    {
-        "OrganisationId": "00000000-0000-0000-0000-000000000000",
-        "AuthorisationServers": [
-            {
-                "AuthorisationServerId": "ee6fd655-5bb3-4446-9fac-e1788d9c4049",
-                "OpenIDDiscoveryDocument": "https://auth.mockbank.local/.well-known/openid-configuration",
-                "ApiResources": [
-                    {
-                        "ApiVersion": "3.2.0",
-                        "ApiFamilyType": "consents",
-                        "Status": "Active",
-                        "ApiDiscoveryEndpoints": [
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/consents/v3/consents"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/consents/v3/consents/{consentId}"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/consents/v3/consents/{consentId}/extend"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/consents/v3/consents/{consentId}/extensions"
-                            }
-                        ]
-                    },
-                    {
-                        "ApiVersion": "3.0.0",
-                        "ApiFamilyType": "resources",
-                        "Status": "Active",
-                        "ApiDiscoveryEndpoints": [
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/resources/v3/resources"
-                            }
-                        ]
-                    },
-                    {
-                        "ApiVersion": "2.2.0",
-                        "ApiFamilyType": "customers-personal",
-                        "Status": "Active",
-                        "ApiDiscoveryEndpoints": [
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/customers/v2/personal/identifications"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/customers/v2/personal/qualifications"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/customers/v2/personal/financial-relations"
-                            }
-                        ]
-                    },
-                    {
-                        "ApiVersion": "2.4.1",
-                        "ApiFamilyType": "accounts",
-                        "Status": "Active",
-                        "ApiDiscoveryEndpoints": [
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}/balances"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}/transactions"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}/transactions-current"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits"
-                            }
-                        ]
-                    },
-                    {
-                        "ApiVersion": "2.3.1",
-                        "ApiFamilyType": "credit-cards-accounts",
-                        "Status": "Active",
-                        "ApiDiscoveryEndpoints": [
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/bills"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/bills/{billId}/transactions"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/limits"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/transactions"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/transactions-current"
-                            }
-                        ]
-                    },
-                    {
-                        "ApiFamilyType": "payments-consents",
-                        "ApiVersion": "4.0.0",
-                        "Status": "Active",
-                        "ApiDiscoveryEndpoints": [
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/consents"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/consents/{consentId}"
-                            }
-                        ]
-                    },
-                    {
-                        "ApiFamilyType": "payments-pix",
-                        "ApiVersion": "4.0.0",
-                        "Status": "Active",
-                        "ApiDiscoveryEndpoints": [
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/pix/payments"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/pix/payments/{paymentId}"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/pix/payments/consents/{consentId}"
-                            }
-                        ]
-                    },
-                    {
-                        "ApiFamilyType": "payments-recurring-consents",
-                        "ApiVersion": "2.0.0",
-                        "Status": "Active",
-                        "ApiDiscoveryEndpoints": [
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/recurring-consents"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
-                            }
-                        ]
-                    },
-                    {
-                        "ApiFamilyType": "payments-pix-recurring-payments",
-                        "ApiVersion": "2.0.0",
-                        "Status": "Active",
-                        "ApiDiscoveryEndpoints": [
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/pix/recurring-payments"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}"
-                            }
-                        ]
-                    },
-                    {
-                        "ApiFamilyType": "enrollments",
-                        "ApiVersion": "2.1.0",
-                        "Status": "Active",
-                        "ApiDiscoveryEndpoints": [
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/risk-signals"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-sign-options"
-                            },
-                            {
-                                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/consents/{consentId}/authorise"
-                            }
-                        ]
-                    }
-                ]
-            }
+  {
+    "OrganisationId": "00000000-0000-0000-0000-000000000000",
+    "AuthorisationServers": [
+      {
+        "AuthorisationServerId": "ee6fd655-5bb3-4446-9fac-e1788d9c4049",
+        "OpenIDDiscoveryDocument": "https://auth.mockbank.local/.well-known/openid-configuration",
+        "ApiResources": [
+          {
+            "ApiDiscoveryEndpoints": [
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/consents/v3/consents"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/consents/v3/consents/{consentId}"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/consents/v3/consents/{consentId}/extend"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/consents/v3/consents/{consentId}/extensions"
+              }
+            ],
+            "ApiFamilyType": "consents",
+            "ApiVersion": "3.2.0",
+            "Status": "Active"
+          },
+          {
+            "ApiDiscoveryEndpoints": [
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/resources/v3/resources"
+              }
+            ],
+            "ApiFamilyType": "resources",
+            "ApiVersion": "3.0.0",
+            "Status": "Active"
+          },
+          {
+            "ApiDiscoveryEndpoints": [
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/customers/v2/personal/identifications"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/customers/v2/personal/qualifications"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/customers/v2/personal/financial-relations"
+              }
+            ],
+            "ApiFamilyType": "customers-personal",
+            "ApiVersion": "2.2.0",
+            "Status": "Active"
+          },
+          {
+            "ApiDiscoveryEndpoints": [
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}/balances"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}/transactions"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}/transactions-current"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits"
+              }
+            ],
+            "ApiFamilyType": "accounts",
+            "ApiVersion": "2.4.1",
+            "Status": "Active"
+          },
+          {
+            "ApiFamilyType": "loans",
+            "ApiVersion": "2.0.0",
+            "Status": "Active",
+            "ApiDiscoveryEndpoints": [
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/loans/v2/contracts"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/loans/v2/contracts/{contractId}"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/loans/v2/contracts/{contractId}/warranties"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/loans/v2/contracts/{contractId}/scheduled-instalments"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/loans/v2/contracts/{contractId}/payments"
+              }
+            ]
+          },
+          {
+            "ApiDiscoveryEndpoints": [
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/bills"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/bills/{billId}/transactions"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/limits"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/transactions"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/transactions-current"
+              }
+            ],
+            "ApiFamilyType": "credit-cards-accounts",
+            "ApiVersion": "2.3.1",
+            "Status": "Active"
+          },
+          {
+            "ApiDiscoveryEndpoints": [
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/consents"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/consents/{consentId}"
+              }
+            ],
+            "ApiFamilyType": "payments-consents",
+            "ApiVersion": "4.0.0",
+            "Status": "Active"
+          },
+          {
+            "ApiDiscoveryEndpoints": [
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/pix/payments"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/pix/payments/{paymentId}"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/pix/payments/consents/{consentId}"
+              }
+            ],
+            "ApiFamilyType": "payments-pix",
+            "ApiVersion": "4.0.0",
+            "Status": "Active"
+          },
+          {
+            "ApiDiscoveryEndpoints": [
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/recurring-consents"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+              }
+            ],
+            "ApiFamilyType": "payments-recurring-consents",
+            "ApiVersion": "2.0.0",
+            "Status": "Active"
+          },
+          {
+            "ApiDiscoveryEndpoints": [
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/pix/recurring-payments"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}"
+              }
+            ],
+            "ApiFamilyType": "payments-pix-recurring-payments",
+            "ApiVersion": "2.0.0",
+            "Status": "Active"
+          },
+          {
+            "ApiDiscoveryEndpoints": [
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/risk-signals"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-sign-options"
+              },
+              {
+                "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/consents/{consentId}/authorise"
+              }
+            ],
+            "ApiFamilyType": "enrollments",
+            "ApiVersion": "2.1.0",
+            "Status": "Active"
+          }
         ]
-    }
+      }
+    ]
+  }
 ]

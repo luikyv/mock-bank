@@ -26,7 +26,7 @@ func ConsentURN(id uuid.UUID) string {
 }
 
 func ConsentIDFromScopes(scopes string) (string, bool) {
-	for _, s := range strings.Split(scopes, " ") {
+	for s := range strings.SplitSeq(scopes, " ") {
 		if consent.ScopeID.Matches(s) {
 			return strings.TrimPrefix(s, "consent:"+ConsentURNPrefix), true
 		}

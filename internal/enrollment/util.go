@@ -13,7 +13,7 @@ func URN(id uuid.UUID) string {
 }
 
 func IDFromScopes(scopes string) (string, bool) {
-	for _, s := range strings.Split(scopes, " ") {
+	for s := range strings.SplitSeq(scopes, " ") {
 		if ScopeID.Matches(s) {
 			return strings.TrimPrefix(s, "enrollment:"+URNPrefix), true
 		}

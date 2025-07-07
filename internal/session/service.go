@@ -23,7 +23,7 @@ func NewService(db *gorm.DB, directoryService directory.Service) Service {
 	}
 }
 
-func (s Service) CreateSession(ctx context.Context) (session *Session, authURL string, err error) {
+func (s Service) Create(ctx context.Context) (session *Session, authURL string, err error) {
 	authURL, codeVerifier, err := s.directoryService.AuthURL(ctx)
 	if err != nil {
 		return nil, "", err
@@ -40,7 +40,7 @@ func (s Service) CreateSession(ctx context.Context) (session *Session, authURL s
 	return session, authURL, nil
 }
 
-func (s Service) AuthorizeSession(ctx context.Context, sessionID, authCode string) error {
+func (s Service) Authorize(ctx context.Context, sessionID, authCode string) error {
 	var session Session
 	if err := s.db.WithContext(ctx).First(&session, "id = ?", sessionID).Error; err != nil {
 		return fmt.Errorf("could not find session: %w", err)
@@ -84,13 +84,13 @@ func (s Service) Session(ctx context.Context, id string) (*Session, error) {
 	}
 
 	if session.IsExpired() {
-		_ = s.DeleteSession(ctx, id)
+		_ = s.Delete(ctx, id)
 		return nil, ErrNotFound
 	}
 	return session, nil
 }
 
-func (s Service) DeleteSession(ctx context.Context, id string) error {
+func (s Service) Delete(ctx context.Context, id string) error {
 	if err := s.db.WithContext(ctx).Delete(&Session{}, "id = ?", id).Error; err != nil {
 		return fmt.Errorf("could not delete session with id %s: %w", id, err)
 	}

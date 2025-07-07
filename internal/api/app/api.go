@@ -29,7 +29,14 @@ const (
 
 var _ StrictServerInterface = Server{}
 
+type BankConfig interface {
+	AccountBranch() string
+	AccountCheckDigit() string
+	AccountCompeCode() string
+}
+
 type Server struct {
+	config          BankConfig
 	host            string
 	sessionService  session.Service
 	userService     user.Service
@@ -39,6 +46,7 @@ type Server struct {
 }
 
 func NewServer(
+	config BankConfig,
 	host string,
 	service session.Service,
 	userService user.Service,
@@ -47,6 +55,7 @@ func NewServer(
 	accountService account.Service,
 ) Server {
 	return Server{
+		config:          config,
 		host:            host,
 		sessionService:  service,
 		userService:     userService,
@@ -105,7 +114,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (s Server) GetDirectoryAuthURL(ctx context.Context, request GetDirectoryAuthURLRequestObject) (GetDirectoryAuthURLResponseObject, error) {
-	session, authURL, err := s.sessionService.CreateSession(ctx)
+	session, authURL, err := s.sessionService.Create(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +143,7 @@ func (s Server) GetDirectoryAuthURL(ctx context.Context, request GetDirectoryAut
 
 func (s Server) HandleDirectoryCallback(ctx context.Context, req HandleDirectoryCallbackRequestObject) (HandleDirectoryCallbackResponseObject, error) {
 	sessionID := ctx.Value(api.CtxKeySessionID).(string)
-	if err := s.sessionService.AuthorizeSession(ctx, sessionID, req.Params.Code); err != nil {
+	if err := s.sessionService.Authorize(ctx, sessionID, req.Params.Code); err != nil {
 		return nil, err
 	}
 
@@ -146,7 +155,7 @@ func (s Server) HandleDirectoryCallback(ctx context.Context, req HandleDirectory
 
 func (s Server) LogoutUser(ctx context.Context, req LogoutUserRequestObject) (LogoutUserResponseObject, error) {
 	sessionID := ctx.Value(api.CtxKeySessionID).(string)
-	_ = s.sessionService.DeleteSession(ctx, sessionID)
+	_ = s.sessionService.Delete(ctx, sessionID)
 
 	headers := LogoutUser303ResponseHeaders{
 		SetCookie: (&http.Cookie{
@@ -325,7 +334,7 @@ func (s Server) CreateAccount(ctx context.Context, req CreateAccountRequestObjec
 		BlockedAmount:               req.Body.Data.BlockedAmount,
 		AutomaticallyInvestedAmount: req.Body.Data.AutomaticallyInvestedAmount,
 		OrgID:                       req.OrgID,
-		UserID:                      req.UserID,
+		OwnerID:                     req.UserID,
 	}
 	if err := s.accountService.Create(ctx, acc); err != nil {
 		return nil, err
@@ -337,9 +346,9 @@ func (s Server) CreateAccount(ctx context.Context, req CreateAccountRequestObjec
 			AutomaticallyInvestedAmount: acc.AutomaticallyInvestedAmount,
 			AvailableAmount:             acc.AvailableAmount,
 			BlockedAmount:               acc.BlockedAmount,
-			BranchCode:                  account.DefaultBranch,
-			CheckDigit:                  account.DefaultCheckDigit,
-			CompeCode:                   account.DefaultCompeCode,
+			BranchCode:                  s.config.AccountBranch(),
+			CheckDigit:                  s.config.AccountCheckDigit(),
+			CompeCode:                   s.config.AccountCompeCode(),
 			Number:                      acc.Number,
 			Subtype:                     string(acc.SubType),
 			Type:                        string(acc.Type),
@@ -366,7 +375,7 @@ func (s Server) UpdateAccount(ctx context.Context, req UpdateAccountRequestObjec
 		BlockedAmount:               req.Body.Data.BlockedAmount,
 		AutomaticallyInvestedAmount: req.Body.Data.AutomaticallyInvestedAmount,
 		OrgID:                       req.OrgID,
-		UserID:                      req.UserID,
+		OwnerID:                     req.UserID,
 	}
 	if err := s.accountService.Update(ctx, acc); err != nil {
 		return nil, err
@@ -378,9 +387,9 @@ func (s Server) UpdateAccount(ctx context.Context, req UpdateAccountRequestObjec
 			AutomaticallyInvestedAmount: acc.AutomaticallyInvestedAmount,
 			AvailableAmount:             acc.AvailableAmount,
 			BlockedAmount:               acc.BlockedAmount,
-			BranchCode:                  account.DefaultBranch,
-			CheckDigit:                  account.DefaultCheckDigit,
-			CompeCode:                   account.DefaultCompeCode,
+			BranchCode:                  s.config.AccountBranch(),
+			CheckDigit:                  s.config.AccountCheckDigit(),
+			CompeCode:                   s.config.AccountCompeCode(),
 			Number:                      acc.Number,
 			Subtype:                     string(acc.SubType),
 			Type:                        string(acc.Type),
@@ -408,9 +417,9 @@ func (s Server) GetAccounts(ctx context.Context, req GetAccountsRequestObject) (
 			AutomaticallyInvestedAmount: acc.AutomaticallyInvestedAmount,
 			AvailableAmount:             acc.AvailableAmount,
 			BlockedAmount:               acc.BlockedAmount,
-			BranchCode:                  account.DefaultBranch,
-			CheckDigit:                  account.DefaultCheckDigit,
-			CompeCode:                   account.DefaultCompeCode,
+			BranchCode:                  s.config.AccountBranch(),
+			CheckDigit:                  s.config.AccountCheckDigit(),
+			CompeCode:                   s.config.AccountCompeCode(),
 			Number:                      acc.Number,
 			Subtype:                     string(acc.SubType),
 			Type:                        string(acc.Type),
@@ -486,7 +495,7 @@ func (s Server) GetConsents(ctx context.Context, req GetConsentsRequestObject) (
 func (s Server) GetResources(ctx context.Context, req GetResourcesRequestObject) (GetResourcesResponseObject, error) {
 	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
 
-	rs, err := s.resourceService.Resources(ctx, req.OrgID, resource.Filter{UserID: req.UserID.String()}, pag)
+	rs, err := s.resourceService.Resources(ctx, req.OrgID, resource.Filter{OwnerID: req.UserID.String()}, pag)
 	if err != nil {
 		return nil, err
 	}

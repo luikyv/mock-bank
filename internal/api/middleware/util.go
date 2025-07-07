@@ -19,6 +19,10 @@ const (
 	HeaderXFAPIInteractionID = "X-FAPI-Interaction-ID"
 )
 
+type Options struct {
+	ErrorPagination bool
+}
+
 func CertCN(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cert, err := oidc.ClientCert(r)
@@ -35,11 +39,11 @@ func CertCN(next http.Handler) http.Handler {
 	})
 }
 
-type Options struct {
-	ErrorPagination bool
+func FAPIID() func(http.Handler) http.Handler {
+	return FAPIIDWithOptions(nil)
 }
 
-func FAPIID(opts *Options) func(http.Handler) http.Handler {
+func FAPIIDWithOptions(opts *Options) func(http.Handler) http.Handler {
 	if opts == nil {
 		opts = &Options{}
 	}

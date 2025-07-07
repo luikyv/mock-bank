@@ -19,15 +19,19 @@ import (
 	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
-func JWT(baseURL, bankOrgID, keystoreHost string, signer crypto.Signer) func(http.Handler) http.Handler {
+// JWT creates a middleware that handles JWT request/response processing.
+// It validates incoming JWT requests and signs outgoing JWT responses.
+func JWT(baseURL, bankOrgID, keystoreHost string, signer crypto.Signer, service jwtutil.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		next = requestMiddlewareHandler(next, baseURL, keystoreHost)
+		next = requestMiddlewareHandler(next, baseURL, keystoreHost, service)
 		next = responseMiddlewareHandler(next, bankOrgID, signer)
 		return next
 	}
 }
 
-func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) http.Handler {
+// requestMiddlewareHandler processes incoming JWT requests by validating the JWT signature,
+// claims, and extracting the payload data for downstream handlers.
+func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string, service jwtutil.Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method == http.MethodGet || r.Method == http.MethodDelete {
@@ -104,6 +108,18 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 			return
 		}
 
+		jtiIsValid, err := service.CheckJTI(r.Context(), jwtClaims.ID, clientOrgID)
+		if err != nil {
+			slog.ErrorContext(r.Context(), "failed to check jti", "error", err)
+			api.WriteError(w, r, fmt.Errorf("failed to check jti: %w", err))
+			return
+		}
+
+		if !jtiIsValid {
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, "jti is invalid"))
+			return
+		}
+
 		claims = map[string]any{
 			"data": claims["data"],
 		}
@@ -123,6 +139,8 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string) h
 	})
 }
 
+// responseMiddlewareHandler processes outgoing responses by wrapping them in a JWT
+// with the bank's signature and required claims.
 func responseMiddlewareHandler(next http.Handler, bankOrgID string, signer crypto.Signer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &responseBuffer{
@@ -137,6 +155,7 @@ func responseMiddlewareHandler(next http.Handler, bankOrgID string, signer crypt
 			return
 		}
 
+		// Only sign successful responses and 422 responses.
 		if !slices.Contains([]int{
 			http.StatusOK,
 			http.StatusCreated,
@@ -158,8 +177,7 @@ func responseMiddlewareHandler(next http.Handler, bankOrgID string, signer crypt
 		respPayload["iss"] = bankOrgID
 		respPayload["aud"] = r.Context().Value(api.CtxKeyOrgID)
 		respPayload["jti"] = uuid.NewString()
-		now := timeutil.Timestamp()
-		respPayload["iat"] = now
+		respPayload["iat"] = timeutil.Timestamp()
 
 		jwsResp, err := jwtutil.Sign(respPayload, signer)
 		if err != nil {
@@ -173,6 +191,8 @@ func responseMiddlewareHandler(next http.Handler, bankOrgID string, signer crypt
 	})
 }
 
+// responseBuffer captures the response from downstream handlers to allow
+// JWT processing before sending to the client.
 type responseBuffer struct {
 	http.ResponseWriter
 	Body       *bytes.Buffer

@@ -11,7 +11,7 @@ func ConsentURN(id uuid.UUID) string {
 }
 
 func ConsentIDFromScopes(scopes string) (string, bool) {
-	for _, s := range strings.Split(scopes, " ") {
+	for s := range strings.SplitSeq(scopes, " ") {
 		if ScopeConsentID.Matches(s) {
 			return strings.TrimPrefix(s, "recurring-consent:"+ConsentURNPrefix), true
 		}
