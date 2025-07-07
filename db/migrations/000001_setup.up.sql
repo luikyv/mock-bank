@@ -479,7 +479,7 @@ CREATE TABLE idempotency_records (
 
 CREATE TABLE jwt_ids (
     id TEXT PRIMARY KEY,
-    
+
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
