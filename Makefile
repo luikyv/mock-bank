@@ -17,7 +17,8 @@ setup-dev:
 setup-cs:
 	@if [ ! -d "conformance-suite" ]; then \
 	  echo "Cloning open finance conformance suite repository..."; \
-	  git clone --branch $(CS_VERSION) --single-branch --depth=1 https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance-suite; \
+	  git clone https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance-suite; \
+	  cd conformance-suite && git checkout $(CS_VERSION); \
 	fi
 
 	@make build-cs
