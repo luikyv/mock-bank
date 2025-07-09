@@ -71,7 +71,7 @@ test-coverage:
 cs-tests:
 	@if [ ! -d "cs-venv" ]; then \
 	  python3 -m venv cs-venv; \
-	  source cs-venv/bin/activate; \
+	  . ./cs-venv/bin/activate; \
 	  python3 -m pip install httpx; \
 	fi
 
