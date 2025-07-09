@@ -224,7 +224,7 @@ func (s Service) Transactions(ctx context.Context, accID, orgID string, pag page
 	query := s.db.WithContext(ctx).
 		Model(&Transaction{}).
 		Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID).
-		Where("account_id = ? AND created_at >= ? AND created_at <= ?", accID, filter.from.Time, filter.to.Time)
+		Where("account_id = ? AND date_time >= ? AND date_time <= ?", accID, filter.from.DateTime(), filter.to.DateTime())
 
 	if filter.movementType != "" {
 		query = query.Where("movement_type = ?", filter.movementType)
@@ -234,7 +234,7 @@ func (s Service) Transactions(ctx context.Context, accID, orgID string, pag page
 	if err := query.
 		Limit(pag.Limit()).
 		Offset(pag.Offset()).
-		Order("created_at DESC").
+		Order("date_time DESC").
 		Find(&txs).Error; err != nil {
 		return page.Page[*Transaction]{}, err
 	}

@@ -119,6 +119,9 @@
         background: #d1d5db;
       }
     </style>
+    <script nonce="{{ .Nonce }}">
+      window.history.pushState({}, "", "{{ .BaseURL }}/authorize/{{ .CallbackID }}/consent");
+    </script>
   </head>
 
   <body>
@@ -133,7 +136,7 @@
       <div class="info-block"><strong>Company (CNPJ):</strong> {{ .BusinessCNPJ }}</div>
       {{ end }}
 
-      <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
+      <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}/consent" method="POST">
         {{ if .Accounts }}
         <div class="section">
           <div class="section-header" id="accountSectionToggle">
@@ -171,7 +174,7 @@
             <li>
               <label class="checkbox">
                 <input type="checkbox" name="loans" value="{{ .ID }}" checked class="loan-checkbox" />
-                Contract: {{ .Number }}, Amount: {{ .Amount }} {{ .Currency }}
+                Contract: {{ .Number }}
               </label>
             </li>
             {{ end }}
@@ -180,12 +183,12 @@
         {{ end }}
 
         <input type="hidden" name="consent" value="true" />
-        <button type="submit" class="consent-button">Consent and Continue</button>
+        <button type="submit" id="consent-button" class="consent-button">Consent and Continue</button>
       </form>
 
-      <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
+      <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}/consent" method="POST">
         <input type="hidden" name="consent" value="false" />
-        <button type="submit" class="cancel-button">Deny</button>
+        <button type="submit" id="cancel-button" class="cancel-button">Deny</button>
       </form>
     </div>
 
@@ -231,23 +234,28 @@
       }
 
       document.addEventListener("DOMContentLoaded", () => {
-        updateAccountsToggle();
-        updateLoansToggle();
 
-        document.getElementById("accountSectionToggle")?.addEventListener("click", toggleAccountList);
-        document.getElementById("loanSectionToggle")?.addEventListener("click", toggleLoanList);
+        const accountsSection = document.getElementById("accountSectionToggle");
+        if (accountsSection) {
+          updateAccountsToggle();
+          accountsSection.addEventListener("click", toggleAccountList);
+          document.getElementById("accountsToggle")?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleAllAccounts();
+          });
+          document.querySelectorAll(".account-checkbox").forEach((cb) => cb.addEventListener("change", updateAccountsToggle));
+        }
 
-        document.getElementById("accountsToggle")?.addEventListener("click", (e) => {
-          e.stopPropagation();
-          toggleAllAccounts();
-        });
-        document.getElementById("loansToggle")?.addEventListener("click", (e) => {
-          e.stopPropagation();
-          toggleAllLoans();
-        });
-
-        document.querySelectorAll(".account-checkbox").forEach((cb) => cb.addEventListener("change", updateAccountsToggle));
-        document.querySelectorAll(".loan-checkbox").forEach((cb) => cb.addEventListener("change", updateLoansToggle));
+        const loansSection = document.getElementById("loanSectionToggle");
+        if (loansSection) {
+          updateLoansToggle();
+          loansSection.addEventListener("click", toggleLoanList);
+          document.getElementById("loansToggle")?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleAllLoans();
+          });
+          document.querySelectorAll(".loan-checkbox").forEach((cb) => cb.addEventListener("change", updateLoansToggle));
+        }
 
         // prevent label click from toggling list
         document.querySelectorAll(".section-header label.checkbox").forEach((label) =>

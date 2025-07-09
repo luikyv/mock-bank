@@ -27,22 +27,22 @@ func (s Service) Schedule(ctx context.Context, schedule *Schedule) {
 
 func (s Service) Unschedule(ctx context.Context, id, orgID string) {
 	if err := s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).Delete(&Schedule{}).Error; err != nil {
-		slog.ErrorContext(ctx, "failed to unschedule task", "error", err)
+		slog.ErrorContext(ctx, "failed to unschedule task", "id", id, "org_id", orgID, "error", err)
 	}
 }
 
 func (s Service) Schedules(ctx context.Context, pag page.Pagination) (page.Page[*Schedule], error) {
-	query := s.db.WithContext(ctx).Model(&Schedule{})
-
 	now := timeutil.DateTimeNow()
+	query := s.db.WithContext(ctx).Model(&Schedule{}).
+		// Fetch the oldest schedules first.
+		Order("next_run_at ASC").
+		// Fetch only schedules that are due but at most 6 hours in the past.
+		Where("next_run_at < ? AND next_run_at > ?", now, now.Add(-6*time.Hour))
+
 	var schedules []*Schedule
 	if err := query.
 		Limit(pag.Limit()).
 		Offset(pag.Offset()).
-		// Fetch the oldest schedules first.
-		Order("next_run_at ASC").
-		// Fetch only schedules that are due but at most 6 hours in the past.
-		Where("next_run_at < ? AND next_run_at > ?", now, now.Add(-6*time.Hour)).
 		Find(&schedules).Error; err != nil {
 		return page.Page[*Schedule]{}, err
 	}

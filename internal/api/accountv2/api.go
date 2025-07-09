@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/luikyv/mock-bank/internal/api/middleware"
+	"github.com/luikyv/mock-bank/internal/errorutil"
 
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
@@ -76,37 +77,55 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	var handler http.Handler
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccounts)
-	handler = middleware.Permission(s.consentService, consent.PermissionAccountsRead)(handler)
+	handler = middleware.PermissionWithOptions(
+		s.consentService,
+		&middleware.Options{ErrorPagination: true},
+		consent.PermissionAccountsRead,
+	)(handler)
 	handler = authCodeAuthMiddleware(handler)
+	handler = middleware.FAPIIDWithOptions(&middleware.Options{ErrorPagination: true})(handler)
 	accountMux.Handle("GET /accounts", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountID)
-	handler = middleware.Permission(s.consentService, consent.PermissionAccountsRead)(handler)
+	handler = middleware.PermissionWithOptions(
+		s.consentService,
+		&middleware.Options{ErrorPagination: true},
+		consent.PermissionAccountsRead,
+	)(handler)
 	handler = authCodeAuthMiddleware(handler)
+	handler = middleware.FAPIIDWithOptions(&middleware.Options{ErrorPagination: true})(handler)
 	accountMux.Handle("GET /accounts/{accountId}", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDBalances)
-	handler = middleware.Permission(s.consentService, consent.PermissionAccountsBalanceRead)(handler)
+	handler = middleware.PermissionWithOptions(
+		s.consentService,
+		&middleware.Options{ErrorPagination: true},
+		consent.PermissionAccountsBalanceRead,
+	)(handler)
 	handler = authCodeAuthMiddleware(handler)
+	handler = middleware.FAPIIDWithOptions(&middleware.Options{ErrorPagination: true})(handler)
 	accountMux.Handle("GET /accounts/{accountId}/balances", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDOverdraftLimits)
-	handler = middleware.Permission(s.consentService, consent.PermissionAccountsOverdraftLimitsRead)(handler)
+	handler = middleware.PermissionWithOptions(s.consentService, &middleware.Options{ErrorPagination: true},
+		consent.PermissionAccountsOverdraftLimitsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
+	handler = middleware.FAPIIDWithOptions(&middleware.Options{ErrorPagination: true})(handler)
 	accountMux.Handle("GET /accounts/{accountId}/overdraft-limits", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDTransactions)
 	handler = middleware.Permission(s.consentService, consent.PermissionAccountsTransactionsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
+	handler = middleware.FAPIID()(handler)
 	accountMux.Handle("GET /accounts/{accountId}/transactions", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDTransactionsCurrent)
 	handler = middleware.Permission(s.consentService, consent.PermissionAccountsTransactionsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
+	handler = middleware.FAPIID()(handler)
 	accountMux.Handle("GET /accounts/{accountId}/transactions-current", handler)
 
-	handler = middleware.FAPIID()(accountMux)
-	mux.Handle("/open-banking/accounts/v2/", http.StripPrefix("/open-banking/accounts/v2", handler))
+	mux.Handle("/open-banking/accounts/v2/", http.StripPrefix("/open-banking/accounts/v2", accountMux))
 }
 
 func (s Server) AccountsGetAccounts(ctx context.Context, req AccountsGetAccountsRequestObject) (AccountsGetAccountsResponseObject, error) {
@@ -237,7 +256,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
 	consentID := ctx.Value(api.CtxKeyConsentID).(string)
 	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
-	filter, err := account.NewTransactionFilter(req.Params.FromBookingDate, req.Params.ToBookingDate, false)
+	filter, err := account.NewTransactionFilter(req.Params.FromBookingDate, req.Params.ToBookingDate)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +273,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 	resp := ResponseAccountTransactions{
 		Data:  []AccountTransactionsData{},
 		Meta:  *api.NewMeta(),
-		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts/"+req.AccountID+"/transactions", txs),
+		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts/"+req.AccountID+"/transactions", txs).WithoutLast(),
 	}
 	for _, tx := range txs.Records {
 		data := AccountTransactionsData{
@@ -269,8 +288,8 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 				Amount:   tx.Amount,
 				Currency: s.config.Currency(),
 			},
-			TransactionDateTime: tx.CreatedAt.Format(timeutil.DateTimeMillisFormat),
-			TransactionID:       tx.ID,
+			TransactionDateTime: tx.DateTime.Format(timeutil.DateTimeMillisFormat),
+			TransactionID:       tx.ID.String(),
 			TransactionName:     tx.Name,
 			Type:                EnumTransactionTypes(tx.Type),
 		}
@@ -287,7 +306,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
 	consentID := ctx.Value(api.CtxKeyConsentID).(string)
 	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
-	filter, err := account.NewTransactionFilter(req.Params.FromBookingDate, req.Params.ToBookingDate, false)
+	filter, err := account.NewCurrentTransactionFilter(req.Params.FromBookingDate, req.Params.ToBookingDate)
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +323,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 	resp := ResponseAccountTransactions{
 		Data:  []AccountTransactionsData{},
 		Meta:  *api.NewMeta(),
-		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts/"+req.AccountID+"/transactions-current", txs),
+		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts/"+req.AccountID+"/transactions-current", txs).WithoutLast(),
 	}
 	for _, tx := range txs.Records {
 		data := AccountTransactionsData{
@@ -319,8 +338,8 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 				Amount:   tx.Amount,
 				Currency: s.config.Currency(),
 			},
-			TransactionDateTime: tx.CreatedAt.Format(timeutil.DateTimeMillisFormat),
-			TransactionID:       tx.ID,
+			TransactionDateTime: tx.DateTime.Format(timeutil.DateTimeMillisFormat),
+			TransactionID:       tx.ID.String(),
 			TransactionName:     tx.Name,
 			Type:                EnumTransactionTypes(tx.Type),
 		}
@@ -342,6 +361,11 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error, pagin
 
 	if errors.Is(err, account.ErrJointAccountPendingAuthorization) {
 		api.WriteError(w, r, api.NewError("STATUS_RESOURCE_PENDING_AUTHORISATION", http.StatusForbidden, account.ErrJointAccountPendingAuthorization.Error()).Pagination(pagination))
+		return
+	}
+
+	if errors.As(err, &errorutil.Error{}) {
+		api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusUnprocessableEntity, err.Error()).Pagination(pagination))
 		return
 	}
 

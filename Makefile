@@ -4,32 +4,30 @@ ORG_ID="00000000-0000-0000-0000-000000000000"
 SOFTWARE_ID="11111111-1111-1111-1111-111111111111"
 CS_VERSION="3de7a6d5bccbea655519cd4f3e632bf01f9247d9"
 
-# Set up the development environment by downloading dependencies installing
-# pre-commit hooks, generating keys, and setting up the Open Finance
-# Conformance Suite.
 setup:
-	@go mod download
-	@pre-commit install
-	@make tools
-	@make keys
 	@chmod +x testdata/setup-localstack.sh
 	@make setup-ui
-	@make setup-cs
+
+setup-dev:
+	@go mod download
+	@pre-commit install
+	@make setup
+
+# Clone and build the Open Finance Conformance Suite.
+setup-cs:
+	@if [ ! -d "conformance-suite" ]; then \
+	  echo "Cloning open finance conformance suite repository..."; \
+	  git clone --branch $(CS_VERSION) --single-branch --depth=1 https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance-suite; \
+	fi
+
+	@make build-cs
 
 setup-ui:
 	@if [ ! -d "mock-bank-ui" ]; then \
 	  echo "Cloning mock-bank-ui repository..."; \
-	  git clone git@github.com:luikyv/mock-bank-ui.git mock-bank-ui; \
+	  git clone git@github.com:luikyv/mock-bank-ui.git; \
 	fi
-
-tools:
-	@go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
-	@go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
-
-lambda-zip:
-	@GOOS=linux GOARCH=amd64 go build -o bootstrap ./cmd/server/main.go
-	@zip lambda.zip bootstrap
-	@rm bootstrap
+	@cd mock-bank-ui && git pull
 
 run:
 	@docker-compose up
@@ -40,29 +38,22 @@ run-with-cs:
 
 # Generate certificates, private keys, and JWKS files for both the server and clients.
 keys:
-	@go run cmd/keymaker/main.go --org_id=$(ORG_ID) --software_id=$(SOFTWARE_ID)
+	@go run cmd/keymaker/main.go --org_id=$(ORG_ID) --software_id=$(SOFTWARE_ID) --keys_dir=./testdata/keys
 
 models:
 	@go generate ./...
 
-# Build the MockBank Docker Image.
+migration:
+	@docker compose run migration
+
 build-mockbank:
 	@docker-compose build mockbank
 
 build-mockgw:
 	@docker-compose build mockgw
 
-migrations:
-	@ cd cmd/migration && go run .
-
-# Clone and build the Open Finance Conformance Suite.
-setup-cs:
-	@if [ ! -d "conformance/suite" ]; then \
-	  echo "Cloning open finance conformance suite repository..."; \
-	  git clone --branch $(CS_VERSION) --single-branch --depth=1 https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance/suite; \
-	fi
-
-	@make build-cs
+build-migration:
+	@docker compose build migration
 
 # Build the Conformance Suite JAR file.
 build-cs:
@@ -77,7 +68,13 @@ test-coverage:
 	@echo "Total Coverage: `go tool cover -func=coverage.out | grep total | grep -Eo '[0-9]+\.[0-9]+'` %"
 
 cs-tests:
-	@python3 conformance/suite/scripts/run-test-plan.py \
-		consents_test-plan_v3-2 ./conformance/phase2_consents_v3-config.json \
-		--expected-failures-file ./conformance/expected_failures.json \
-		--export-dir ./conformance/results
+	@if [ ! -d "cs-venv" ]; then \
+	  python3 -m venv cs-venv; \
+	  source cs-venv/bin/activate; \
+	  python3 -m pip install httpx; \
+	fi
+
+	@cs-venv/bin/python conformance-suite/scripts/run-test-plan.py \
+		accounts_test-plan_v2-4 ./testdata/conformance/phase2-config.json \
+		--expected-failures-file ./testdata/conformance/expected_failures.json \
+		--export-dir ./conformance-suite/results

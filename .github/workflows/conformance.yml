@@ -1,10 +1,10 @@
 name: Conformance Suite Tests
 on:
-    push:
-      branches: [main]
-    pull_request:
-      branches: [main]
-    workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
 
@@ -20,39 +20,21 @@ jobs:
           with:
             python-version: '3.x'
 
-        - name: Set Up Dependencies
-          run: |
-            echo "Installing Python httpx"
-            python3 -m pip install httpx
-
         - name: Cache Conformance Suite Repository
           uses: actions/cache@v3
           id: cache-cs
           with:
-            path: ./conformance/suite
+            path: ./conformance-suite
             key: cs-${{ env.CS_VERSION }}
 
         - name: Set Up Conformance Suite
           if: steps.cache-cs.outputs.cache-hit != 'true'
           run: |
-            git clone --branch $CS_VERSION --single-branch --depth=1 https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance/suite
-            docker compose run cs-builder
+            make setup-cs
 
         - name: Run Mock Bank With Conformance Suite
           run: |
-            docker compose --profile conformance up -d
-
-            echo "Waiting for the mock bank server to be ready"
-            timeout 30 bash -c '
-              while [ "$(curl -skf -o /dev/null -w "%{http_code}" https://auth.mockbank.localhost/.well-known/openid-configuration)" != "200" ]; do
-                echo "Mock Bank server not ready, sleeping for 2 seconds"
-                sleep 2
-              done
-              echo "Mock Bank server is ready"
-            ' || {
-                echo "Timeout reached before the mock bank server was ready"
-                exit 1
-            }
+            make run-with-cs
 
             echo "Wait for the conformance suite to be ready"
             timeout 60 bash -c '
@@ -75,7 +57,7 @@ jobs:
           if: always()
           with:
             name: mockbank
-            path: conformance/results/*.zip
+            path: conformance-suite/results/*.zip
 
   all-tests-succeeded:
     runs-on: ubuntu-latest

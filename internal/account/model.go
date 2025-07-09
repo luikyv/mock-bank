@@ -1,16 +1,11 @@
 package account
 
 import (
-	"crypto/rand"
-	"errors"
-	"math/big"
-	"time"
-
 	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/mock-bank/internal/errorutil"
 	"github.com/luikyv/mock-bank/internal/resource"
 	"github.com/luikyv/mock-bank/internal/timeutil"
-	"gorm.io/gorm"
 )
 
 const (
@@ -79,9 +74,10 @@ const (
 )
 
 type Transaction struct {
-	ID               string `gorm:"primaryKey"`
+	ID               uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	AccountID        uuid.UUID
 	Status           TransactionStatus
+	DateTime         timeutil.DateTime
 	MovementType     MovementType
 	Name             string
 	Type             TransactionType
@@ -94,17 +90,13 @@ type Transaction struct {
 	PartiePersonType *PersonType
 
 	OrgID     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CrossOrg  bool
+	CreatedAt timeutil.DateTime
+	UpdatedAt timeutil.DateTime
 }
 
 func (Transaction) TableName() string {
 	return "account_transactions"
-}
-
-func (t *Transaction) BeforeCreate(_ *gorm.DB) error {
-	t.ID = newTransactionID()
-	return nil
 }
 
 type TransactionStatus string
@@ -163,50 +155,58 @@ func (f TransactionFilter) WithMovementType(mt MovementType) TransactionFilter {
 	return f
 }
 
-func NewTransactionFilter(from, to *timeutil.BrazilDate, current bool) (TransactionFilter, error) {
-	brazilNow := timeutil.BrazilDateNow()
+func NewTransactionFilter(from, to *string) (TransactionFilter, error) {
+	today := timeutil.BrazilDateNow()
 	filter := TransactionFilter{
-		from: brazilNow,
-		to:   brazilNow.AddDate(0, 0, 1),
+		from: today.StartOfDay(),
+		to:   today.EndOfDay(),
 	}
 
 	if from != nil {
-		if to == nil {
-			return TransactionFilter{}, errors.New("to booking date is required if from booking date is informed")
+		fromDate, err := timeutil.ParseBrazilDate(*from)
+		if err != nil {
+			return TransactionFilter{}, errorutil.Format("invalid from booking date: %w", err)
 		}
-		filter.from = *from
+		filter.from = fromDate.StartOfDay()
+
+		if to == nil {
+			return TransactionFilter{}, errorutil.New("to booking date is required if from booking date is informed")
+		}
 	}
 
 	if to != nil {
-		if from == nil {
-			return TransactionFilter{}, errors.New("from booking date is required if to booking date is informed")
+		toDate, err := timeutil.ParseBrazilDate(*to)
+		if err != nil {
+			return TransactionFilter{}, errorutil.Format("invalid to booking date: %w", err)
 		}
+		filter.to = toDate.EndOfDay()
 
-		filter.to = *to
+		if from == nil {
+			return TransactionFilter{}, errorutil.New("from booking date is required if to booking date is informed")
+		}
 	}
 
-	if current {
-		nowMinus7Days := brazilNow.AddDate(0, 0, -7)
-		if filter.from.Before(nowMinus7Days) {
-			return TransactionFilter{}, errors.New("from booking date too far in the past")
-		}
-
-		if filter.to.Before(nowMinus7Days) {
-			return TransactionFilter{}, errors.New("to booking date too far in the past")
-		}
+	if filter.from.After(filter.to) {
+		return TransactionFilter{}, errorutil.New("from booking date must be before to booking date")
 	}
 
 	return filter, nil
 }
 
-func newTransactionID() string {
-	b := make([]byte, TransactionIDLength)
-	for i := range b {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterBytes))))
-		if err != nil {
-			panic(err)
-		}
-		b[i] = letterBytes[n.Int64()]
+func NewCurrentTransactionFilter(from, to *string) (TransactionFilter, error) {
+	filter, err := NewTransactionFilter(from, to)
+	if err != nil {
+		return TransactionFilter{}, err
 	}
-	return "TX" + string(b)
+
+	today := timeutil.BrazilDateNow()
+	if filter.from.Before(today.AddDate(0, 0, -7)) {
+		return TransactionFilter{}, errorutil.New("from booking date too far in the past")
+	}
+
+	if filter.to.After(today.AddDate(1, 0, 0)) {
+		return TransactionFilter{}, errorutil.New("to booking date too far in the future")
+	}
+
+	return filter, nil
 }

@@ -24,10 +24,12 @@ CREATE TABLE mock_users (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_mock_users_org_id ON mock_users (org_id);
 CREATE UNIQUE INDEX idx_mock_users_org_id_cpf ON mock_users (org_id, cpf);
 CREATE UNIQUE INDEX idx_mock_users_org_id_cnpj ON mock_users (org_id, cnpj);
 CREATE UNIQUE INDEX idx_mock_users_org_id_username ON mock_users (org_id, username);
 
+-- mock_user_business associates individual users with business users (i.e., users that own a CNPJ).
 CREATE TABLE mock_user_business (
     user_id UUID NOT NULL REFERENCES mock_users(id) ON DELETE CASCADE,
     business_user_id UUID NOT NULL REFERENCES mock_users(id) ON DELETE CASCADE,
@@ -38,6 +40,7 @@ CREATE TABLE mock_user_business (
 
     PRIMARY KEY (user_id, business_user_id)
 );
+CREATE INDEX idx_mock_user_business_org_id ON mock_user_business (org_id);
 
 CREATE TABLE oauth_clients (
     id TEXT PRIMARY KEY,
@@ -64,6 +67,7 @@ CREATE TABLE oauth_sessions (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_oauth_sessions_org_id ON oauth_sessions (org_id);
 CREATE INDEX idx_oauth_sessions_callback_id ON oauth_sessions (callback_id);
 CREATE INDEX idx_oauth_sessions_auth_code ON oauth_sessions (auth_code);
 CREATE INDEX idx_oauth_sessions_pushed_auth_req_id ON oauth_sessions (pushed_auth_req_id);
@@ -80,6 +84,7 @@ CREATE TABLE oauth_grants (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_oauth_grants_org_id ON oauth_grants (org_id);
 CREATE INDEX idx_oauth_grants_token_id ON oauth_grants (token_id);
 CREATE INDEX idx_oauth_grants_refresh_token_id ON oauth_grants (refresh_token_id);
 CREATE INDEX idx_oauth_grants_auth_code ON oauth_grants (auth_code);
@@ -102,6 +107,7 @@ CREATE TABLE consents (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_consents_org_id ON consents (org_id);
 
 CREATE TABLE consent_extensions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -118,6 +124,7 @@ CREATE TABLE consent_extensions (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_consent_extensions_org_id ON consent_extensions (org_id);
 
 CREATE TABLE accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -137,7 +144,7 @@ CREATE TABLE accounts (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
-CREATE INDEX idx_accounts_org_id_owner_id ON accounts (org_id, owner_id);
+CREATE INDEX idx_accounts_org_id ON accounts (org_id);
 CREATE UNIQUE INDEX idx_accounts_org_id_number ON accounts (org_id, number);
 
 CREATE TABLE consent_accounts (
@@ -152,12 +159,13 @@ CREATE TABLE consent_accounts (
 
     PRIMARY KEY (consent_id, account_id)
 );
-CREATE INDEX idx_consent_accounts_org_id_owner_id ON consent_accounts (org_id, owner_id);
+CREATE INDEX idx_consent_accounts_org_id ON consent_accounts (org_id);
 
 CREATE TABLE account_transactions (
-    id TEXT PRIMARY KEY,
-    account_id UUID NOT NULL REFERENCES accounts(id),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     status TEXT NOT NULL,
+    date_time TIMESTAMPTZ NOT NULL,
     movement_type TEXT NOT NULL,
     name TEXT NOT NULL,
     type TEXT NOT NULL,
@@ -174,7 +182,7 @@ CREATE TABLE account_transactions (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
-CREATE INDEX idx_account_transactions_org_id_account_id ON account_transactions (org_id, account_id);
+CREATE INDEX idx_account_transactions_org_id ON account_transactions (org_id);
 
 CREATE TABLE credit_contracts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -217,6 +225,7 @@ CREATE TABLE credit_contracts (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_credit_contracts_org_id ON credit_contracts (org_id);
 
 CREATE TABLE consent_credit_contracts (
     consent_id UUID NOT NULL REFERENCES consents(id) ON DELETE CASCADE,
@@ -231,6 +240,7 @@ CREATE TABLE consent_credit_contracts (
 
     PRIMARY KEY (consent_id, contract_id)
 );
+CREATE INDEX idx_consent_credit_contracts_org_id ON consent_credit_contracts (org_id);
 
 CREATE TABLE credit_contract_warranties (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -245,6 +255,7 @@ CREATE TABLE credit_contract_warranties (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_credit_contract_warranties_org_id ON credit_contract_warranties (org_id);
 
 CREATE TABLE credit_contract_release_payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -261,6 +272,7 @@ CREATE TABLE credit_contract_release_payments (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_credit_contract_release_payments_org_id ON credit_contract_release_payments (org_id);
 
 CREATE TABLE credit_contract_balloon_payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -274,8 +286,11 @@ CREATE TABLE credit_contract_balloon_payments (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_credit_contract_balloon_payments_org_id ON credit_contract_balloon_payments (org_id);
 
 CREATE OR REPLACE VIEW consent_resources AS
+    WITH authorised_consents AS (SELECT id, org_id FROM consents WHERE status = 'AUTHORISED')
+
     SELECT
         'ACCOUNT' AS resource_type,
         consent_accounts.consent_id,
@@ -286,9 +301,10 @@ CREATE OR REPLACE VIEW consent_resources AS
         consent_accounts.created_at,
         consent_accounts.updated_at
     FROM consent_accounts
-    JOIN consents ON consent_accounts.consent_id = consents.id
-    WHERE consents.status = 'AUTHORISED'
-UNION ALL
+    JOIN authorised_consents ON consent_accounts.consent_id = authorised_consents.id AND consent_accounts.org_id = authorised_consents.org_id
+
+    UNION ALL
+
     SELECT
         consent_credit_contracts.type AS resource_type,
         consent_credit_contracts.consent_id,
@@ -299,8 +315,7 @@ UNION ALL
         consent_credit_contracts.created_at,
         consent_credit_contracts.updated_at
     FROM consent_credit_contracts
-    JOIN consents ON consent_credit_contracts.consent_id = consents.id
-    WHERE consents.status = 'AUTHORISED';
+    JOIN authorised_consents ON consent_credit_contracts.consent_id = authorised_consents.id AND consent_credit_contracts.org_id = authorised_consents.org_id;
 
 CREATE TABLE enrollments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -328,6 +343,7 @@ CREATE TABLE enrollments (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_enrollments_org_id ON enrollments (org_id);
 
 CREATE TABLE payment_consents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -367,6 +383,7 @@ CREATE TABLE payment_consents (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX idx_payment_consents_org_id ON payment_consents (org_id);
 
 CREATE TABLE payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -399,6 +416,7 @@ CREATE TABLE payments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX idx_payments_org_id ON payments (org_id);
 
 CREATE TABLE recurring_payment_consents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -429,6 +447,7 @@ CREATE TABLE recurring_payment_consents (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX idx_recurring_payment_consents_org_id ON recurring_payment_consents (org_id);
 
 CREATE TABLE recurring_payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -465,6 +484,7 @@ CREATE TABLE recurring_payments (
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL
 );
+CREATE INDEX idx_recurring_payments_org_id ON recurring_payments (org_id);
 
 CREATE TABLE idempotency_records (
     id TEXT PRIMARY KEY,
@@ -476,6 +496,7 @@ CREATE TABLE idempotency_records (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_idempotency_records_org_id ON idempotency_records (org_id);
 
 CREATE TABLE jwt_ids (
     id TEXT PRIMARY KEY,
@@ -484,6 +505,7 @@ CREATE TABLE jwt_ids (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_jwt_ids_org_id ON jwt_ids (org_id);
 
 CREATE TABLE schedules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -494,3 +516,4 @@ CREATE TABLE schedules (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+CREATE INDEX idx_schedules_org_id ON schedules (org_id);

@@ -55,10 +55,8 @@ func main() {
 	}
 
 	// Migrations.
+	// migrationsPath = "file://../../db/migrations"
 	migrationsPath := "file://db/migrations"
-	if Env == LocalEnvironment {
-		migrationsPath = "file://../../db/migrations"
-	}
 	slog.Info("running database migrations")
 	if err := runMigrations(db, migrationsPath); err != nil {
 		slog.Error("failed to run migrations", "error", err)

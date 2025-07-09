@@ -367,7 +367,12 @@ func (s Service) Cancel(ctx context.Context, e *Enrollment, cancellation Cancell
 	}
 
 	e.Cancellation = &cancellation
-	return s.updateStatus(ctx, e, status)
+	if err := s.updateStatus(ctx, e, status); err != nil {
+		return err
+	}
+
+	s.webhookService.Notify(ctx, e.ClientID, "/enrollments/"+s.version+"/enrollments/"+e.URN())
+	return nil
 }
 
 func (s Service) validate(_ context.Context, e *Enrollment, debtorAccount *payment.Account) error {
@@ -427,18 +432,17 @@ func (s Service) updateStatus(ctx context.Context, e *Enrollment, status Status)
 		return fmt.Errorf("could not update enrollment status: %w", err)
 	}
 
-	if slices.Contains([]Status{StatusRejected, StatusRevoked}, status) {
-		s.webhookService.Notify(ctx, e.ClientID, "/enrollments/"+s.version+"/enrollments/"+e.URN())
-	}
-
 	return nil
 }
 
 func (s Service) update(ctx context.Context, e *Enrollment) error {
 	e.UpdatedAt = timeutil.DateTimeNow()
-	return s.db.WithContext(ctx).
+	if err := s.db.WithContext(ctx).
 		Model(&Enrollment{}).
 		Omit("ID", "CreatedAt", "OrgID").
 		Where("id = ? AND org_id = ?", e.ID, e.OrgID).
-		Updates(e).Error
+		Updates(e).Error; err != nil {
+		return fmt.Errorf("could not update enrollment: %w", err)
+	}
+	return nil
 }

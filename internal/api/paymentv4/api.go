@@ -708,6 +708,11 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
+	if errors.Is(err, payment.ErrInvalidPaymentMethod) {
+		api.WriteError(w, r, api.NewError("FORMA_PAGAMENTO_INVALIDA", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
 	if errors.As(err, &errorutil.Error{}) {
 		api.WriteError(w, r, api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
 		return

@@ -54,7 +54,7 @@ func NewPagination(pageNumber *int32, pageSize *int32) Pagination {
 		pagination.Number = int(*pageNumber)
 	}
 
-	if pageSize != nil && *pageSize > 0 && *pageSize <= 1000 {
+	if pageSize != nil && *pageSize > 0 && *pageSize <= defaultPageSize {
 		pagination.Size = int(*pageSize)
 	}
 

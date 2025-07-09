@@ -21,6 +21,7 @@ import (
 )
 
 func main() {
+	// Load and parse the directory JWKS.
 	directoryJWKSBytes, err := os.ReadFile("/mocks/directory_jwks.json")
 	if err != nil {
 		log.Fatal("failed to read directory jwks:", err)
@@ -30,6 +31,7 @@ func main() {
 		log.Fatal("failed to parse directory jwks:", err)
 	}
 
+	// Load and parse the keystore JWKS.
 	keystoreJWKSBytes, err := os.ReadFile("/mocks/software_statement_jwks.json")
 	if err != nil {
 		log.Fatal("failed to read keystore jwks:", err)
@@ -39,6 +41,7 @@ func main() {
 		log.Fatal("failed to parse keystore jwks:", err)
 	}
 
+	// Load and parse the participant ID token.
 	idTokenBytes, err := os.ReadFile("/mocks/id_token.json")
 	if err != nil {
 		log.Fatal("failed to read id token:", err)
@@ -46,12 +49,15 @@ func main() {
 	var idTokenClaims map[string]any
 	_ = json.Unmarshal(idTokenBytes, &idTokenClaims)
 
+	// Load and parse the software statement.
 	ssBytes, err := os.ReadFile("/mocks/software_statement.json")
 	if err != nil {
 		log.Fatal("failed to read id token:", err)
 	}
 	var ssClaims map[string]any
 	_ = json.Unmarshal(ssBytes, &ssClaims)
+
+	// Define routes.
 
 	directoryHandler := func() http.Handler {
 		mux := http.NewServeMux()
@@ -184,18 +190,26 @@ func main() {
 	mux.Handle("keystore.local/", keystoreHandler())
 	mux.Handle("matls-keystore.local/", keystoreHandler())
 
+	// Mock Bank backend can be accessed from the host machine for local development.
+	// If the connection is refused, fallback to the container.
 	mockbankLocalhostURL, _ := url.Parse("http://host.docker.internal")
 	mockbankLocalhostReverseProxy := httputil.NewSingleHostReverseProxy(mockbankLocalhostURL)
 	mockbankURL, _ := url.Parse("http://mockbank")
 	mockbankReverseProxy := httputil.NewSingleHostReverseProxy(mockbankURL)
-	mbHandler := mockbankHandler(mockbankLocalhostReverseProxy, mockbankReverseProxy)
+	mbHandler := reverseProxyWithFallback(mockbankLocalhostReverseProxy, mockbankReverseProxy)
 	mux.HandleFunc("auth.mockbank.local/", mbHandler)
 	mux.HandleFunc("matls-auth.mockbank.local/", mbHandler)
 	mux.HandleFunc("matls-api.mockbank.local/", mbHandler)
 	mux.HandleFunc("app.mockbank.local/api/", mbHandler)
 
-	appURL, _ := url.Parse("http://host.docker.internal:8080")
-	mux.Handle("app.mockbank.local/", httputil.NewSingleHostReverseProxy(appURL))
+	// Mock Bank frontend can be accessed from the host machine for local development.
+	// If the connection is refused, fallback to the container.
+	mockbankAppLocalhostURL, _ := url.Parse("http://host.docker.internal:8080")
+	mockbankAppLocalhostReverseProxy := httputil.NewSingleHostReverseProxy(mockbankAppLocalhostURL)
+	mockbankAppURL, _ := url.Parse("http://mockbank-ui:8080")
+	mockbankAppReverseProxy := httputil.NewSingleHostReverseProxy(mockbankAppURL)
+	mbAppHandler := reverseProxyWithFallback(mockbankAppLocalhostReverseProxy, mockbankAppReverseProxy)
+	mux.Handle("app.mockbank.local/", mbAppHandler)
 
 	// Serve participant information over HTTP because the Conformance Suite
 	// does not accept self-signed certificates.
@@ -225,6 +239,7 @@ func main() {
 		Addr:    ":443",
 		Handler: mux,
 		TLSConfig: &tls.Config{
+			// Only hosts starting with "matls-" require mTLS.
 			GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 				log.Printf("picking tls config for %s\n", hello.ServerName)
 				cfg := &tls.Config{
@@ -246,7 +261,11 @@ func main() {
 	}
 }
 
-func mockbankHandler(reverseProxy, fallbackProxy *httputil.ReverseProxy) http.HandlerFunc {
+// reverseProxyWithFallback is a helper function that creates a reverse proxy
+// with a fallback mechanism. It handles TLS connections, client certificates,
+// and request body buffering. If the reverse proxy encounters a connection
+// refused error, it will serve the request from the fallback proxy.
+func reverseProxyWithFallback(reverseProxy, fallbackProxy *httputil.ReverseProxy) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.TLS == nil {
 			log.Println("No TLS connection established")

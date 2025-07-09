@@ -24,6 +24,15 @@ actions:
   description: Remove $ref fields from links properties to ensure the application of the custom x-go-type
   remove: true
 
+- target: $.components.parameters.fromBookingDate.schema.format
+  remove: true
+- target: $.components.parameters.toBookingDate.schema.format
+  remove: true
+- target: $.components.parameters.fromBookingDateMaxLimited.schema.format
+  remove: true
+- target: $.components.parameters.toBookingDateMaxLimited.schema.format
+  remove: true
+
 - target: $..[*][?(@.format == "date")]
   update:
     x-go-type: timeutil.BrazilDate

@@ -1,8 +1,9 @@
 services:
+
   mockbank:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: cmd/server/Dockerfile
     environment:
       - ENV=LOCAL
       - AWS_ENDPOINT_URL=http://localstack:4566
@@ -26,19 +27,19 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./testdata/setup-localstack.sh:/etc/localstack/init/ready.d/setup.sh:ro
-      - ./keys/:/keys:ro
+      - ./testdata/keys/:/keys:ro
     healthcheck:
       test:
         [
           "CMD",
           "sh",
           "-c",
-          "sleep 2 && curl -f http://localhost:4566/_localstack/health || exit 1",
+          "curl -f http://localhost:4566/_localstack/health || exit 1",
         ]
-      interval: 1s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
 
   psql:
     image: postgres
@@ -51,7 +52,7 @@ services:
     networks:
       default:
         aliases:
-          - psql.local
+          - database.local
 
   psql-test:
     profiles:
@@ -68,17 +69,18 @@ services:
     networks:
       default:
         aliases:
-          - psql.local
+          - database.local
 
   mockgw:
     build:
-      context: ./cmd/mockgw
+      context: .
+      dockerfile: cmd/mockgw/Dockerfile
     volumes:
-      - ./keys/server.crt:/mocks/server.crt:ro
-      - ./keys/server.key:/mocks/server.key:ro
-      - ./keys/client_one_pub.jwks:/mocks/client.jwks:ro
-      - ./keys/ca.crt:/mocks/ca.crt:ro
-      - ./keys/org_pub.jwks:/mocks/org.jwks:ro
+      - ./testdata/keys/server.crt:/mocks/server.crt:ro
+      - ./testdata/keys/server.key:/mocks/server.key:ro
+      - ./testdata/keys/client_one_pub.jwks:/mocks/client.jwks:ro
+      - ./testdata/keys/ca.crt:/mocks/ca.crt:ro
+      - ./testdata/keys/org_pub.jwks:/mocks/org.jwks:ro
       - ./testdata/participants.json:/mocks/participants.json:ro
       - ./testdata/directory_jwks.json:/mocks/directory_jwks.json:ro
       - ./testdata/directory_well_known.json:/mocks/directory_well_known.json:ro
@@ -100,16 +102,39 @@ services:
           - matls-directory.local
           - keystore.local
 
+  mockbank-ui:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./mock-bank-ui:/app
+    command: sh -c "npm install && npm run dev -- --host"
+
+  migration:
+    build:
+      context: .
+      dockerfile: ./cmd/migration/Dockerfile
+    environment:
+      - ENV=LOCAL
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - AWS_REGION=us-east-1
+    volumes:
+      - ./db/migrations:/db/migrations:ro
+    depends_on:
+      localstack:
+        condition: service_healthy
+      psql:
+        condition: service_started
+
   cs-httpd:
     profiles:
       - conformance
     build:
-      context: ./conformance/suite/httpd
+      context: ./conformance-suite/httpd
       dockerfile: Dockerfile-static
     ports:
       - "8443:8443"
     volumes:
-      - ./conformance/suite/src/main/resources/:/usr/local/apache2/htdocs/
+      - ./conformance-suite/src/main/resources/:/usr/local/apache2/htdocs/
     depends_on:
       - cs-server
     networks:
@@ -123,11 +148,11 @@ services:
     hostname: server
     image: openjdk:17-jdk-slim
     build:
-      context: ./conformance/suite/server-dev
+      context: ./conformance-suite/server-dev
     ports:
       - "9999:9999"
     volumes:
-      - ./conformance/suite/target/:/server/
+      - ./conformance-suite/target/:/server/
     command: >
       java
       -Xdebug -Xrunjdwp:transport=dt_socket,address=*:9999,server=y,suspend=n
@@ -165,7 +190,7 @@ services:
     image: maven:3-openjdk-17
     volumes:
       - maven-cache:/root/.m2
-      - ./conformance/suite:/usr/src/mymaven
+      - ./conformance-suite:/usr/src/mymaven
     working_dir: /usr/src/mymaven
     command: mvn -B clean package -DskipTests=true
 

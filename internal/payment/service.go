@@ -367,12 +367,13 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *A
 	}
 
 	if c.PaymentSchedule != nil {
-		today := timeutil.BrazilDateNow()
-		twoYearsLater := today.AddDate(2, 0, 0)
+		minAllowedDate := timeutil.BrazilDateNow()
+		maxAllowedDate := minAllowedDate.AddDate(2, 0, 0)
 
-		startDate := today
-		lastPaymentDate := twoYearsLater
+		startDate := minAllowedDate
+		lastPaymentDate := maxAllowedDate
 		if single := c.PaymentSchedule.Single; single != nil {
+			minAllowedDate = timeutil.BrazilDateNow().AddDate(0, 0, 1)
 			startDate = single.Date
 			lastPaymentDate = single.Date
 		}
@@ -411,10 +412,10 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *A
 			}
 		}
 
-		if startDate.Before(today) {
+		if startDate.Before(minAllowedDate) {
 			return errorutil.Format("%w: schedule cannot start in the past", ErrInvalidDate)
 		}
-		if lastPaymentDate.After(twoYearsLater) {
+		if lastPaymentDate.After(maxAllowedDate) {
 			return errorutil.Format("%w: schedule cannot end more than 2 years from now", ErrInvalidDate)
 		}
 
@@ -466,24 +467,21 @@ func (s Service) validateConsent(_ context.Context, c *Consent, debtorAccount *A
 	return nil
 }
 
-func (s Service) runConsentPreCreationAutomations(ctx context.Context, c *Consent) error {
+func (s Service) runConsentPreCreationAutomations(_ context.Context, c *Consent) error {
 	switch c.PaymentAmount {
 	case "10422.00":
 		return ErrInvalidPayment
+	case "10422.01":
+		return ErrInvalidPayment
+	case "10422.02":
+		return ErrInvalidPaymentMethod
 	}
 
-	s.scheduleConsent(ctx, c, timeutil.DateTimeNow().Add(scheduleDelay))
 	return nil
 }
 
 func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Consent) error {
 	slog.DebugContext(ctx, "evaluating payment consent automations", "status", c.Status, "amount", c.PaymentAmount)
-
-	now := timeutil.DateTimeNow()
-	if now.Before(c.UpdatedAt.Add(5 * time.Second)) {
-		slog.DebugContext(ctx, "payment consent was updated less than 5 secs ago, skipping transitions", "updated_at", c.UpdatedAt.String())
-		return nil
-	}
 
 	switch c.Status {
 	case ConsentStatusAwaitingAuthorization:
@@ -511,15 +509,17 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 			return s.RejectConsent(ctx, c, ConsentRejectionInvalidQRCode, "forced rejection")
 		}
 	case ConsentStatusPartiallyAccepted:
-		if timeutil.DateTimeNow().After(c.StatusUpdatedAt.Add(3 * time.Minute)) {
-			slog.DebugContext(ctx, "payment consent partially accepted for more than 3 minutes, moving to authorized")
-			if err := s.updateConsentStatus(ctx, c, ConsentStatusAuthorized); err != nil {
-				return err
-			}
-			s.unscheduleConsent(ctx, c)
-			s.notifyConsentStatusChange(ctx, c)
+		// Skip if the consent was partially accepted less than 3 minutes ago.
+		if timeutil.DateTimeNow().Before(c.StatusUpdatedAt.Add(3 * time.Minute)) {
 			return nil
 		}
+		slog.DebugContext(ctx, "payment consent partially accepted for more than 3 minutes, moving to authorized")
+		if err := s.updateConsentStatus(ctx, c, ConsentStatusAuthorized); err != nil {
+			return err
+		}
+		s.unscheduleConsent(ctx, c)
+		s.notifyConsentStatusChange(ctx, c)
+		return nil
 	case ConsentStatusAuthorized:
 		if timeutil.DateTimeNow().After(c.ExpiresAt) {
 			slog.DebugContext(ctx, "payment consent reached expiration, moving to rejected")
@@ -721,12 +721,18 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 		return nil
 
 	case StatusACCP:
-		today := timeutil.BrazilDateNow()
-		if p.Date.After(today) {
+		if p.Date.After(timeutil.BrazilDateNow()) {
 			if err := s.updateStatus(ctx, p, StatusSCHD); err != nil {
 				return err
 			}
-			s.schedule(ctx, p, p.Date.DateTime())
+
+			switch p.Amount {
+			case "1400.00":
+				s.schedule(ctx, p, now.Add(scheduleDelay))
+			default:
+				s.schedule(ctx, p, p.Date.DateTime())
+			}
+
 			s.notifyStatusChange(ctx, p)
 			return nil
 		}
@@ -738,11 +744,22 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 		return nil
 
 	case StatusSCHD:
-		today := timeutil.BrazilDateNow()
-		if p.Date.After(today) {
+
+		switch p.Amount {
+		case "1400.00":
+			// Cancel the payment if it has been updated more than 3 minutes ago.
+			if now.After(p.UpdatedAt.Add(3 * time.Minute)) {
+				slog.DebugContext(ctx, "cancelling scheduled payment with amount 1400.00")
+				return s.cancel(ctx, p, CancelledFromHolder, c.UserIdentification)
+			}
+		}
+
+		// Skip if the payment date has not yet arrived.
+		if p.Date.After(timeutil.BrazilDateNow()) {
 			return nil
 		}
 
+		slog.DebugContext(ctx, "moving scheduled payment status to ACPD")
 		if err := s.updateStatus(ctx, p, StatusACPD); err != nil {
 			return err
 		}

@@ -170,5 +170,5 @@ func ClientCert(r *http.Request) (*x509.Certificate, error) {
 }
 
 func LogError(ctx context.Context, err error) {
-	slog.InfoContext(ctx, "error during request", slog.String("error", err.Error()))
+	slog.InfoContext(ctx, "error during request", "error", err)
 }

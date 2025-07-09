@@ -198,7 +198,7 @@ func main() {
 	slog.Info("starting mock bank")
 
 	if Env == LocalEnvironment {
-		go pollResources(ctx, scheduleService, paymentService, autoPaymentService, time.NewTicker(time.Second*10))
+		go pollSchedules(ctx, scheduleService, paymentService, autoPaymentService, time.NewTicker(time.Second*10))
 
 		if err := http.ListenAndServe(":"+Port, handler); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
@@ -585,7 +585,7 @@ func middleware(next http.Handler) http.Handler {
 	})
 }
 
-func pollResources(
+func pollSchedules(
 	ctx context.Context,
 	scheduleService schedule.Service,
 	paymentService payment.Service,
@@ -595,15 +595,18 @@ func pollResources(
 	for {
 		select {
 		case <-ctx.Done():
-			slog.InfoContext(ctx, "finished polling resources")
+			slog.InfoContext(ctx, "finished polling schedules")
 			return
 		case <-ticker.C:
-			slog.InfoContext(ctx, "polling resources")
-			schedules, err := scheduleService.Schedules(ctx, page.NewPagination(nil, nil))
+			slog.InfoContext(ctx, "polling schedules")
+			pageSize := int32(100)
+			schedules, err := scheduleService.Schedules(ctx, page.NewPagination(nil, &pageSize))
 			if err != nil {
 				slog.ErrorContext(ctx, "error fetching schedules", "error", err)
 				continue
 			}
+			slog.InfoContext(ctx, "schedules fetched", "count", len(schedules.Records), "total", schedules.TotalRecords)
+
 			for _, s := range schedules.Records {
 				switch s.TaskType {
 				case schedule.TaskTypePaymentConsent:

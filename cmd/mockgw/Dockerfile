@@ -6,20 +6,20 @@ ENV CGO_ENABLED=0
 ENV GOOS=linux
 ENV GOARCH=amd64
 
-WORKDIR /
+WORKDIR /app
 
-COPY . .
+COPY . /app
 
 RUN go mod download
 
-RUN go build -o main
+RUN go build -o main ./cmd/mockgw
 
 # Step 2: Run Stage.
 FROM alpine:latest
 
-WORKDIR /
+WORKDIR /app
 
-COPY --from=builder /main ./main
+COPY --from=builder /app/main ./main
 
 EXPOSE 443
 

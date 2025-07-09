@@ -14,7 +14,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,39 +26,41 @@ var (
 
 // TODO: Review this.
 func main() {
-	_, filename, _, _ := runtime.Caller(0)
-	workingDir := filepath.Dir(filename)
-	keysDir := filepath.Join(workingDir, "../../keys")
-	// Create the "keys" directory if it doesn't exist.
-	err := os.MkdirAll(keysDir, os.ModePerm)
-	if err != nil {
-		log.Fatalf("Failed to create keys directory: %v", err)
-	}
-
+	keysDir := flag.String("keys_dir", "", "Keys Folder")
 	orgID := flag.String("org_id", uuid.NewString(), "Organization ID")
 	softwareID := flag.String("software_id", uuid.NewString(), "Software ID")
 	flag.Parse()
 
-	serverCert, serverKey := generateServerCert("server", keysDir)
-	generateJWKS("server", serverCert, serverKey, keysDir)
+	if *keysDir == "" {
+		panic("keys_dir is required")
+	}
 
-	caCert, caKey := generateCACert("ca", keysDir)
+	// Create the "keys" directory if it doesn't exist.
+	err := os.MkdirAll(*keysDir, 0o700)
+	if err != nil {
+		log.Fatalf("Failed to create keys directory: %v", err)
+	}
 
-	orgSigningCert, orgSigningKey := generateSigningCert("org_signing", *softwareID, *orgID, caCert, caKey, keysDir)
-	generateJWKS("org", orgSigningCert, orgSigningKey, keysDir)
+	serverCert, serverKey := generateServerCert("server", *keysDir)
+	generateJWKS("server", serverCert, serverKey, *keysDir)
 
-	_, _ = generateSigningCert("op_signing", *softwareID, *orgID, caCert, caKey, keysDir)
+	caCert, caKey := generateCACert("ca", *keysDir)
 
-	generateTransportCert("directory_client_transport", *softwareID, *orgID, caCert, caKey, keysDir)
-	_, _ = generateSigningCert("directory_client_signing", *softwareID, *orgID, caCert, caKey, keysDir)
+	orgSigningCert, orgSigningKey := generateSigningCert("org_signing", *softwareID, *orgID, caCert, caKey, *keysDir)
+	generateJWKS("org", orgSigningCert, orgSigningKey, *keysDir)
 
-	generateTransportCert("client_one_transport", *softwareID, *orgID, caCert, caKey, keysDir)
-	clientOneSigningCert, clientOneSigningKey := generateSigningCert("client_one_signing", *softwareID, *orgID, caCert, caKey, keysDir)
-	generateJWKS("client_one", clientOneSigningCert, clientOneSigningKey, keysDir)
+	_, _ = generateSigningCert("op_signing", *softwareID, *orgID, caCert, caKey, *keysDir)
 
-	generateTransportCert("client_two_transport", *softwareID, *orgID, caCert, caKey, keysDir)
-	clientTwoTransportCert, clientTwoTransportKey := generateSigningCert("client_two_signing", *softwareID, *orgID, caCert, caKey, keysDir)
-	generateJWKS("client_two", clientTwoTransportCert, clientTwoTransportKey, keysDir)
+	generateTransportCert("directory_client_transport", *softwareID, *orgID, caCert, caKey, *keysDir)
+	_, _ = generateSigningCert("directory_client_signing", *softwareID, *orgID, caCert, caKey, *keysDir)
+
+	generateTransportCert("client_one_transport", *softwareID, *orgID, caCert, caKey, *keysDir)
+	clientOneSigningCert, clientOneSigningKey := generateSigningCert("client_one_signing", *softwareID, *orgID, caCert, caKey, *keysDir)
+	generateJWKS("client_one", clientOneSigningCert, clientOneSigningKey, *keysDir)
+
+	generateTransportCert("client_two_transport", *softwareID, *orgID, caCert, caKey, *keysDir)
+	clientTwoTransportCert, clientTwoTransportKey := generateSigningCert("client_two_signing", *softwareID, *orgID, caCert, caKey, *keysDir)
+	generateJWKS("client_two", clientTwoTransportCert, clientTwoTransportKey, *keysDir)
 }
 
 func generateServerCert(name, dir string) (*x509.Certificate, *rsa.PrivateKey) {

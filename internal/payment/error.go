@@ -17,4 +17,5 @@ var (
 	ErrMissingValue                      = errorutil.New("parameter is missing")
 	ErrCancelNotAllowed                  = errorutil.New("cannot cancel the payment")
 	ErrInvalidPayment                    = errorutil.New("invalid payment")
+	ErrInvalidPaymentMethod              = errorutil.New("invalid payment method")
 )

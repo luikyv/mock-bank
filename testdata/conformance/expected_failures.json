@@ -1,0 +1,10 @@
+[
+    {
+        "test-name": "consents_api_preflight_test-module_v2",
+        "variant": "*",
+        "configuration-filename": "*",
+        "current-block": "Pre-flight Get an SSA",
+        "condition": "ExtractDirectoryConfiguration",
+        "expected-result": "failure"
+    }
+]

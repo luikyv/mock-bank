@@ -30,6 +30,11 @@ type Links struct {
 	Self  string `json:"self"`
 }
 
+func (l *Links) WithoutLast() *Links {
+	l.Last = ""
+	return l
+}
+
 func NewLinks(self string) *Links {
 	return &Links{
 		Self: self,

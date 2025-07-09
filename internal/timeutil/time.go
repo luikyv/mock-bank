@@ -13,9 +13,15 @@ const (
 	dateFormat           = "2006-01-02"
 )
 
-var (
-	brazilLocation, _ = time.LoadLocation("America/Sao_Paulo")
-)
+var brazilLocation *time.Location
+
+func init() {
+	brLocation, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		panic(err)
+	}
+	brazilLocation = brLocation
+}
 
 type DateTime struct {
 	time.Time
@@ -86,6 +92,14 @@ func (d DateTime) AddDate(years int, months int, days int) DateTime {
 	return NewDateTime(d.Time.AddDate(years, months, days))
 }
 
+func (d DateTime) StartOfDay() DateTime {
+	return NewDateTime(time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, d.Location()))
+}
+
+func (d DateTime) EndOfDay() DateTime {
+	return NewDateTime(time.Date(d.Year(), d.Month(), d.Day(), 23, 59, 59, 999999999, d.Location()))
+}
+
 func DateTimeNow() DateTime {
 	return NewDateTime(now())
 }
@@ -130,12 +144,12 @@ func (d *BrazilDate) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	parsed, err := time.ParseInLocation(dateFormat, dateStr, brazilLocation)
+	parsed, err := ParseBrazilDate(dateStr)
 	if err != nil {
 		return err
 	}
 
-	d.Time = parsed
+	d.Time = parsed.Time
 	return nil
 }
 
@@ -153,13 +167,25 @@ func (d *BrazilDate) Scan(value any) error {
 		return errors.New("failed to scan Date: value is not time.Time")
 	}
 
-	d.Time = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, brazilLocation)
+	d.Time = time.Date(t.Year(), t.Month(), t.Day(), 12, 0, 0, 0, brazilLocation)
 	return nil
 }
 
 func (d BrazilDate) Value() (driver.Value, error) {
-	t := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, brazilLocation)
+	t := time.Date(d.Year(), d.Month(), d.Day(), 12, 0, 0, 0, brazilLocation)
 	return t, nil
+}
+
+func (d BrazilDate) StartOfDay() BrazilDate {
+	return BrazilDate{
+		Time: time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, brazilLocation),
+	}
+}
+
+func (d BrazilDate) EndOfDay() BrazilDate {
+	return BrazilDate{
+		Time: time.Date(d.Year(), d.Month(), d.Day(), 23, 59, 59, 999999999, brazilLocation),
+	}
 }
 
 // StartOfWeek returns a new BrazilDate representing the start of the current week (Monday).
@@ -182,20 +208,20 @@ func (d BrazilDate) EndOfWeek() BrazilDate {
 }
 
 func (d BrazilDate) StartOfMonth() BrazilDate {
-	return NewBrazilDate(time.Date(d.Year(), d.Month(), 1, 0, 0, 0, 0, d.Location()))
+	return NewBrazilDate(time.Date(d.Year(), d.Month(), 1, 12, 0, 0, 0, d.Location()))
 }
 
 func (d BrazilDate) EndOfMonth() BrazilDate {
-	firstOfNextMonth := time.Date(d.Year(), d.Month()+1, 1, 0, 0, 0, 0, d.Location())
+	firstOfNextMonth := time.Date(d.Year(), d.Month()+1, 1, 12, 0, 0, 0, d.Location())
 	return NewBrazilDate(firstOfNextMonth.AddDate(0, 0, -1))
 }
 
 func (d BrazilDate) StartOfYear() BrazilDate {
-	return NewBrazilDate(time.Date(d.Year(), 1, 1, 0, 0, 0, 0, d.Location()))
+	return NewBrazilDate(time.Date(d.Year(), 1, 1, 12, 0, 0, 0, d.Location()))
 }
 
 func (d BrazilDate) EndOfYear() BrazilDate {
-	return NewBrazilDate(time.Date(d.Year(), 12, 31, 0, 0, 0, 0, d.Location()))
+	return NewBrazilDate(time.Date(d.Year(), 12, 31, 12, 0, 0, 0, d.Location()))
 }
 
 func BrazilDateNow() BrazilDate {
@@ -205,8 +231,16 @@ func BrazilDateNow() BrazilDate {
 func NewBrazilDate(t time.Time) BrazilDate {
 	brTime := t.In(brazilLocation)
 	return BrazilDate{
-		Time: time.Date(brTime.Year(), brTime.Month(), brTime.Day(), 0, 0, 0, 0, brazilLocation),
+		Time: time.Date(brTime.Year(), brTime.Month(), brTime.Day(), 12, 0, 0, 0, brazilLocation),
 	}
+}
+
+func ParseBrazilDate(s string) (BrazilDate, error) {
+	t, err := time.ParseInLocation(dateFormat, s, brazilLocation)
+	if err != nil {
+		return BrazilDate{}, err
+	}
+	return NewBrazilDate(t), nil
 }
 
 // Now returns the current time in UTC.

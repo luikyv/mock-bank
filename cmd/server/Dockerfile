@@ -17,10 +17,13 @@ RUN go build -o main ./cmd/server
 # Step 2: Run Stage.
 FROM alpine:latest
 
+# Install tzdata to support time zones like America/Sao_Paulo.
+RUN apk add --no-cache tzdata
+
 WORKDIR /app
 
-COPY --from=builder /app/main ./
+COPY --from=builder /app/main ./main
 
 EXPOSE 80
 
-CMD ["./main"]
+ENTRYPOINT [ "./main" ]
