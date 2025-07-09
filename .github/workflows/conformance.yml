@@ -11,7 +11,7 @@ jobs:
   run-tests:
     runs-on: ubuntu-latest
     env:
-      CS_VERSION="3de7a6d5bccbea655519cd4f3e632bf01f9247d9"
+      CS_VERSION: "3de7a6d5bccbea655519cd4f3e632bf01f9247d9"
 
     steps:
         - uses: actions/checkout@v4
