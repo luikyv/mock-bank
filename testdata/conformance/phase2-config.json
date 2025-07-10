@@ -13,7 +13,7 @@
     "brazilOrganizationId": "00000000-0000-0000-0000-000000000000"
   },
   "conditionalResources": {
-    "brazilCpfJointAccount": "76109277673"
+    "brazilCpfJointAccount": "87517400444"
   },
   "consent": {},
   "client": {
@@ -167,5 +167,71 @@
           }
       ]
     }
-  ]
+  ],
+  "override": {
+    "consents_api_multiple-consents-extension-cond_test-module_v3-2": {
+      "browser": [
+        {
+          "match": "https://auth.mockbank.local/authorize*",
+          "tasks": [
+              {
+                  "task": "Login",
+                  "match": "https://auth.mockbank.local/authorize/*/login",
+                  "commands": [
+                      ["text", "name", "username", "gabriel.nunes@email.com"],
+                      ["text", "name", "password", "P@ssword01"],
+                      ["click", "id", "login-button"]
+                  ]
+              },
+              {
+                  "task": "Consent",
+                  "match": "https://auth.mockbank.local/authorize/*/consent",
+                  "commands": [
+                    ["click", "id", "consent-button"]
+                  ]
+              },
+              {
+                  "task": "Verify Complete",
+                  "match": "*/test/*/callback*",
+                  "commands": [
+                    ["wait", "id", "submission_complete", 10]
+                  ]
+              }
+          ]
+        }
+      ]
+    },
+    "accounts_api_multiple-consents_test-module_v2-4": {
+      "browser": [
+        {
+          "match": "https://auth.mockbank.local/authorize*",
+          "tasks": [
+              {
+                  "task": "Login",
+                  "match": "https://auth.mockbank.local/authorize/*/login",
+                  "commands": [
+                      ["text", "name", "username", "gabriel.nunes@email.com"],
+                      ["text", "name", "password", "P@ssword01"],
+                      ["click", "id", "login-button"]
+                  ]
+              },
+              {
+                  "task": "Consent",
+                  "match": "https://auth.mockbank.local/authorize/*/consent",
+                  "commands": [
+                    ["click", "id", "consent-button"]
+                  ]
+              },
+              {
+                  "task": "Verify Complete",
+                  "match": "*/test/*/callback*",
+                  "commands": [
+                    ["wait", "id", "submission_complete", 10]
+                  ]
+              }
+          ]
+        }
+      ]
+    }
+  }
 }

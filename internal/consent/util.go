@@ -1,12 +1,10 @@
 package consent
 
 import (
-	"reflect"
 	"slices"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 func URN(id uuid.UUID) string {
@@ -56,35 +54,6 @@ func validatePersonalAndBusinessPermissions(requestedPermissions []Permission) e
 
 	if isPersonal && isBusiness {
 		return ErrPersonalAndBusinessPermissionsTogether
-	}
-
-	return nil
-}
-
-func validateExtension(c *Consent, ext *Extension) error {
-	if c.Status != StatusAuthorized {
-		return ErrCannotExtendConsentNotAuthorized
-	}
-
-	if c.UserIdentification != ext.UserCPF {
-		return ErrExtensionNotAllowed
-	}
-
-	if c.BusinessIdentification != nil && reflect.DeepEqual(c.BusinessIdentification, ext.BusinessCNPJ) {
-		return ErrExtensionNotAllowed
-	}
-
-	if ext.ExpiresAt == nil {
-		return nil
-	}
-
-	now := timeutil.DateTimeNow()
-	if ext.ExpiresAt.Before(now) || ext.ExpiresAt.After(now.AddDate(1, 0, 0)) {
-		return ErrInvalidExpiration
-	}
-
-	if c.ExpiresAt != nil && !ext.ExpiresAt.After(*c.ExpiresAt) {
-		return ErrInvalidExpiration
 	}
 
 	return nil

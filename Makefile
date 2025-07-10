@@ -76,6 +76,6 @@ cs-tests:
 	fi
 
 	@cs-venv/bin/python conformance-suite/scripts/run-test-plan.py \
+		consents_test-plan_v3-2 ./testdata/conformance/phase2-config.json \
 		accounts_test-plan_v2-4 ./testdata/conformance/phase2-config.json \
-		--expected-failures-file ./testdata/conformance/expected_failures.json \
 		--export-dir ./conformance-suite/results

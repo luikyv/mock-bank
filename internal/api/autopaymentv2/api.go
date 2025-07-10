@@ -75,11 +75,11 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	idempotencyMiddleware := middleware.Idempotency(s.idempotencyService)
 	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, autopayment.Scope)
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID)
-	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) string {
+	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) api.Error {
 		if strings.Contains(err.Error(), "is missing") {
-			return "PARAMETRO_NAO_INFORMADO"
+			return api.NewError("PARAMETRO_NAO_INFORMADO", http.StatusUnprocessableEntity, err.Error())
 		}
-		return "PARAMETRO_INVALIDO"
+		return api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error())
 	})
 	// TODO. Use the swagger version.
 	xvMiddleware := middleware.Version("2.0.0")

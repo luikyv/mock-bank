@@ -157,9 +157,14 @@ func main() {
 		mux := http.NewServeMux()
 
 		mux.HandleFunc("GET /{org_id}/{software_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {
-			log.Println("request keystore client jwks")
+			softwareID := r.PathValue("software_id")
+			log.Printf("request keystore client jwks for %s\n", softwareID)
 			w.Header().Set("Content-Type", "application/json")
-			http.ServeFile(w, r, "/mocks/client.jwks")
+			if softwareID == "11111111-1111-1111-1111-111111111111" {
+				http.ServeFile(w, r, "/mocks/client.jwks")
+			} else {
+				http.ServeFile(w, r, "/mocks/client2.jwks")
+			}
 		})
 
 		mux.HandleFunc("GET /{org_id}/application.jwks", func(w http.ResponseWriter, r *http.Request) {

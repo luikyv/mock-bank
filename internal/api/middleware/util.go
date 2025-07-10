@@ -63,7 +63,7 @@ func FAPIIDWithOptions(opts *Options) func(http.Handler) http.Handler {
 	}
 }
 
-func Swagger(getSwagger func() (*openapi3.T, error), errCodeFunc func(error) string) (middleware func(http.Handler) http.Handler, version string) {
+func Swagger(getSwagger func() (*openapi3.T, error), errCodeFunc func(error) api.Error) (middleware func(http.Handler) http.Handler, version string) {
 	spec, err := getSwagger()
 	if err != nil {
 		panic(err)
@@ -77,7 +77,7 @@ func Swagger(getSwagger func() (*openapi3.T, error), errCodeFunc func(error) str
 			},
 		},
 		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts netmiddleware.ErrorHandlerOpts) {
-			api.WriteError(w, r, api.NewError(errCodeFunc(err), http.StatusUnprocessableEntity, err.Error()))
+			api.WriteError(w, r, errCodeFunc(err))
 		},
 	}), spec.Info.Version
 }

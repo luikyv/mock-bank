@@ -277,15 +277,21 @@ const (
 )
 
 type Extension struct {
-	ID                uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	ConsentID         uuid.UUID
-	UserCPF           string
-	BusinessCNPJ      *string
-	ExpiresAt         *timeutil.DateTime
-	PreviousExpiresAt *timeutil.DateTime
-	RequestedAt       timeutil.DateTime
-	UserIPAddress     string
-	UserAgent         string
+	ID                     uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ConsentID              uuid.UUID
+	UserIdentification     string
+	UserRel                Relation
+	BusinessIdentification *string
+	BusinessRel            *Relation
+	ExpiresAt              *timeutil.DateTime
+	PreviousExpiresAt      *timeutil.DateTime
+	RequestedAt            timeutil.DateTime
+	UserIPAddress          string
+	UserAgent              string
+
+	OrgID     string
+	CreatedAt timeutil.DateTime
+	UpdatedAt timeutil.DateTime
 }
 
 func (Extension) TableName() string {

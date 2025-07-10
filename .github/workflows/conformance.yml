@@ -30,11 +30,7 @@ jobs:
         - name: Set Up Conformance Suite
           if: steps.cache-cs.outputs.cache-hit != 'true'
           run: |
-            git clone https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance-suite
-            cd conformance-suite
-            git checkout ${{ env.CS_VERSION }}
-            cd ..
-            docker compose run cs-builder
+            make setup-cs
 
         - name: Run Mock Bank With Conformance Suite
           run: |

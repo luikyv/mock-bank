@@ -60,7 +60,9 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	accountMux := http.NewServeMux()
 
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)
-	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) string { return "PARAMETRO_INVALIDO" })
+	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) api.Error {
+		return api.NewError("PARAMETRO_INVALIDO", http.StatusBadRequest, err.Error())
+	})
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{

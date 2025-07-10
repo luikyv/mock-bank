@@ -42,4 +42,5 @@ func (Resource) TableName() string {
 type Filter struct {
 	OwnerID   string
 	ConsentID string
+	Status    Status
 }

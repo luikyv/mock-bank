@@ -75,12 +75,12 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	idempotencyMiddleware := middleware.Idempotency(s.idempotencyService)
 	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, payment.Scope)
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, enrollment.ScopeID, enrollment.ScopeConsent, payment.Scope)
-	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) string {
+	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) api.Error {
 		var schemaErr *openapi3.SchemaError
 		if errors.As(err, &schemaErr) && schemaErr.SchemaField == "required" {
-			return "PARAMETRO_NAO_INFORMADO"
+			return api.NewError("PARAMETRO_NAO_INFORMADO", http.StatusUnprocessableEntity, err.Error())
 		}
-		return "PARAMETRO_INVALIDO"
+		return api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error())
 	})
 
 	wrapper := ServerInterfaceWrapper{

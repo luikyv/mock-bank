@@ -10,6 +10,9 @@ import (
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/mock-bank/internal/api"
+	"github.com/luikyv/mock-bank/internal/autopayment"
+	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/oidc"
 )
 
@@ -37,7 +40,6 @@ func AuthWithOptions(op *provider.Provider, grantType goidc.GrantType, opts *Opt
 			ctx = context.WithValue(ctx, api.CtxKeySubject, tokenInfo.Subject)
 			ctx = context.WithValue(ctx, api.CtxKeyScopes, tokenInfo.Scopes)
 			ctx = context.WithValue(ctx, api.CtxKeyOrgID, tokenInfo.AdditionalTokenClaims[oidc.OrgIDKey])
-			r = r.WithContext(ctx)
 
 			switch grantType {
 			case goidc.GrantClientCredentials:
@@ -63,6 +65,19 @@ func AuthWithOptions(op *provider.Provider, grantType goidc.GrantType, opts *Opt
 				return
 			}
 
+			if consentID, ok := consent.IDFromScopes(tokenInfo.Scopes); ok {
+				ctx = context.WithValue(ctx, api.CtxKeyConsentID, consentID)
+			}
+
+			if recurringConsentID, ok := autopayment.ConsentIDFromScopes(tokenInfo.Scopes); ok {
+				ctx = context.WithValue(ctx, api.CtxKeyConsentID, recurringConsentID)
+			}
+
+			if enrollmentID, ok := enrollment.IDFromScopes(tokenInfo.Scopes); ok {
+				ctx = context.WithValue(ctx, api.CtxKeyEnrollmentID, enrollmentID)
+			}
+
+			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
 		})
 	}

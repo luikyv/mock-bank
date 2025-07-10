@@ -28,6 +28,9 @@ func (s Service) Resources(ctx context.Context, orgID string, filter Filter, pag
 	if filter.ConsentID != "" {
 		query = query.Where("consent_id = ?", filter.ConsentID)
 	}
+	if filter.Status != "" {
+		query = query.Where("status = ?", filter.Status)
+	}
 
 	var rs []*Resource
 	if err := query.

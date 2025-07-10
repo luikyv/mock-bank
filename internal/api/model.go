@@ -17,6 +17,7 @@ const (
 	CtxKeySubject       ContextKey = "subject"
 	CtxKeyScopes        ContextKey = "scopes"
 	CtxKeyConsentID     ContextKey = "consent_id"
+	CtxKeyEnrollmentID  ContextKey = "enrollment_id"
 	CtxKeyInteractionID ContextKey = "interaction_id"
 	CtxKeyOrgID         ContextKey = "org_id"
 	CtxKeySessionID     ContextKey = "session_id"

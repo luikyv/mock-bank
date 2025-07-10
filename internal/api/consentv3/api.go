@@ -6,8 +6,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/google/uuid"
-
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/mock-bank/internal/api"
@@ -37,7 +35,9 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, consent.Scope)
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)
-	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) string { return "PARAMETRO_INVALIDO" })
+	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) api.Error {
+		return api.NewError("PARAMETRO_INVALIDO", http.StatusBadRequest, err.Error())
+	})
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
@@ -45,7 +45,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 				writeResponseError(w, r, err)
 			},
 		}),
-		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware, middleware.FAPIID()},
+		HandlerMiddlewares: []MiddlewareFunc{swaggerMiddleware},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error()))
 		},
@@ -73,7 +73,8 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = clientCredentialsAuthMiddleware(handler)
 	consentMux.Handle("GET /consents/{consentId}/extensions", handler)
 
-	mux.Handle("/open-banking/consents/v3/", http.StripPrefix("/open-banking/consents/v3", consentMux))
+	handler = middleware.FAPIID()(consentMux)
+	mux.Handle("/open-banking/consents/v3/", http.StripPrefix("/open-banking/consents/v3", handler))
 }
 
 func (s Server) ConsentsPostConsents(ctx context.Context, req ConsentsPostConsentsRequestObject) (ConsentsPostConsentsResponseObject, error) {
@@ -193,9 +194,17 @@ func (s Server) ConsentsPostConsentsConsentIDExtends(ctx context.Context, req Co
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
 	consentID := ctx.Value(api.CtxKeyConsentID).(string)
 	ext := &consent.Extension{
-		ConsentID:     uuid.MustParse(consentID),
-		UserAgent:     req.Params.XCustomerUserAgent,
-		UserIPAddress: req.Params.XFapiCustomerIPAddress,
+		UserIdentification: req.Body.Data.LoggedUser.Document.Identification,
+		UserRel:            consent.Relation(req.Body.Data.LoggedUser.Document.Rel),
+		ExpiresAt:          req.Body.Data.ExpirationDateTime,
+		UserAgent:          req.Params.XCustomerUserAgent,
+		UserIPAddress:      req.Params.XFapiCustomerIPAddress,
+	}
+
+	if req.Body.Data.BusinessEntity != nil {
+		ext.BusinessIdentification = &req.Body.Data.BusinessEntity.Document.Identification
+		rel := consent.Relation(req.Body.Data.BusinessEntity.Document.Rel)
+		ext.BusinessRel = &rel
 	}
 
 	c, err := s.service.Extend(ctx, consentID, orgID, ext)
@@ -251,7 +260,7 @@ func (s Server) ConsentsGetConsentsConsentIDExtensions(ctx context.Context, req 
 		}{
 			LoggedUser: LoggedUserExtensions{
 				Document: LoggedUserDocumentExtensions{
-					Identification: ext.UserCPF,
+					Identification: ext.UserIdentification,
 					Rel:            consent.DefaultUserDocumentRelation,
 				},
 			},

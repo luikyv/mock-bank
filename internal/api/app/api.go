@@ -67,7 +67,9 @@ func NewServer(
 
 func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
-	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) string { return "PARAMETRO_INVALIDO" })
+	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) api.Error {
+		return api.NewError("PARAMETRO_INVALIDO", http.StatusBadRequest, err.Error())
+	})
 	secureMiddleware := secure.New(secure.Options{
 		STSSeconds:            31536000,
 		STSIncludeSubdomains:  true,

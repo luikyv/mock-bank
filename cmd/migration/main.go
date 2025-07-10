@@ -55,7 +55,7 @@ func main() {
 	}
 
 	// Migrations.
-	// migrationsPath = "file://../../db/migrations"
+	// migrationsPath := "file://../../db/migrations"
 	migrationsPath := "file://db/migrations"
 	slog.Info("running database migrations")
 	if err := runMigrations(db, migrationsPath); err != nil {
@@ -107,6 +107,10 @@ func seedDatabase(ctx context.Context, db *gorm.DB) error {
 		return fmt.Errorf("failed to seed Ralph Bragg: %w", err)
 	}
 
+	if err := seedGabrielNunes(ctx, db); err != nil {
+		return fmt.Errorf("failed to seed Gabriel Nunes: %w", err)
+	}
+
 	if Env == LocalEnvironment {
 		if err := createOAuthClients(ctx, db); err != nil {
 			return fmt.Errorf("failed to create OAuth client: %w", err)
@@ -117,38 +121,71 @@ func seedDatabase(ctx context.Context, db *gorm.DB) error {
 }
 
 func createOAuthClients(ctx context.Context, db *gorm.DB) error {
-	oidcClient := &goidc.Client{
+	testClientOne := &client.Client{
 		ID: "client_one",
-		ClientMeta: goidc.ClientMeta{
-			Name:                 "Client One",
-			RedirectURIs:         []string{"https://localhost.emobix.co.uk:8443/test/a/mockbank/callback"},
-			GrantTypes:           []goidc.GrantType{"authorization_code", "client_credentials", "implicit", "refresh_token"},
-			ResponseTypes:        []goidc.ResponseType{"code id_token"},
-			PublicJWKSURI:        "https://keystore.local/00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111/application.jwks",
-			ScopeIDs:             "openid consents consent resources accounts loans payments recurring-payments recurring-consent enrollment nrp-consents",
-			IDTokenKeyEncAlg:     "RSA-OAEP",
-			IDTokenContentEncAlg: "A256GCM",
-			TokenAuthnMethod:     goidc.ClientAuthnPrivateKeyJWT,
-			TokenAuthnSigAlg:     goidc.PS256,
-			CustomAttributes: map[string]any{
-				oidc.OrgIDKey:       OrgID,
-				oidc.OriginURIsKey:  []string{"https://mockbank.local"},
-				oidc.WebhookURIsKey: []string{"https://localhost.emobix.co.uk:8443/test-mtls/a/mockbank"},
+		Data: goidc.Client{
+			ID: "client_one",
+			ClientMeta: goidc.ClientMeta{
+				Name:                 "Client One",
+				RedirectURIs:         []string{"https://localhost.emobix.co.uk:8443/test/a/mockbank/callback"},
+				GrantTypes:           []goidc.GrantType{"authorization_code", "client_credentials", "implicit", "refresh_token"},
+				ResponseTypes:        []goidc.ResponseType{"code id_token"},
+				PublicJWKSURI:        "https://keystore.local/00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111/application.jwks",
+				ScopeIDs:             "openid consents consent resources accounts customers loans payments recurring-payments recurring-consent enrollment nrp-consents",
+				IDTokenKeyEncAlg:     "RSA-OAEP",
+				IDTokenContentEncAlg: "A256GCM",
+				TokenAuthnMethod:     goidc.ClientAuthnPrivateKeyJWT,
+				TokenAuthnSigAlg:     goidc.PS256,
+				CustomAttributes: map[string]any{
+					oidc.OrgIDKey:       OrgID,
+					oidc.OriginURIsKey:  []string{"https://mockbank.local"},
+					oidc.WebhookURIsKey: []string{"https://localhost.emobix.co.uk:8443/test-mtls/a/mockbank"},
+				},
 			},
 		},
-	}
-
-	clientEntity := &client.Client{
-		ID:          oidcClient.ID,
-		Data:        *oidcClient,
-		Name:        oidcClient.Name,
+		Name:        "Client One",
 		OriginURIs:  []string{"https://mockbank.local"},
 		WebhookURIs: []string{"https://localhost.emobix.co.uk:8443/test-mtls/a/mockbank"},
 		OrgID:       OrgID,
 		UpdatedAt:   timeutil.DateTimeNow(),
 	}
+	if err := db.WithContext(ctx).Omit("CreatedAt").Save(testClientOne).Error; err != nil {
+		return fmt.Errorf("failed to save test client one: %w", err)
+	}
 
-	return db.WithContext(ctx).Omit("CreatedAt").Save(clientEntity).Error
+	testClientTwo := &client.Client{
+		ID: "client_two",
+		Data: goidc.Client{
+			ID: "client_two",
+			ClientMeta: goidc.ClientMeta{
+				Name:                 "Client Two",
+				RedirectURIs:         []string{"https://localhost.emobix.co.uk:8443/test/a/mockbank/callback"},
+				GrantTypes:           []goidc.GrantType{"authorization_code", "client_credentials", "implicit", "refresh_token"},
+				ResponseTypes:        []goidc.ResponseType{"code id_token"},
+				PublicJWKSURI:        "https://keystore.local/00000000-0000-0000-0000-000000000000/22222222-2222-2222-2222-222222222222/application.jwks",
+				ScopeIDs:             "openid consents consent resources accounts customers loans payments recurring-payments recurring-consent enrollment nrp-consents",
+				IDTokenKeyEncAlg:     "RSA-OAEP",
+				IDTokenContentEncAlg: "A256GCM",
+				TokenAuthnMethod:     goidc.ClientAuthnPrivateKeyJWT,
+				TokenAuthnSigAlg:     goidc.PS256,
+				CustomAttributes: map[string]any{
+					oidc.OrgIDKey:       OrgID,
+					oidc.OriginURIsKey:  []string{"https://mockbank.local"},
+					oidc.WebhookURIsKey: []string{"https://localhost.emobix.co.uk:8443/test-mtls/a/mockbank"},
+				},
+			},
+		},
+		Name:        "Client Two",
+		OriginURIs:  []string{"https://mockbank.local"},
+		WebhookURIs: []string{"https://localhost.emobix.co.uk:8443/test-mtls/a/mockbank"},
+		OrgID:       OrgID,
+		UpdatedAt:   timeutil.DateTimeNow(),
+	}
+	if err := db.WithContext(ctx).Omit("CreatedAt").Save(testClientTwo).Error; err != nil {
+		return fmt.Errorf("failed to save test client two: %w", err)
+	}
+
+	return nil
 }
 
 func getEnv[T ~string](key, fallback T) T {

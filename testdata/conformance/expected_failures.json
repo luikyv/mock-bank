@@ -4,7 +4,17 @@
         "variant": "*",
         "configuration-filename": "*",
         "current-block": "Pre-flight Get an SSA",
-        "condition": "ExtractDirectoryConfiguration",
-        "expected-result": "failure"
+        "condition": "CallTokenEndpoint",
+        "expected-result": "failure",
+        "comment": "Self signed certificates"
+    },
+    {
+        "test-name": "consents_api_preflight_test-module_v3",
+        "variant": "*",
+        "configuration-filename": "*",
+        "current-block": "Pre-flight Get an SSA",
+        "condition": "CallTokenEndpoint",
+        "expected-result": "failure",
+        "comment": "Self signed certificates"
     }
 ]

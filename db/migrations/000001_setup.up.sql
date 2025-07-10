@@ -112,8 +112,10 @@ CREATE INDEX idx_consents_org_id ON consents (org_id);
 CREATE TABLE consent_extensions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     consent_id UUID NOT NULL REFERENCES consents(id) ON DELETE CASCADE,
-    user_cpf TEXT NOT NULL,
-    business_cnpj TEXT,
+    user_identification TEXT NOT NULL,
+	user_rel TEXT NOT NULL,
+    business_identification TEXT,
+	business_rel TEXT,
     expires_at TIMESTAMPTZ,
     previous_expires_at TIMESTAMPTZ,
     requested_at TIMESTAMPTZ NOT NULL,

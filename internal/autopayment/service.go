@@ -513,12 +513,6 @@ func (s Service) runConsentPreCreationAutomations(_ context.Context, _ *Consent)
 func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Consent) error {
 	slog.DebugContext(ctx, "evaluating recurring payment consent automations", "status", c.Status)
 
-	now := timeutil.DateTimeNow()
-	if now.Before(c.UpdatedAt.Add(5 * time.Second)) {
-		slog.DebugContext(ctx, "recurring payment consent was updated less than 5 secs ago, skipping transitions", "updated_at", c.UpdatedAt.String())
-		return nil
-	}
-
 	switch c.Status {
 	case ConsentStatusAwaitingAuthorization:
 		if timeutil.DateTimeNow().After(c.CreatedAt.Add(60 * time.Minute)) {
@@ -531,16 +525,17 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 			})
 		}
 	case ConsentStatusPartiallyAccepted:
-		if timeutil.DateTimeNow().After(c.CreatedAt.Add(3 * time.Minute)) {
-			slog.DebugContext(ctx, "recurring payment consent partially accepted for more than 3 minutes, moving to authorized")
-			if err := s.updateConsentStatus(ctx, c, ConsentStatusAuthorized); err != nil {
-				return err
-			}
-
-			s.unscheduleConsent(ctx, c)
-			s.notifyConsentStatusChange(ctx, c)
+		if timeutil.DateTimeNow().Before(c.CreatedAt.Add(3 * time.Minute)) {
 			return nil
 		}
+
+		slog.DebugContext(ctx, "recurring payment consent partially accepted for more than 3 minutes, moving to authorized")
+		if err := s.updateConsentStatus(ctx, c, ConsentStatusAuthorized); err != nil {
+			return err
+		}
+		s.unscheduleConsent(ctx, c)
+		s.notifyConsentStatusChange(ctx, c)
+		return nil
 	case ConsentStatusAuthorized:
 		if c.ExpiresAt != nil && timeutil.DateTimeNow().After(*c.ExpiresAt) {
 			slog.DebugContext(ctx, "recurring consent is authorized, but expired, moving to consumed")

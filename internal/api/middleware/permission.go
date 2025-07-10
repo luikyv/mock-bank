@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 
@@ -24,10 +23,9 @@ func PermissionWithOptions(consentService consent.Service, opts *Options, permis
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			scopes := ctx.Value(api.CtxKeyScopes).(string)
+			id := ctx.Value(api.CtxKeyConsentID).(string)
 			orgID := ctx.Value(api.CtxKeyOrgID).(string)
 
-			id, _ := consent.IDFromScopes(scopes)
 			c, err := consentService.Consent(ctx, id, orgID)
 			if err != nil {
 				slog.DebugContext(ctx, "could not find consent", "consent_id", id, "error", err)
@@ -47,7 +45,6 @@ func PermissionWithOptions(consentService consent.Service, opts *Options, permis
 				return
 			}
 
-			r = r.WithContext(context.WithValue(ctx, api.CtxKeyConsentID, id))
 			next.ServeHTTP(w, r)
 		})
 	}

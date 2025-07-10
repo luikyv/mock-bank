@@ -27,6 +27,7 @@ import (
 	"github.com/luikyv/mock-bank/internal/api/resourcev3"
 	"github.com/luikyv/mock-bank/internal/client"
 	"github.com/luikyv/mock-bank/internal/creditop"
+	"github.com/luikyv/mock-bank/internal/customer"
 	"github.com/luikyv/mock-bank/internal/directory"
 	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/idempotency"
@@ -167,8 +168,8 @@ func main() {
 	jwtService := jwtutil.NewService(db)
 	webhookService := webhook.NewService(clientService)
 	userService := user.NewService(db, OrgID)
-	consentService := consent.NewService(db, userService)
 	resourceService := resource.NewService(db)
+	consentService := consent.NewService(db, userService, resourceService)
 	accountService := account.NewService(db, OrgID)
 	creditOpService := creditop.NewService(db, OrgID)
 	paymentService := payment.NewService(db, userService, accountService, webhookService, scheduleService)
@@ -400,7 +401,7 @@ func openidProvider(
 		goidc.ScopeOpenID,
 		consent.ScopeID,
 		consent.Scope,
-		// customer.Scope,
+		customer.Scope,
 		account.Scope,
 		// creditcard.Scope,
 		creditop.ScopeLoans,

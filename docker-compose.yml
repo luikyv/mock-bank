@@ -79,6 +79,7 @@ services:
       - ./testdata/keys/server.crt:/mocks/server.crt:ro
       - ./testdata/keys/server.key:/mocks/server.key:ro
       - ./testdata/keys/client_one_pub.jwks:/mocks/client.jwks:ro
+      - ./testdata/keys/client_two_pub.jwks:/mocks/client2.jwks:ro
       - ./testdata/keys/ca.crt:/mocks/ca.crt:ro
       - ./testdata/keys/org_pub.jwks:/mocks/org.jwks:ro
       - ./testdata/participants.json:/mocks/participants.json:ro
@@ -118,7 +119,7 @@ services:
       - AWS_ENDPOINT_URL=http://localstack:4566
       - AWS_REGION=us-east-1
     volumes:
-      - ./db/migrations:/db/migrations:ro
+      - ./db/migrations:/app/db/migrations:ro
     depends_on:
       localstack:
         condition: service_healthy

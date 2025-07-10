@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"reflect"
 	"strings"
 	"time"
 
@@ -11,20 +12,23 @@ import (
 	"github.com/luikyv/mock-bank/internal/api"
 	"github.com/luikyv/mock-bank/internal/errorutil"
 	"github.com/luikyv/mock-bank/internal/page"
+	"github.com/luikyv/mock-bank/internal/resource"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 	"github.com/luikyv/mock-bank/internal/user"
 	"gorm.io/gorm"
 )
 
 type Service struct {
-	db          *gorm.DB
-	userService user.Service
+	db              *gorm.DB
+	userService     user.Service
+	resourceService resource.Service
 }
 
-func NewService(db *gorm.DB, userService user.Service) Service {
+func NewService(db *gorm.DB, userService user.Service, resourceService resource.Service) Service {
 	return Service{
-		db:          db,
-		userService: userService,
+		db:              db,
+		userService:     userService,
+		resourceService: resourceService,
 	}
 }
 
@@ -127,30 +131,19 @@ func (s Service) Delete(ctx context.Context, id, orgID string) error {
 	return s.Reject(ctx, id, orgID, rejectedBy, rejectionReason)
 }
 
-func (s Service) runPostCreationAutomations(ctx context.Context, c *Consent) error {
-	switch c.Status {
-	case StatusAwaitingAuthorization:
-		if timeutil.DateTimeNow().After(c.CreatedAt.Add(3600 * time.Second)) {
-			slog.DebugContext(ctx, "consent awaiting authorization for too long, moving to rejected")
-			return s.reject(ctx, c, RejectedByUser, RejectionReasonConsentExpired)
-		}
-	case StatusAuthorized:
-		if c.ExpiresAt != nil && timeutil.DateTimeNow().After(*c.ExpiresAt) {
-			slog.DebugContext(ctx, "consent reached expiration, moving to rejected")
-			return s.reject(ctx, c, RejectedByASPSP, RejectionReasonConsentMaxDateReached)
-		}
-	}
-
-	return nil
-}
-
 func (s Service) Extend(ctx context.Context, id, orgID string, ext *Extension) (*Consent, error) {
+	ext.ConsentID = uuid.MustParse(id)
+	ext.OrgID = orgID
+	ext.RequestedAt = timeutil.DateTimeNow()
+	ext.CreatedAt = timeutil.DateTimeNow()
+	ext.UpdatedAt = timeutil.DateTimeNow()
+
 	c, err := s.Consent(ctx, id, orgID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := validateExtension(c, ext); err != nil {
+	if err := s.validateExtension(ctx, c, ext); err != nil {
 		return nil, err
 	}
 
@@ -191,6 +184,64 @@ func (s Service) validate(_ context.Context, c *Consent) error {
 
 	now := timeutil.DateTimeNow()
 	if c.ExpiresAt != nil && (c.ExpiresAt.After(now.AddDate(1, 0, 0)) || c.ExpiresAt.Before(now)) {
+		return ErrInvalidExpiration
+	}
+
+	return nil
+}
+
+func (s Service) runPostCreationAutomations(ctx context.Context, c *Consent) error {
+	switch c.Status {
+	case StatusAwaitingAuthorization:
+		if timeutil.DateTimeNow().After(c.CreatedAt.Add(3600 * time.Second)) {
+			slog.DebugContext(ctx, "consent awaiting authorization for too long, moving to rejected")
+			return s.reject(ctx, c, RejectedByUser, RejectionReasonConsentExpired)
+		}
+	case StatusAuthorized:
+		if c.ExpiresAt != nil && timeutil.DateTimeNow().After(*c.ExpiresAt) {
+			slog.DebugContext(ctx, "consent reached expiration, moving to rejected")
+			return s.reject(ctx, c, RejectedByASPSP, RejectionReasonConsentMaxDateReached)
+		}
+	}
+
+	return nil
+}
+
+func (s Service) validateExtension(ctx context.Context, c *Consent, ext *Extension) error {
+	if c.Status != StatusAuthorized {
+		return ErrCannotExtendConsentNotAuthorized
+	}
+
+	if c.UserIdentification != ext.UserIdentification {
+		return ErrExtensionNotAllowed
+	}
+
+	if c.BusinessIdentification != nil && reflect.DeepEqual(c.BusinessIdentification, ext.BusinessIdentification) {
+		return ErrExtensionNotAllowed
+	}
+
+	rs, err := s.resourceService.Resources(ctx, c.OrgID, resource.Filter{
+		ConsentID: c.ID.String(),
+		Status:    resource.StatusPendingAuthorization,
+	}, page.NewPagination(nil, nil))
+	if err != nil {
+		return errorutil.Format("failed to get resources pending authorization: %w", err)
+	}
+
+	if rs.TotalRecords != 0 {
+		return ErrCannotExtendConsentForJointAccount
+	}
+
+	if ext.ExpiresAt == nil {
+		return nil
+	}
+
+	now := timeutil.DateTimeNow()
+	if ext.ExpiresAt.Before(now) || ext.ExpiresAt.After(now.AddDate(1, 0, 0)) {
+		return ErrInvalidExpiration
+	}
+
+	if c.ExpiresAt != nil && !ext.ExpiresAt.After(*c.ExpiresAt) {
 		return ErrInvalidExpiration
 	}
 
