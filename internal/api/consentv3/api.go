@@ -313,8 +313,8 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
-	if errors.Is(err, consent.ErrCannotExtendConsentForJointAccount) {
-		api.WriteError(w, r, api.NewError("DEPENDE_MULTIPLA_ALCADA", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentForJointAccount.Error()))
+	if errors.Is(err, consent.ErrCannotExtendConsentPendingAuthorization) {
+		api.WriteError(w, r, api.NewError("DEPENDE_MULTIPLA_ALCADA", http.StatusUnprocessableEntity, consent.ErrCannotExtendConsentPendingAuthorization.Error()))
 		return
 	}
 

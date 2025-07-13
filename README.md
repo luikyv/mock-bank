@@ -34,6 +34,7 @@ All users listed below share the default password: `P@ssword01`.
 | Username              | CPF           | CNPJ              | Description                                  |
 |-----------------------|---------------|-------------------|----------------------------------------------|
 | ralph.bragg@gmail.com | 761.092.776-73 | 50.685.362/0006-73 | Primary test user with resources in all APIs |
+| gabriel.nunes@email.com | 87517400444 | N/A | Test user with joint account for multiple consents scenarios |
 
 
 ## Payments
@@ -114,14 +115,13 @@ To run MockBank with the Open Finance Conformance Suite:
    ```
 
 ## TODO
+- Add doc.go's.
+- Test the scheduler.
 - Finish accounts and loans.
 - Improve the html.
-- Conformance tests.
-- Webhook must use mtls.
 - Update swaggers to undo modifications.
 - Improve loops that query the db.
 - Remove descriptions.
-- Accounts overdraft limits.
 - Transactions.
 - Improve error handling.
 - Add logs.

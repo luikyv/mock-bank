@@ -5,17 +5,16 @@ import (
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"runtime/debug"
 	"time"
 
+	"github.com/luikyv/mock-bank/cmd/runutil"
 	"github.com/luikyv/mock-bank/internal/api/accountv2"
 	"github.com/luikyv/mock-bank/internal/api/app"
 	"github.com/luikyv/mock-bank/internal/api/autopaymentv2"
@@ -32,15 +31,12 @@ import (
 	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/idempotency"
 	"github.com/luikyv/mock-bank/internal/jwtutil"
-	"github.com/luikyv/mock-bank/internal/page"
 	"github.com/luikyv/mock-bank/internal/schedule"
 	"github.com/luikyv/mock-bank/internal/session"
 	"github.com/luikyv/mock-bank/internal/webhook"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
@@ -56,51 +52,49 @@ import (
 	"github.com/luikyv/mock-bank/internal/resource"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 	"github.com/luikyv/mock-bank/internal/user"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-type Environment string
-
 const (
-	LocalEnvironment  Environment = "LOCAL"
-	Brand             string      = "MockBank"
-	CNPJ              string      = "00000000000000"
-	ISPB              string      = "00000000"
-	IBGETownCode      string      = "0000000"
-	Currency          string      = "BRL"
-	AccountCompeCode  string      = "001"
-	AccountBranch     string      = "0001"
-	AccountCheckDigit string      = "1"
+	Brand             string = "MockBank"
+	CNPJ              string = "00000000000000"
+	ISPB              string = "00000000"
+	IBGETownCode      string = "0000000"
+	Currency          string = "BRL"
+	AccountCompeCode  string = "001"
+	AccountBranch     string = "0001"
+	AccountCheckDigit string = "1"
 )
 
 var (
-	Env = getEnv("ENV", LocalEnvironment)
+	Env = runutil.EnvValue("ENV", runutil.LocalEnvironment)
 	// OrgID is the Mock Bank organization identifier.
-	OrgID        = getEnv("ORG_ID", "00000000-0000-0000-0000-000000000000")
-	BaseDomain   = getEnv("BASE_DOMAIN", "mockbank.local")
+	OrgID        = runutil.EnvValue("ORG_ID", "00000000-0000-0000-0000-000000000000")
+	BaseDomain   = runutil.EnvValue("BASE_DOMAIN", "mockbank.local")
 	APPHost      = "https://app." + BaseDomain
 	APIMTLSHost  = "https://matls-api." + BaseDomain
 	AuthHost     = "https://auth." + BaseDomain
 	AuthMTLSHost = "https://matls-auth." + BaseDomain
 	// DirectoryIssuer is the issuer used by the directory to sign ID tokens, etc.
-	DirectoryIssuer = getEnv("DIRECTORY_ISSUER", "https://directory.local")
+	DirectoryIssuer = runutil.EnvValue("DIRECTORY_ISSUER", "https://directory.local")
 	// DirectoryClientID is the client ID for Mock Bank to make OAuth requests to the directory.
-	DirectoryClientID       = getEnv("DIRECTORY_CLIENT_ID", "mockbank")
-	KeyStoreHost            = getEnv("KEYSTORE_HOST", "https://keystore.local")
-	SoftwareStatementIssuer = getEnv("SS_ISSUER", "Open Banking Brasil sandbox SSA issuer")
-	Port                    = getEnv("PORT", "80")
-	DBSecretName            = getEnv("DB_SECRET_NAME", "mockbank/db-credentials")
+	DirectoryClientID       = runutil.EnvValue("DIRECTORY_CLIENT_ID", "mockbank")
+	KeyStoreHost            = runutil.EnvValue("KEYSTORE_HOST", "https://keystore.local")
+	SoftwareStatementIssuer = runutil.EnvValue("SS_ISSUER", "Open Banking Brasil sandbox SSA issuer")
+	Port                    = runutil.EnvValue("PORT", "80")
+	DBSecretName            = runutil.EnvValue("DB_SECRET_NAME", "mockbank/db-credentials")
 	// OPSigningKeySSMParamName is the parameter used to sign JWTs for the OpenID Provider.
-	OPSigningKeySSMParamName = getEnv("OP_SIGNING_KEY_SSM_PARAM", "/mockbank/op-signing-key")
+	OPSigningKeySSMParamName = runutil.EnvValue("OP_SIGNING_KEY_SSM_PARAM", "/mockbank/op-signing-key")
 	// DirectoryClientSigningKeySSMParamName is the parameter used to sign JWTs for the directory client.
-	DirectoryClientSigningKeySSMParamName = getEnv("DIRECTORY_CLIENT_SIGNING_KEY_SSM_PARAM", "/mockbank/directory-client-signing-key")
+	DirectoryClientSigningKeySSMParamName = runutil.EnvValue("DIRECTORY_CLIENT_SIGNING_KEY_SSM_PARAM", "/mockbank/directory-client-signing-key")
 	// DirectoryClientMTLSCertSSMParamName and DirectoryClientMTLSKeySSMParamName are the parameters used for mutual TLS connection with the directory.
-	DirectoryClientMTLSCertSSMParamName = getEnv("DIRECTORY_CLIENT_MTLS_CERT_SSM_PARAM", "/mockbank/directory-client-transport-cert")
-	DirectoryClientMTLSKeySSMParamName  = getEnv("DIRECTORY_CLIENT_MTLS_KEY_SSM_PARAM", "/mockbank/directory-client-transport-key")
+	DirectoryClientMTLSCertSSMParamName = runutil.EnvValue("DIRECTORY_CLIENT_MTLS_CERT_SSM_PARAM", "/mockbank/directory-client-transport-cert")
+	DirectoryClientMTLSKeySSMParamName  = runutil.EnvValue("DIRECTORY_CLIENT_MTLS_KEY_SSM_PARAM", "/mockbank/directory-client-transport-key")
 	// OrgSigningKeySSMParamName is the parameter used by Mock Bank to sign API responses.
-	OrgSigningKeySSMParamName = getEnv("ORG_SIGNING_KEY_SSM_PARAM", "/mockbank/org-signing-key")
-	AWSEndpoint               = getEnv("AWS_ENDPOINT_URL", "http://localhost:4566")
+	OrgSigningKeySSMParamName = runutil.EnvValue("ORG_SIGNING_KEY_SSM_PARAM", "/mockbank/org-signing-key")
+	// TransportCertSSMParamName and TransportKeySSMParamName are the parameters used for mutual TLS connection with the webhook client.
+	TransportCertSSMParamName = runutil.EnvValue("TRANSPORT_CERT_SSM_PARAM", "/mockbank/transport-cert")
+	TransportKeySSMParamName  = runutil.EnvValue("TRANSPORT_KEY_SSM_PARAM", "/mockbank/transport-key")
 )
 
 func main() {
@@ -110,7 +104,11 @@ func main() {
 	slog.SetDefault(logger())
 	slog.Info("setting up mock bank", "env", Env)
 	http.DefaultClient = httpClient()
-	awsConfig := awsConfig(ctx)
+	awsConfig, err := runutil.AWSConfig(ctx, Env)
+	if err != nil {
+		slog.Error("failed to load aws config", "error", err)
+		os.Exit(1)
+	}
 	bankConfig := BankConfig{
 		host:              APIMTLSHost,
 		orgID:             OrgID,
@@ -128,9 +126,10 @@ func main() {
 	slog.Info("creating secrets manager client")
 	secretsClient := secretsmanager.NewFromConfig(*awsConfig)
 	slog.Info("secrets manager client created")
-	db, err := dbConnection(ctx, secretsClient)
+	db, err := runutil.DB(ctx, secretsClient, DBSecretName)
 	if err != nil {
-		log.Fatalf("failed connecting to database: %v", err)
+		slog.Error("failed connecting to database", "error", err)
+		os.Exit(1)
 	}
 
 	// Keys.
@@ -140,46 +139,57 @@ func main() {
 
 	opSigner, err := signerFromSSM(ctx, ssmClient, OPSigningKeySSMParamName)
 	if err != nil {
-		log.Fatalf("could not load signer for op: %v\n", err)
+		slog.Error("could not load signer for op", "error", err)
+		os.Exit(1)
 	}
 
 	directoryClientSigner, err := signerFromSSM(ctx, ssmClient, DirectoryClientSigningKeySSMParamName)
 	if err != nil {
-		log.Fatalf("could not load signer for directory: %v\n", err)
+		slog.Error("could not load signer for directory", "error", err)
+		os.Exit(1)
 	}
 
-	directoryClientTLSCert, err := tlsCertFromSSM(ctx, ssmClient, DirectoryClientMTLSCertSSMParamName, DirectoryClientMTLSKeySSMParamName)
+	directoryClientTLSCert, err := runutil.TLSCertFromSSM(ctx, ssmClient, DirectoryClientMTLSCertSSMParamName, DirectoryClientMTLSKeySSMParamName)
 	if err != nil {
-		log.Fatalf("could not load directory client TLS certificate: %v\n", err)
+		slog.Error("could not load directory client TLS certificate", "error", err)
+		os.Exit(1)
 	}
 
 	orgSigner, err := signerFromSSM(ctx, ssmClient, OrgSigningKeySSMParamName)
 	if err != nil {
-		log.Fatalf("could not load signer for organization: %v\n", err)
+		slog.Error("could not load signer for organization", "error", err)
+		os.Exit(1)
+	}
+
+	transportTLSCert, err := runutil.TLSCertFromSSM(ctx, ssmClient, TransportCertSSMParamName, TransportKeySSMParamName)
+	if err != nil {
+		slog.Error("could not load transport TLS certificate", "error", err)
+		os.Exit(1)
 	}
 
 	// Services.
 	directoryService := directory.NewService(DirectoryIssuer, DirectoryClientID, APPHost+"/api/directory/callback",
-		directoryClientSigner, mtlsHTTPClient(directoryClientTLSCert))
+		directoryClientSigner, runutil.MTLSHTTPClient(directoryClientTLSCert, Env))
 	sessionService := session.NewService(db, directoryService)
 	clientService := client.NewService(db)
 	idempotencyService := idempotency.NewService(db)
 	scheduleService := schedule.NewService(db)
 	jwtService := jwtutil.NewService(db)
-	webhookService := webhook.NewService(clientService)
+	webhookService := webhook.NewService(clientService, runutil.MTLSHTTPClient(transportTLSCert, Env))
 	userService := user.NewService(db, OrgID)
 	resourceService := resource.NewService(db)
 	consentService := consent.NewService(db, userService, resourceService)
 	accountService := account.NewService(db, OrgID)
 	creditOpService := creditop.NewService(db, OrgID)
 	paymentService := payment.NewService(db, userService, accountService, webhookService, scheduleService)
-	autoPaymentService := autopayment.NewService(db, bankConfig, userService, accountService, webhookService, scheduleService)
+	autoPaymentService := autopayment.NewService(db, userService, accountService, webhookService, scheduleService)
 	enrollmentService := enrollment.NewService(db, userService, accountService, paymentService, autoPaymentService, webhookService)
 
 	op, err := openidProvider(db, opSigner, clientService, userService, consentService, accountService,
 		creditOpService, paymentService, autoPaymentService, enrollmentService)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to create openid provider", "error", err)
+		os.Exit(1)
 	}
 
 	// Servers.
@@ -198,11 +208,10 @@ func main() {
 	handler := middleware(mux)
 	slog.Info("starting mock bank")
 
-	if Env == LocalEnvironment {
-		go pollSchedules(ctx, scheduleService, paymentService, autoPaymentService, time.NewTicker(time.Second*10))
-
+	if Env == runutil.LocalEnvironment {
 		if err := http.ListenAndServe(":"+Port, handler); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal(err)
+			slog.Error("failed to start mock bank", "error", err)
+			os.Exit(1)
 		}
 		return
 	}
@@ -264,69 +273,6 @@ func (bc BankConfig) AccountCheckDigit() string {
 	return bc.accountCheckDigit
 }
 
-func dbConnection(ctx context.Context, sm *secretsmanager.Client) (*gorm.DB, error) {
-	type dbSecret struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Host     string `json:"host"`
-		Port     int    `json:"port"`
-		DBName   string `json:"dbname"`
-		Engine   string `json:"engine"`
-		SSLMode  string `json:"sslmode"`
-	}
-
-	slog.Info("retrieving database credentials from secrets manager")
-	resp, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-		SecretId: &DBSecretName,
-	})
-	slog.Info("retrieved database credentials from secrets manager")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get secret: %w", err)
-	}
-
-	var secret dbSecret
-	if err := json.Unmarshal([]byte(*resp.SecretString), &secret); err != nil {
-		return nil, fmt.Errorf("failed to parse secret JSON: %w", err)
-	}
-
-	if secret.SSLMode == "" {
-		secret.SSLMode = "require"
-	}
-
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s connect_timeout=5",
-		secret.Host, secret.Port, secret.Username, secret.Password, secret.DBName, secret.SSLMode)
-
-	slog.Info("connecting to database")
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		NowFunc: func() time.Time {
-			return timeutil.DateTimeNow().Time
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sql.DB from gorm DB: %w", err)
-	}
-	if err := sqlDB.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	slog.Info("successfully connected to database")
-
-	return db, nil
-}
-
-// getEnv retrieves an environment variable or returns a fallback value if not found.
-func getEnv[T ~string](key, fallback T) T {
-	if value, exists := os.LookupEnv(string(key)); exists {
-		return T(value)
-	}
-	return fallback
-}
-
 func logger() *slog.Logger {
 	return slog.New(&logCtxHandler{
 		Handler: slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -360,22 +306,10 @@ func (h *logCtxHandler) Handle(ctx context.Context, r slog.Record) error {
 }
 
 func httpClient() *http.Client {
-	tlsConfig := &tls.Config{}
-	if Env == LocalEnvironment {
-		tlsConfig.InsecureSkipVerify = true
-	}
-	return &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
-	}
-}
-
-func mtlsHTTPClient(cert tls.Certificate) *http.Client {
 	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
+		Renegotiation: tls.RenegotiateOnceAsClient,
 	}
-	if Env == LocalEnvironment {
+	if Env == runutil.LocalEnvironment {
 		tlsConfig.InsecureSkipVerify = true
 	}
 	return &http.Client{
@@ -463,8 +397,10 @@ func openidProvider(
 		provider.WithACRs(oidc.ACROpenBankingLOA2, oidc.ACROpenBankingLOA3),
 		provider.WithUserInfoSignatureAlgs(goidc.PS256),
 		provider.WithUserInfoEncryption(goidc.RSA_OAEP),
+		provider.WithUserInfoContentEncryptionAlgs(goidc.A256GCM),
 		provider.WithIDTokenSignatureAlgs(goidc.PS256),
 		provider.WithIDTokenEncryption(goidc.RSA_OAEP),
+		provider.WithIDTokenContentEncryptionAlgs(goidc.A256GCM),
 		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(op, consentService, paymentService, autoPaymentService, enrollmentService)),
 		provider.WithPolicies(oidc.Policies(AuthHost, userService, consentService, accountService, creditOpService, paymentService, autoPaymentService, enrollmentService)...),
 		provider.WithNotifyErrorFunc(oidc.LogError),
@@ -479,20 +415,6 @@ func openidProvider(
 	}
 
 	return op, nil
-}
-
-func awsConfig(ctx context.Context) *aws.Config {
-
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		log.Fatalf("unable to load aws config, %v", err)
-	}
-
-	if Env == LocalEnvironment {
-		cfg.BaseEndpoint = &AWSEndpoint
-		cfg.Credentials = credentials.NewStaticCredentialsProvider("test", "test", "")
-	}
-	return &cfg
 }
 
 func signerFromSSM(ctx context.Context, ssmClient *ssm.Client, paramName string) (crypto.Signer, error) {
@@ -533,36 +455,6 @@ func signerFromSSM(ctx context.Context, ssmClient *ssm.Client, paramName string)
 	return signer, nil
 }
 
-func tlsCertFromSSM(ctx context.Context, ssmClient *ssm.Client, certParamName, keyParamName string) (tls.Certificate, error) {
-	withDecryption := true
-
-	certOut, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           aws.String(certParamName),
-		WithDecryption: &withDecryption,
-	})
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("could not fetch cert from SSM (%s): %w", certParamName, err)
-	}
-
-	keyOut, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           aws.String(keyParamName),
-		WithDecryption: &withDecryption,
-	})
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("could not fetch key from SSM (%s): %w", keyParamName, err)
-	}
-
-	certPEM := []byte(aws.ToString(certOut.Parameter.Value))
-	keyPEM := []byte(aws.ToString(keyOut.Parameter.Value))
-
-	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("could not parse TLS certificate: %w", err)
-	}
-
-	return tlsCert, nil
-}
-
 func middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -584,43 +476,4 @@ func middleware(next http.Handler) http.Handler {
 		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	})
-}
-
-func pollSchedules(
-	ctx context.Context,
-	scheduleService schedule.Service,
-	paymentService payment.Service,
-	autoPaymentService autopayment.Service,
-	ticker *time.Ticker,
-) {
-	for {
-		select {
-		case <-ctx.Done():
-			slog.InfoContext(ctx, "finished polling schedules")
-			return
-		case <-ticker.C:
-			slog.InfoContext(ctx, "polling schedules")
-			pageSize := int32(100)
-			schedules, err := scheduleService.Schedules(ctx, page.NewPagination(nil, &pageSize))
-			if err != nil {
-				slog.ErrorContext(ctx, "error fetching schedules", "error", err)
-				continue
-			}
-			slog.InfoContext(ctx, "schedules fetched", "count", len(schedules.Records), "total", schedules.TotalRecords)
-
-			for _, s := range schedules.Records {
-				switch s.TaskType {
-				case schedule.TaskTypePaymentConsent:
-					_, _ = paymentService.Consent(ctx, s.ID.String(), s.OrgID)
-				case schedule.TaskTypePayment:
-					_, _ = paymentService.Payment(ctx, s.ID.String(), s.OrgID)
-				case schedule.TaskTypeAutoPaymentConsent:
-					_, _ = autoPaymentService.Consent(ctx, s.ID.String(), s.OrgID)
-				case schedule.TaskTypeAutoPayment:
-					_, _ = autoPaymentService.Payment(ctx, s.ID.String(), s.OrgID)
-				}
-				scheduleService.Unschedule(ctx, s.ID.String(), s.OrgID)
-			}
-		}
-	}
 }

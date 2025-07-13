@@ -31,4 +31,3 @@ playground/
 .vscode/
 coverage.*
 mock-bank-ui/
-cs-venv/

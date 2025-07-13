@@ -30,7 +30,6 @@ type Service struct {
 	paymentService     payment.Service
 	autopaymentService autopayment.Service
 	webhookService     webhook.Service
-	version            string
 }
 
 func NewService(
@@ -48,13 +47,7 @@ func NewService(
 		paymentService:     paymentService,
 		autopaymentService: autopaymentService,
 		webhookService:     webhookService,
-		version:            "v0",
 	}
-}
-
-func (s Service) WithVersion(version string) Service {
-	s.version = version
-	return s
 }
 
 func (s Service) Create(ctx context.Context, e *Enrollment, debtorAcc *payment.Account) error {
@@ -371,7 +364,7 @@ func (s Service) Cancel(ctx context.Context, e *Enrollment, cancellation Cancell
 		return err
 	}
 
-	s.webhookService.Notify(ctx, e.ClientID, "/enrollments/"+s.version+"/enrollments/"+e.URN())
+	s.webhookService.NotifyEnrollment(ctx, e.ClientID, e.URN(), e.Version)
 	return nil
 }
 

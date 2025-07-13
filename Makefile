@@ -56,6 +56,9 @@ build-mockgw:
 build-migration:
 	@docker compose build migration
 
+build-scheduler:
+	@docker compose build scheduler
+
 # Build the Conformance Suite JAR file.
 build-cs:
 	@docker compose run cs-builder
@@ -69,13 +72,13 @@ test-coverage:
 	@echo "Total Coverage: `go tool cover -func=coverage.out | grep total | grep -Eo '[0-9]+\.[0-9]+'` %"
 
 cs-tests:
-	@if [ ! -d "cs-venv" ]; then \
-	  python3 -m venv cs-venv; \
-	  . ./cs-venv/bin/activate; \
+	@if [ ! -d "conformance-suite/venv" ]; then \
+	  python3 -m venv conformance-suite/venv; \
+	  . ./conformance-suite/venv/bin/activate; \
 	  python3 -m pip install httpx; \
 	fi
 
-	@cs-venv/bin/python conformance-suite/scripts/run-test-plan.py \
+	@conformance-suite/venv/bin/python conformance-suite/scripts/run-test-plan.py \
 		consents_test-plan_v3-2 ./testdata/conformance/phase2-config.json \
 		accounts_test-plan_v2-4 ./testdata/conformance/phase2-config.json \
 		--export-dir ./conformance-suite/results

@@ -60,6 +60,7 @@ type Enrollment struct {
 	RelyingParty           string
 	Challenge              *string
 	PublicKey              *string
+	Version                string
 
 	OrgID     string
 	CreatedAt timeutil.DateTime

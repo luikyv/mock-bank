@@ -50,6 +50,7 @@ type Payment struct {
 	Date                      timeutil.BrazilDate
 	Rejection                 *Rejection    `gorm:"serializer:json"`
 	Cancellation              *Cancellation `gorm:"serializer:json"`
+	Version                   string
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -159,6 +160,7 @@ type Consent struct {
 	EnrollmentChallenge        *string
 	EnrollmentTransactionLimit *string
 	EnrollmentDailyLimit       *string
+	Version                    string
 
 	OrgID     string
 	CreatedAt timeutil.DateTime

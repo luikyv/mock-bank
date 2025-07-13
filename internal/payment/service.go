@@ -28,7 +28,6 @@ type Service struct {
 	accountService  account.Service
 	webhookService  webhook.Service
 	scheduleService schedule.Service
-	version         string
 }
 
 func NewService(
@@ -44,13 +43,7 @@ func NewService(
 		accountService:  accountService,
 		webhookService:  webhookService,
 		scheduleService: scheduleService,
-		version:         "v0",
 	}
-}
-
-func (s Service) WithVersion(version string) Service {
-	s.version = version
-	return s
 }
 
 func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *Account) error {
@@ -564,7 +557,7 @@ func (s Service) updateConsent(ctx context.Context, c *Consent) error {
 
 func (s Service) notifyConsentStatusChange(ctx context.Context, c *Consent) {
 	slog.DebugContext(ctx, "notifying client about payment consent status change", "status", c.Status)
-	s.webhookService.Notify(ctx, c.ClientID, "/payments/"+s.version+"/consents/"+c.URN())
+	s.webhookService.NotifyPaymentConsent(ctx, c.ClientID, c.URN(), c.Version)
 }
 
 func (s Service) scheduleConsent(ctx context.Context, c *Consent, nextRunAt timeutil.DateTime) {
@@ -879,5 +872,5 @@ func (s Service) unschedule(ctx context.Context, p *Payment) {
 
 func (s Service) notifyStatusChange(ctx context.Context, p *Payment) {
 	slog.DebugContext(ctx, "notifying client about payment status change", "status", p.Status)
-	s.webhookService.Notify(ctx, p.ClientID, "/payments/"+s.version+"/pix/payments/"+p.ID.String())
+	s.webhookService.NotifyPayment(ctx, p.ClientID, p.ID.String(), p.Version)
 }

@@ -229,7 +229,7 @@ func (s Service) validateExtension(ctx context.Context, c *Consent, ext *Extensi
 	}
 
 	if rs.TotalRecords != 0 {
-		return ErrCannotExtendConsentForJointAccount
+		return ErrCannotExtendConsentPendingAuthorization
 	}
 
 	if ext.ExpiresAt == nil {

@@ -24,23 +24,16 @@ import (
 	"gorm.io/gorm"
 )
 
-type BankConfig interface {
-	CNPJ() string
-}
-
 type Service struct {
 	db              *gorm.DB
-	bankConfig      BankConfig
 	userService     user.Service
 	accountService  account.Service
 	webhookService  webhook.Service
 	scheduleService schedule.Service
-	version         string
 }
 
 func NewService(
 	db *gorm.DB,
-	bankConfig BankConfig,
 	userService user.Service,
 	accountService account.Service,
 	webhookService webhook.Service,
@@ -52,18 +45,11 @@ func NewService(
 		accountService:  accountService,
 		webhookService:  webhookService,
 		scheduleService: scheduleService,
-		version:         "v0",
-		bankConfig:      bankConfig,
 	}
 }
 
 func (s Service) WithTx(tx *gorm.DB) Service {
-	return NewService(tx, s.bankConfig, s.userService, s.accountService, s.webhookService, s.scheduleService)
-}
-
-func (s Service) WithVersion(version string) Service {
-	s.version = version
-	return s
+	return NewService(tx, s.userService, s.accountService, s.webhookService, s.scheduleService)
 }
 
 func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payment.Account) error {
@@ -633,7 +619,7 @@ func (s Service) updateConsent(ctx context.Context, c *Consent) error {
 
 func (s Service) notifyConsentStatusChange(ctx context.Context, c *Consent) {
 	slog.DebugContext(ctx, "notifying client about automatic payment consent status change", "status", c.Status)
-	s.webhookService.Notify(ctx, c.ClientID, "/automatic-payments/"+s.version+"/recurring-consents/"+c.URN())
+	s.webhookService.NotifyRecurringPaymentConsent(ctx, c.ClientID, c.URN(), c.Version)
 }
 
 func (s Service) scheduleConsent(ctx context.Context, c *Consent, nextRunAt timeutil.DateTime) {
@@ -987,7 +973,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 
 	case payment.StatusSCHD:
 		if c.ExpiresAt != nil && p.Date.After(c.ExpiresAt.BrazilDate()) {
-			return s.cancel(ctx, p, payment.CancelledFromHolder, s.bankConfig.CNPJ())
+			return s.cancel(ctx, p, payment.CancelledFromHolder, c.UserIdentification)
 		}
 		if p.Date.After(timeutil.BrazilDateNow()) {
 			return nil
@@ -1071,7 +1057,7 @@ func (s Service) payments(ctx context.Context, orgID string, opts *Filter) ([]*P
 	}
 	query := s.db.WithContext(ctx).Where("org_id = ?", orgID)
 	if opts.ConsentID != "" {
-		query = query.Where("consent_id = ?", strings.TrimPrefix(opts.ConsentID, consent.URNPrefix))
+		query = query.Where("consent_id = ?", strings.TrimPrefix(opts.ConsentID, ConsentURNPrefix))
 	}
 	if opts.Statuses != nil {
 		query = query.Where("status IN ?", opts.Statuses)
@@ -1151,5 +1137,5 @@ func (s Service) unschedule(ctx context.Context, p *Payment) {
 }
 
 func (s Service) notifyStatusChange(ctx context.Context, p *Payment) {
-	s.webhookService.Notify(ctx, p.ClientID, "/automatic-payments/"+s.version+"/pix/recurring-payments/"+p.ID.String())
+	s.webhookService.NotifyRecurringPayment(ctx, p.ClientID, p.ID.String(), p.Version)
 }

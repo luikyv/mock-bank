@@ -55,7 +55,6 @@ func NewServer(
 	orgID string,
 	signer crypto.Signer,
 ) Server {
-	service = service.WithVersion("v4")
 	return Server{
 		config:             config,
 		baseURL:            config.Host() + "/open-banking/payments/v4",
@@ -158,6 +157,7 @@ func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsen
 		QRCode:                req.Body.Data.Payment.Details.QrCode,
 		Proxy:                 req.Body.Data.Payment.Details.Proxy,
 		OrgID:                 orgID,
+		Version:               "v4",
 	}
 	if business := req.Body.Data.BusinessEntity; business != nil {
 		rel := consent.Relation(business.Document.Rel)
@@ -391,6 +391,7 @@ func (s Server) PaymentsPostPixPayments(ctx context.Context, req PaymentsPostPix
 			Proxy:                     reqPayment.Proxy,
 			TransactionIdentification: reqPayment.TransactionIdentification,
 			IBGETownCode:              reqPayment.IbgeTownCode,
+			Version:                   "v4",
 			ClientID:                  clientID,
 			OrgID:                     orgID,
 		}

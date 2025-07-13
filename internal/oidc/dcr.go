@@ -106,14 +106,6 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 			}
 		}
 
-		if c.PublicJWKS != nil {
-			return goidc.NewError(goidc.ErrorCodeInvalidClientMetadata, "jwks cannot be informed by value")
-		}
-
-		if c.ScopeIDs == "" {
-			c.ScopeIDs = strings.Join(scopeIDs, " ")
-		}
-
 		if webhookURIs, ok := c.CustomAttribute(WebhookURIsKey).([]string); ok {
 			for _, webhookURI := range webhookURIs {
 				if !slices.Contains(ss.SoftwareAPIWebhookURIs, webhookURI) {
@@ -122,17 +114,32 @@ func DCRFunc(config DCRConfig) goidc.HandleDynamicClientFunc {
 			}
 		}
 
+		if c.PublicJWKS != nil {
+			return goidc.NewError(goidc.ErrorCodeInvalidClientMetadata, "jwks cannot be informed by value")
+		}
+
+		if c.ScopeIDs == "" {
+			c.ScopeIDs = strings.Join(scopeIDs, " ")
+		}
+
 		c.Name = ss.SoftwareClientName
-		c.CustomAttributes = map[string]any{
+		c.IDTokenKeyEncAlg = goidc.RSA_OAEP
+		c.IDTokenContentEncAlg = goidc.A256GCM
+		attrs := map[string]any{
 			OrgIDKey:      ss.OrgID,
 			SoftwareIDKey: ss.SoftwareID,
 		}
 		if ss.SoftwareOriginURIs != nil {
-			c.SetCustomAttribute(OriginURIsKey, ss.SoftwareOriginURIs)
+			attrs[OriginURIsKey] = ss.SoftwareOriginURIs
 		}
-		if webhookURIs := c.CustomAttribute(WebhookURIsKey); webhookURIs != nil {
-			c.SetCustomAttribute(WebhookURIsKey, webhookURIs)
+		if uris, ok := c.CustomAttribute(WebhookURIsKey).([]any); ok {
+			webhookURIs := make([]string, len(uris))
+			for i, uri := range uris {
+				webhookURIs[i] = uri.(string)
+			}
+			attrs[WebhookURIsKey] = webhookURIs
 		}
+		c.CustomAttributes = attrs
 		return nil
 	}
 }

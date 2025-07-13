@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -12,17 +13,48 @@ import (
 	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
-const webhookInteractionIDHeader = "X-Webhook-Interaction-ID"
+const (
+	webhookInteractionIDHeader  = "X-Webhook-Interaction-ID"
+	recurringPaymentConsentPath = "/open-banking/webhook/v1/automatic-payments/%s/recurring-consents/%s"
+	recurringPaymentPath        = "/open-banking/webhook/v1/automatic-payments/%s/pix/recurring-payments/%s"
+	paymentConsentPath          = "/open-banking/webhook/v1/payments/%s/consents/%s"
+	paymentPath                 = "/open-banking/webhook/v1/payments/%s/pix/payments/%s"
+	enrollmentPath              = "/open-banking/webhook/v1/enrollments/%s/enrollments/%s"
+)
 
 type Service struct {
 	clientService client.Service
+	httpClient    *http.Client
 }
 
-func NewService(clientService client.Service) Service {
-	return Service{clientService: clientService}
+func NewService(clientService client.Service, httpClient *http.Client) Service {
+	return Service{
+		clientService: clientService,
+		httpClient:    httpClient,
+	}
 }
 
-func (s Service) Notify(ctx context.Context, clientID, path string) {
+func (s Service) NotifyRecurringPaymentConsent(ctx context.Context, clientID, id, version string) {
+	s.notify(ctx, clientID, fmt.Sprintf(recurringPaymentConsentPath, version, id))
+}
+
+func (s Service) NotifyRecurringPayment(ctx context.Context, clientID, id, version string) {
+	s.notify(ctx, clientID, fmt.Sprintf(recurringPaymentPath, version, id))
+}
+
+func (s Service) NotifyPaymentConsent(ctx context.Context, clientID, id, version string) {
+	s.notify(ctx, clientID, fmt.Sprintf(paymentConsentPath, version, id))
+}
+
+func (s Service) NotifyPayment(ctx context.Context, clientID, id, version string) {
+	s.notify(ctx, clientID, fmt.Sprintf(paymentPath, version, id))
+}
+
+func (s Service) NotifyEnrollment(ctx context.Context, clientID, id, version string) {
+	s.notify(ctx, clientID, fmt.Sprintf(enrollmentPath, version, id))
+}
+
+func (s Service) notify(ctx context.Context, clientID, path string) {
 	client, err := s.clientService.Client(ctx, clientID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to get client", "error", err)
@@ -55,7 +87,7 @@ func (s Service) Notify(ctx context.Context, clientID, path string) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(webhookInteractionIDHeader, uuid.NewString())
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to notify client", "error", err)
 		return

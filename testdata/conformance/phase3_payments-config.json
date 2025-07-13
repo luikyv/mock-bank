@@ -4,20 +4,11 @@
     "discoveryUrl": "https://auth.mockbank.local/.well-known/openid-configuration"
   },
   "directory": {
-    "keystore": "https://keystore.local/",
-    "discoveryUrl": "https://directory.local/.well-known/openid-configuration",
     "apibase": "https://matls-directory.local",
-    "client_id": "random_client"
+    "client_id": "random_client",
+    "discoveryUrl": "https://directory.local/.well-known/openid-configuration",
+    "keystore": "https://keystore.local/"
   },
-  "resource": {
-    "consentUrl": "https://matls-api.mockbank.local/open-banking/consents/v3/consents",
-    "brazilCpf": "76109277673",
-    "brazilOrganizationId": "00000000-0000-0000-0000-000000000000"
-  },
-  "conditionalResources": {
-    "brazilCpfJointAccount": "87517400444"
-  },
-  "consent": {},
   "client": {
     "client_id": "client_one",
     "jwks": {
@@ -140,169 +131,250 @@
     "cert": "-----BEGIN CERTIFICATE-----\nMIIFSzCCAzOgAwIBAgIIGFD7RErRI7gwDQYJKoZIhvcNAQELBQAwDTELMAkGA1UE\nAxMCY2EwHhcNMjUwNzEwMTkzNzA1WhcNMjYwNzEwMTk0MjA1WjCBlDEtMCsGA1UE\nCxMkMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwMS0wKwYDVQQD\nEyQxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTExNDAyBgoJkiaJ\nk/IsZAEBEyQxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEwggIi\nMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDYJnQz0b0dhUNXL87Fi8/mvFfr\nGAz0Hr7TUaptkbSmVXjKCXag66fwtWzHAGuyOtnvmVeEWSudib4GpGmsQMMqVwZQ\niQIBPtB5P5EhyoD8ajxEuZqkpjchTMe3tiZbC+5IaQnqiVQUd3XeYRVcsaPqp0M0\nI6IaCR1mEO9ddheLLY50sxBCt+csKE+646TjUsjuOo3wfG/SVrsDI8UKS8rGVGLq\n4kuJ9p37g2aA5yMM2qOb1oiDWP0WmKsJpO+Mcr/iK9ZKmMNcM1Nki04dPZA1TpRC\n6m4H6S1Ol7Y49uq5YcKIE3xNxSSsN/B/CYzFk8QkDWbPpfUZeddr+Z2Dyw0kiCNb\noqfiJq2C9fhHh7HE0tDWhAXJsLBKhmvXb8ga1O3ohf7K2NPVDEU4SfMMjDsq1x+t\nvf5g7ko4dG58+bg4kF5TurK3yLxMKU8gUouMBZwnzij5bKCptDjGOmLUs1aIZZop\nGylK8JStbAkjTlko7SV69deSXWoIvvTq6OvW8XpZto5aeLiJS0bfNJzmJw23OE/J\nuP28YEpI61bo+CpQ9srXvNqvngKwgihrMYcc7dVHab8EYafLmvCuqNc9qEHbkR/L\nnzgDvrolTa1yIGnnPR1sGvUW6lSMw23IzZnlY5fmkIWZRvVRrYeSODLkDlT4xNlx\n8AjKLAAcuC1wo+yRbQIDAQABoycwJTAOBgNVHQ8BAf8EBAMCBaAwEwYDVR0lBAww\nCgYIKwYBBQUHAwIwDQYJKoZIhvcNAQELBQADggIBAHMXTDmFpniSDw0LqztZLxWG\nEEZG4QyYuMDrTVuzyN2adhDRvtg8s9Hc1huO8U9MQ9XjhXgGLHR19b1dtda/uAJE\nOEO6RKhTXrj4Oa0YJf7vg7ti6eaaT2oauoZ7KvWznUPgcZPDb5wgK+dBUqqI/IMa\neT2vwvRVCnl1Wax7iBPzH16B3ZvQ5f3eLERPkRucTSUOFMJ8qTWe92dcfxu5vOYq\nzRbWd9OWx94G0fGmA5EZrYDDKZnb/hRofdq51AXVBEivBrK1GQC0Yx092lLqN/3B\nPdTFZqMciH/5gfnvSlUeDZld9uwxDB2LJCcTKjRGqZXevrrDlDV71SFXZ+CCLtwD\n+gcaaDza4qS/XaabvABy5hj8B8RaGJ1P+2cQViysc1huHzR3IxQHcGsrcuKk/q5A\n2cZCiSk8FFTXglxywlEdl1T8lxr4oa/tH7BsZknTdI0nDvT2Km8mHnGWaAUbtGTj\nwbGyqR7vmiKbMqNbiLf4xhK/Uf199tWt8nukWVeNki2DFxtm0o80cGHR/QUs7Jen\noV/0/6NOKvtSdD8iblAyNwVnnLGteImUg8txuPqIpaU+CL0B6QcAix474sKHdvJN\nygaxwJsczLClIbQxxdqqqANOB2pIb/dRCDMp/Qux3CRq2vramZHTnsoFyVfQJH/7\nvApdJwmL4uS71pKBrgbD\n-----END CERTIFICATE-----\n",
     "key": "-----BEGIN RSA PRIVATE KEY-----\nMIIJKAIBAAKCAgEA2CZ0M9G9HYVDVy/OxYvP5rxX6xgM9B6+01GqbZG0plV4ygl2\noOun8LVsxwBrsjrZ75lXhFkrnYm+BqRprEDDKlcGUIkCAT7QeT+RIcqA/Go8RLma\npKY3IUzHt7YmWwvuSGkJ6olUFHd13mEVXLGj6qdDNCOiGgkdZhDvXXYXiy2OdLMQ\nQrfnLChPuuOk41LI7jqN8Hxv0la7AyPFCkvKxlRi6uJLifad+4NmgOcjDNqjm9aI\ng1j9FpirCaTvjHK/4ivWSpjDXDNTZItOHT2QNU6UQupuB+ktTpe2OPbquWHCiBN8\nTcUkrDfwfwmMxZPEJA1mz6X1GXnXa/mdg8sNJIgjW6Kn4iatgvX4R4exxNLQ1oQF\nybCwSoZr12/IGtTt6IX+ytjT1QxFOEnzDIw7Ktcfrb3+YO5KOHRufPm4OJBeU7qy\nt8i8TClPIFKLjAWcJ84o+WygqbQ4xjpi1LNWiGWaKRspSvCUrWwJI05ZKO0levXX\nkl1qCL706ujr1vF6WbaOWni4iUtG3zSc5icNtzhPybj9vGBKSOtW6PgqUPbK17za\nr54CsIIoazGHHO3VR2m/BGGny5rwrqjXPahB25Efy584A766JU2tciBp5z0dbBr1\nFupUjMNtyM2Z5WOX5pCFmUb1Ua2Hkjgy5A5U+MTZcfAIyiwAHLgtcKPskW0CAwEA\nAQKCAgAH8fnpgbcq46AjD03Rcx80Qw4URTEMtCidie3y0x1J0/B5tLlYlvD4ZyLV\nec17orAqH3/ZDJIO22ZRxi9gNo01/DbuNOsO8qklG9IQ5Omy3ZDTkeL+VGHIZpMc\nzKRCSoD6xmmn5l5h1jZN81Ges6Tr1jQhMYIe5ODgxJSX4eRhqE4JOh/J5AqqU90C\naKXB+WQLZbmb8mcF20xKhEEU7M5KVgXAzoqqSpdqDF1zNYvTSCIlc1BXS6kZ8Iiw\n9RAdIIavIJ9i5JShyf0xv/EiIAYx/25xuz5KKicRMYBwPZtJLy/AYr75+NotPm0n\nrkkvZgwaqydxUI9e3VyuymEg3BDiipdiDcAZoQpsY2IZiHfIwxq9qZrR/FfkqdW3\n8enDZtGUOd60VU0pT2GIkEHYcDERtixxzvLdV1+v5k7IMBJNLHv9tYfzT6bC66N2\n+gAZWEWC4c+vFHnjvecyGc6zGz3p+0Q6kzxNTlroOvDO0OIQXRelLvl7cqIzwmuI\nUFRn0KSC5csvAZw3Vphg7xKn5q6Mz0ziGadI3/zGIdWYNwrDRjINz98P6xJzzjDz\nyIeQr1kigJ4pSFWrQLzsiAA5YWL6K2XVPOpcJHEqpgGw+zjKhIeq4W4FXMKsjXPW\nQh9UmMCVJU0yutebVh0r3JGm8MAvs2giRyaHmYHH+Af+zfdLPQKCAQEA63pcbriK\neh6PnjZqS7Y1sBPvUvJJZMAgoxX4nAIxcUmLKR/Eeo6fOfrl9Did6rTJi3fREing\ni4uCfQGP9XjhxHJTm1g/K3IxiWUZLZG/I3g0zGOyy9+Iav+ObgL3e2dvYgRo9R9J\n6j+1UrYTMeTgtHsHhYmw9QH6vz873HqVzC/YBuq1KLb8MGERQXhBglpect+9WhYT\n/lX3+9CrR1oMp2gOQTYHVCfkubIo2WCIEdlsncxg8AQjN2ze7re/3qZ/tuejqxLd\nOYLeA/LDIOE5rLX18qd/fB/fJNEXJn7Y8erdF0JbECaUBSMcFX5+e09I3dzVvl7r\nX8Jh4j5gTTZ4PwKCAQEA6vzhU8yNbkeZWq5R2z6yN0zr1K2G+WFx3Ef5AiMTTaWH\nZbLm6YkM9PNLPLY2ut58lKU1C2Zget1krAJJRd6AsGGDM6/SPaPyM0RlkUFIOKhz\nBplK3JYsrcKEGTpBHeVnUIAx6ZXm0BzMHr12liTfowoQHkz8SAgotlqIs1AwkA5N\nKD62VlvHQPjFMBQRbRMKyUvEsF8nPOdx658aPFiTRZMIMGswTCc3Qg74HjKRJi2a\noxH/hpRK7466ezz+Tp3ZolJxaWbRa63CAmMesft5q805CvvJgYrvR6Sx3p8QQsro\nwWHYTHNUzQBA0QlAOzsywvq7Fnq2uxdsN5kcPq8rUwKCAQEA14Am4Wlfybz4QJma\nE+oQHjFQP7/ebSbrd3UfDV9wcjYU9jDNdj/Z9ozoL+Y0l1yWal3f51iN2Ad4BwEM\nB2F2dHsQisVrIk6iiRQNw8dzfnl/EGJZefz7crioV4O9i6EwrSpOB653zbo6LhTV\nYj8Naf6B9rL5UHBcUvQCy5cgSjqq4EGiQz2bdIcQ7LKqeSpM76JVPwGfkI6KoVjp\ntyXxGK/BA+r3MAxGZa9ndPDD9lnd7lfhiyauOAYZy6w8Gv6TOQeqoGBmN0DOAB0G\neKvGRYpNKKIjqKveYmo8Xo2N62++oI+omRJFOqJUDFO0WxNHI0v8DPn/PKa/P/dH\n2MH1rwKCAQBVgGnkedtEMx0jl6YFJkzmPkDZA8LG3qP1SOLb2jNd30riwDOw6cMj\nJZtMnehQGkAuPeaNHVUhn4jP5Y0PtSQSCYkZt3HCJ/MqoEpsjdpfcztXPVO165aa\nKtqx6zZiUGRFMD/5BCgVtUS4MqwBea09v52ZyN1KwF0/7LUsuZLR98IvUJI73e0k\nQOBO3B5zF6inEcChhB3c1UHoP93l8zyy5grmwzmxm9tJV/UD19Zkk9deWmAlcbPK\ncp571PebV2gm3eSSO20bxv9+qt4yWJQu5N9Klc7+KbVi1hQ6MppSE06ZfqabOqOy\na9MpvDn401NnCqAkT8ZJUP55RGa4kDgtAoIBAGMAAYLbSC2Q3vJEKA2xc521tVtK\nkTsy6Un7hfqKDD0BtJoL+7NT+Fps5XoVdwGttx2Fdf6LF451qvyUNB5HLzFb6ynT\nFYWQtsuPeOzzKfB/6HSPkW00M87QjnSWHSMUXQlOMzCOSKieToaHWnrTbz8ZHI6a\n4c/g2xuTDJdo2s6gaDwi4xdb1DoEuOi+sEnvvTL+50afz7Y7AnWOWm6+cV4skqxD\nA2T6HP4GLkWnUjDdmfq1f/qg8TevU6zQZwExjCEST9mCz3hPQI7Pa4QV6L6t+VFz\nsTo81KGoA3vY+jLfM1H57pR1T+YdryWSc0Rw6+yHOIKU9flDAeHgjRLO6Qc=\n-----END RSA PRIVATE KEY-----\n"
   },
+  "conditionalResources": {
+    "brazilCpfJointAccount": "87517400444",
+    "brazilCpfTemporization": "76109277673"
+  },
+  "consent": {},
+  "resource": {
+    "brazilOrganizationId": "00000000-0000-0000-0000-000000000000",
+    "brazilPaymentConsent": {
+      "data": {
+        "creditor": {
+          "cpfCnpj": "48847377765",
+          "name": "Marco Antonio de Brito",
+          "personType": "PESSOA_NATURAL"
+        },
+        "debtorAccount": {
+          "accountType": "CACC",
+          "ispb": "12345678",
+          "issuer": "6272",
+          "number": "94088392"
+        },
+        "loggedUser": {
+          "document": {
+            "identification": "76109277673",
+            "rel": "CPF"
+          }
+        },
+        "payment": {
+          "amount": "1333.00",
+          "currency": "BRL",
+          "date": "2021-01-01",
+          "details": {
+            "creditorAccount": {
+              "accountType": "CACC",
+              "ispb": "12345678",
+              "issuer": "1774",
+              "number": "1234567890"
+            },
+            "localInstrument": "DICT",
+            "proxy": "12345678901"
+          },
+          "type": "PIX"
+        }
+      }
+    },
+    "brazilQrdnCnpj": "43142666000197",
+    "brazilQrdnPaymentConsent": {
+      "data": {
+        "creditor": {
+          "cpfCnpj": "48847377765",
+          "name": "Marco Antonio de Brito",
+          "personType": "PESSOA_NATURAL"
+        },
+        "debtorAccount": {
+          "accountType": "CACC",
+          "ispb": "12345678",
+          "issuer": "6272",
+          "number": "94088392"
+        },
+        "loggedUser": {
+          "document": {
+            "identification": "76109277673",
+            "rel": "CPF"
+          }
+        },
+        "payment": {
+          "amount": "1333.00",
+          "currency": "BRL",
+          "date": "2021-01-01",
+          "details": {
+            "creditorAccount": {
+              "accountType": "CACC",
+              "ispb": "12345678",
+              "issuer": "1774",
+              "number": "1234567890"
+            },
+            "localInstrument": "QRDN",
+            "proxy": "cliente-a00001@pix.bcb.gov.br",
+            "qrCode": "00020126510014BR.GOV.BCB.PIX0129cliente-a00001@pix.bcb.gov.br52040000530398654071333.005802BR5922Marco Antonio de Brito6014BELO HORIZONTE62070503***6304B62D"
+          },
+          "igbeTownCode": "oiweowew",
+          "type": "PIX"
+        }
+      }
+    },
+    "consentUrl": "https://matls-api.mockbank.local/open-banking/payments/v4/consents",
+    "debtorAccountIspb": "12345678",
+    "debtorAccountIssuer": "1774",
+    "debtorAccountNumber": "94088392",
+    "debtorAccountType": "CACC",
+    "loggedUserIdentification": "76109277673",
+    "paymentAmount": "1333.00"
+  },
   "browser": [
     {
       "match": "https://auth.mockbank.local/authorize*",
       "tasks": [
-        {
-          "task": "Login",
-          "match": "https://auth.mockbank.local/authorize/*/login",
-          "commands": [
-            [
-              "text",
-              "name",
-              "username",
-              "ralph.bragg@gmail.com"
-            ],
-            [
-              "text",
-              "name",
-              "password",
-              "P@ssword01"
-            ],
-            [
-              "click",
-              "id",
-              "login-button"
-            ]
-          ]
-        },
-        {
-          "task": "Consent",
-          "match": "https://auth.mockbank.local/authorize/*/consent",
-          "commands": [
-            [
-              "click",
-              "id",
-              "consent-button"
-            ]
-          ]
-        },
-        {
-          "task": "Verify Complete",
-          "match": "*/test/*/callback*",
-          "commands": [
-            [
-              "wait",
-              "id",
-              "submission_complete",
-              10
-            ]
-          ]
-        }
+          {
+              "task": "Login",
+              "match": "https://auth.mockbank.local/authorize/*/login",
+              "commands": [
+                  ["text", "name", "username", "ralph.bragg@gmail.com"],
+                  ["text", "name", "password", "P@ssword01"],
+                  ["click", "id", "login-button"]
+              ]
+          },
+          {
+              "task": "Consent",
+              "match": "https://auth.mockbank.local/authorize/*/consent",
+              "commands": [
+                ["click", "id", "consent-button"]
+              ]
+          },
+          {
+              "task": "Verify Complete",
+              "match": "*/test/*/callback*",
+              "commands": [
+                ["wait", "id", "submission_complete", 10]
+              ]
+          }
       ]
     }
   ],
   "override": {
-    "consents_api_multiple-consents-extension-cond_test-module_v3-2": {
+    "payments_api_consents_rejection-reason_test-module_v4": {
       "browser": [
         {
           "match": "https://auth.mockbank.local/authorize*",
           "tasks": [
-            {
-              "task": "Login",
-              "match": "https://auth.mockbank.local/authorize/*/login",
-              "commands": [
-                [
-                  "text",
-                  "name",
-                  "username",
-                  "gabriel.nunes@email.com"
-                ],
-                [
-                  "text",
-                  "name",
-                  "password",
-                  "P@ssword01"
-                ],
-                [
-                  "click",
-                  "id",
-                  "login-button"
-                ]
-              ]
-            },
-            {
-              "task": "Consent",
-              "match": "https://auth.mockbank.local/authorize/*/consent",
-              "commands": [
-                [
-                  "click",
-                  "id",
-                  "consent-button"
-                ]
-              ]
-            },
-            {
-              "task": "Verify Complete",
-              "match": "*/test/*/callback*",
-              "commands": [
-                [
-                  "wait",
-                  "id",
-                  "submission_complete",
-                  10
-                ]
-              ]
-            }
+              {
+                  "task": "Login",
+                  "match": "https://auth.mockbank.local/authorize/*/login",
+                  "commands": [
+                      ["text", "name", "username", "ralph.bragg@gmail.com"],
+                      ["text", "name", "password", "P@ssword01"],
+                      ["click", "id", "login-button"]
+                  ]
+              },
+              {
+                  "task": "Reject Consent",
+                  "match": "https://auth.mockbank.local/authorize/*/consent",
+                  "commands": [
+                    ["click", "id", "cancel-button"]
+                  ]
+              },
+              {
+                  "task": "Verify Complete",
+                  "match": "*/test/*/callback*",
+                  "commands": [
+                    ["wait", "id", "submission_complete", 10]
+                  ]
+              }
           ]
         }
       ]
     },
-    "accounts_api_multiple-consents_test-module_v2-4": {
-      "browser": [
-        {
-          "match": "https://auth.mockbank.local/authorize*",
-          "tasks": [
-            {
-              "task": "Login",
-              "match": "https://auth.mockbank.local/authorize/*/login",
-              "commands": [
-                [
-                  "text",
-                  "name",
-                  "username",
-                  "gabriel.nunes@email.com"
-                ],
-                [
-                  "text",
-                  "name",
-                  "password",
-                  "P@ssword01"
-                ],
-                [
-                  "click",
-                  "id",
-                  "login-button"
-                ]
-              ]
-            },
-            {
-              "task": "Consent",
-              "match": "https://auth.mockbank.local/authorize/*/consent",
-              "commands": [
-                [
-                  "click",
-                  "id",
-                  "consent-button"
-                ]
-              ]
-            },
-            {
-              "task": "Verify Complete",
-              "match": "*/test/*/callback*",
-              "commands": [
-                [
-                  "wait",
-                  "id",
-                  "submission_complete",
-                  10
-                ]
-              ]
+    "payments_api_pixscheduling-patch-detentora_test-module_v4": {
+      "resource": {
+        "consentUrl": "https://matls-api.mockbank.local/open-banking/payments/v4/consents",
+        "brazilPaymentConsent": {
+            "data": {
+                "loggedUser": {
+                    "document": {
+                        "identification": "76109277673",
+                        "rel": "CPF"
+                    }
+                },
+                "creditor": {
+                    "personType": "PESSOA_NATURAL",
+                    "cpfCnpj": "48847377765",
+                    "name": "Marco Antonio de Brito"
+                },
+                "payment": {
+                    "type": "PIX",
+                    "date": "2021-01-01",
+                    "currency": "BRL",
+                    "amount": "1400.00",
+                    "details": {
+                        "localInstrument": "DICT",
+                        "proxy": "12345678901",
+                        "creditorAccount": {
+                            "ispb": "12345678",
+                            "issuer": "1774",
+                            "number": "1234567890",
+                            "accountType": "CACC"
+                        }
+                    }
+                },
+                "debtorAccount": {
+                    "ispb": "12345678",
+                    "issuer": "6272",
+                    "number": "94088392",
+                    "accountType": "CACC"
+                }
             }
-          ]
-        }
-      ]
+        },
+        "brazilOrganizationId": "00000000-0000-0000-0000-000000000000",
+        "brazilQrdnPaymentConsent": {
+            "data": {
+                "loggedUser": {
+                    "document": {
+                      "identification": "76109277673",
+                      "rel": "CPF"
+                    }
+                },
+                "creditor": {
+                    "personType": "PESSOA_NATURAL",
+                    "cpfCnpj": "48847377765",
+                    "name": "Marco Antonio de Brito"
+                },
+                "payment": {
+                    "type": "PIX",
+                    "date": "2024-02-01",
+                    "currency": "BRL",
+                    "amount": "1400.00",
+                    "igbeTownCode": "oiweowew",
+                    "details": {
+                        "localInstrument": "QRDN",
+                        "proxy": "cliente-a00001@pix.bcb.gov.br",
+                        "qrCode": "00020126510014BR.GOV.BCB.PIX0129cliente-a00001@pix.bcb.gov.br52040000530398654071333.005802BR5922Marco Antonio de Brito6014BELO HORIZONTE62070503***6304B62D",
+                        "creditorAccount": {
+                            "ispb": "12345678",
+                            "issuer": "1774",
+                            "number": "1234567890",
+                            "accountType": "CACC"
+                        }
+                    }
+                },
+                "debtorAccount": {
+                  "ispb": "12345678",
+                  "issuer": "6272",
+                  "number": "94088392",
+                  "accountType": "CACC"
+                }
+            }
+        },
+        "brazilQrdnCnpj": "43142666000197",
+        "loggedUserIdentification": "76109277673",
+        "debtorAccountIspb": "12345678",
+        "debtorAccountIssuer": "1774",
+        "debtorAccountNumber": "94088392",
+        "debtorAccountType": "CACC",
+        "paymentAmount": "1400.00",
+        "transactionIdentifier": "E00038166201907261559y6j6"
+      }
     }
   }
 }

@@ -54,7 +54,6 @@ func NewServer(
 	orgID string,
 	signer crypto.Signer,
 ) Server {
-	service = service.WithVersion("v2")
 	return Server{
 		config:             config,
 		baseURL:            config.Host() + "/open-banking/automatic-payments/v2",
@@ -75,14 +74,13 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	idempotencyMiddleware := middleware.Idempotency(s.idempotencyService)
 	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, autopayment.Scope)
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID)
-	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) api.Error {
+	swaggerMiddleware, swaggerVersion := middleware.Swagger(GetSwagger, func(err error) api.Error {
 		if strings.Contains(err.Error(), "is missing") {
 			return api.NewError("PARAMETRO_NAO_INFORMADO", http.StatusUnprocessableEntity, err.Error())
 		}
 		return api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error())
 	})
-	// TODO. Use the swagger version.
-	xvMiddleware := middleware.Version("2.0.0")
+	xvMiddleware := middleware.Version(swaggerVersion)
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
@@ -154,6 +152,7 @@ func (s Server) AutomaticPaymentsPostRecurringConsents(ctx context.Context, req 
 		ExpiresAt:          req.Body.Data.ExpirationDateTime,
 		AdditionalInfo:     req.Body.Data.AdditionalInformation,
 		Configuration:      req.Body.Data.RecurringConfiguration,
+		Version:            "v2",
 		ClientID:           clientID,
 		OrgID:              orgID,
 	}
@@ -621,6 +620,7 @@ func (s Server) AutomaticPaymentsPostPixRecurringPayments(ctx context.Context, r
 		DocumentRel:               consent.Relation(req.Body.Data.Document.Rel),
 		Reference:                 req.Body.Data.PaymentReference,
 		RiskSignals:               req.Body.Data.RiskSignals,
+		Version:                   "v2",
 		ClientID:                  clientID,
 		OrgID:                     orgID,
 	}

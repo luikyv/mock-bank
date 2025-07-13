@@ -58,6 +58,7 @@ type Payment struct {
 	DebtorAccount             *account.Account
 	Rejection                 *Rejection            `gorm:"serializer:json"`
 	Cancellation              *payment.Cancellation `gorm:"serializer:json"`
+	Version                   string
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -97,6 +98,7 @@ type Consent struct {
 	EnrollmentChallenge        *string
 	EnrollmentTransactionLimit *string
 	EnrollmentDailyLimit       *string
+	Version                    string
 
 	OrgID     string
 	CreatedAt timeutil.DateTime

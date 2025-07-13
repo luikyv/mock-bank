@@ -36,3 +36,15 @@ awslocal ssm put-parameter \
   --type "SecureString" \
   --value "$(cat /keys/org_signing.key)" \
   --overwrite
+
+awslocal ssm put-parameter \
+  --name "/mockbank/transport-key" \
+  --type "SecureString" \
+  --value "$(cat /keys/server_transport.key)" \
+  --overwrite
+
+awslocal ssm put-parameter \
+  --name "/mockbank/transport-cert" \
+  --type "SecureString" \
+  --value "$(cat /keys/server_transport.crt)" \
+  --overwrite

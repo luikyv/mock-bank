@@ -1,5 +1,11 @@
 package page
 
+import (
+	"fmt"
+
+	"gorm.io/gorm"
+)
+
 const (
 	defaultPageSize = 25
 )
@@ -59,4 +65,21 @@ func NewPagination(pageNumber *int32, pageSize *int32) Pagination {
 	}
 
 	return pagination
+}
+
+func Paginate[T any](query *gorm.DB, pag Pagination) (Page[T], error) {
+	var records []T
+	if err := query.
+		Limit(pag.Limit()).
+		Offset(pag.Offset()).
+		Find(&records).Error; err != nil {
+		return Page[T]{}, fmt.Errorf("failed to find records: %w", err)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return Page[T]{}, fmt.Errorf("failed to count records: %w", err)
+	}
+
+	return New(records, pag, int(total)), nil
 }

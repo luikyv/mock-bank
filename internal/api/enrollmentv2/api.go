@@ -54,7 +54,6 @@ func NewServer(
 	orgID string,
 	signer crypto.Signer,
 ) Server {
-	service = service.WithVersion("v2")
 	return Server{
 		config:             config,
 		baseURL:            config.Host() + "/open-banking/enrollments/v2",
@@ -160,6 +159,7 @@ func (s Server) PostEnrollments(ctx context.Context, req PostEnrollmentsRequestO
 		Name:               req.Body.Data.EnrollmentName,
 		Permissions:        req.Body.Data.Permissions,
 		RelyingParty:       certCN,
+		Version:            "v2",
 		ClientID:           clientID,
 		OrgID:              orgID,
 	}
