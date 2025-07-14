@@ -21,7 +21,7 @@ func NewService(db *gorm.DB) Service {
 }
 
 func (s Service) Resources(ctx context.Context, orgID string, filter Filter, pag page.Pagination) (page.Page[*Resource], error) {
-	query := s.db.WithContext(ctx).Where("org_id = ?", orgID)
+	query := s.db.WithContext(ctx).Where("org_id = ?", orgID).Order("created_at DESC")
 	if filter.OwnerID != "" {
 		query = query.Where("owner_id = ?", filter.OwnerID)
 	}
@@ -32,26 +32,17 @@ func (s Service) Resources(ctx context.Context, orgID string, filter Filter, pag
 		query = query.Where("status = ?", filter.Status)
 	}
 
-	var rs []*Resource
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("created_at DESC").
-		Find(&rs).Error; err != nil {
+	rs, err := page.Paginate[*Resource](query, pag)
+	if err != nil {
 		return page.Page[*Resource]{}, fmt.Errorf("could not find consented resources: %w", err)
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*Resource]{}, fmt.Errorf("count failed: %w", err)
-	}
-
-	for i, r := range rs {
+	for i := range rs.Records {
 		// Allow access to resource if it is pending authorization for more than 3 minutes.
-		if r.Status == StatusPendingAuthorization && timeutil.DateTimeNow().After(r.UpdatedAt.Add(3*time.Minute)) {
-			rs[i].Status = StatusAvailable
+		if rs.Records[i].Status == StatusPendingAuthorization && timeutil.DateTimeNow().After(rs.Records[i].UpdatedAt.Add(3*time.Minute)) {
+			rs.Records[i].Status = StatusAvailable
 		}
 	}
 
-	return page.New(rs, pag, int(total)), nil
+	return rs, nil
 }

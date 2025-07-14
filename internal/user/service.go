@@ -85,23 +85,17 @@ func (s Service) User(ctx context.Context, query Query, orgID string) (*User, er
 }
 
 func (s Service) Users(ctx context.Context, orgID string, pag page.Pagination) (page.Page[*User], error) {
-	query := s.db.WithContext(ctx).Model(&User{}).Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID)
+	query := s.db.WithContext(ctx).
+		Model(&User{}).
+		Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID).
+		Order("created_at DESC")
 
-	var users []*User
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("created_at DESC").
-		Find(&users).Error; err != nil {
+	users, err := page.Paginate[*User](query, pag)
+	if err != nil {
 		return page.Page[*User]{}, err
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*User]{}, err
-	}
-
-	return page.New(users, pag, int(total)), nil
+	return users, nil
 }
 
 func (s Service) Delete(ctx context.Context, id uuid.UUID, orgID string) error {

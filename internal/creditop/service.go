@@ -81,51 +81,35 @@ func (s Service) ConsentedContract(ctx context.Context, contractID, consentID, o
 func (s Service) Contracts(ctx context.Context, ownerID, orgID string, resourceType resource.Type, pag page.Pagination) (page.Page[*Contract], error) {
 	query := s.db.WithContext(ctx).
 		Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID).
-		Where("owner_id = ? AND type = ?", ownerID, resourceType)
+		Where("owner_id = ? AND type = ?", ownerID, resourceType).
+		Order("created_at DESC")
 
-	var contracts []*Contract
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("created_at DESC").
-		Find(&contracts).Error; err != nil {
-		return page.Page[*Contract]{}, err
+	contracts, err := page.Paginate[*Contract](query, pag)
+	if err != nil {
+		return page.Page[*Contract]{}, fmt.Errorf("could not find contracts: %w", err)
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*Contract]{}, err
-	}
-
-	return page.New(contracts, pag, int(total)), nil
+	return contracts, nil
 }
 
 func (s Service) ConsentedContracts(ctx context.Context, consentID, orgID string, resourceType resource.Type, pag page.Pagination) (page.Page[*Contract], error) {
 	query := s.db.WithContext(ctx).
 		Model(&ConsentContract{}).
 		Preload("Contract").
-		Where(`consent_id = ? AND org_id = ? AND type = ? AND status = ?`, consentID, orgID, resourceType, resource.StatusAvailable)
+		Where(`consent_id = ? AND org_id = ? AND type = ? AND status = ?`, consentID, orgID, resourceType, resource.StatusAvailable).
+		Order("created_at DESC")
 
-	var consentContracts []*ConsentContract
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("created_at DESC").
-		Find(&consentContracts).Error; err != nil {
+	consentContracts, err := page.Paginate[*ConsentContract](query, pag)
+	if err != nil {
 		return page.Page[*Contract]{}, fmt.Errorf("failed to find consented contracts: %w", err)
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*Contract]{}, fmt.Errorf("failed to count consented contracts: %w", err)
-	}
-
 	var contracts []*Contract
-	for _, consentContract := range consentContracts {
+	for _, consentContract := range consentContracts.Records {
 		contracts = append(contracts, consentContract.Contract)
 	}
 
-	return page.New(contracts, pag, int(total)), nil
+	return page.New(contracts, pag, consentContracts.TotalRecords), nil
 }
 
 func (s Service) AuthorizeContracts(ctx context.Context, ids []string, consentID, orgID string, resourceType resource.Type) error {
@@ -165,23 +149,15 @@ func (s Service) ConsentedWarranties(
 
 	query := s.db.WithContext(ctx).
 		Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID).
-		Where("contract_id = ?", contractID)
+		Where("contract_id = ?", contractID).
+		Order("created_at DESC")
 
-	var warranties []*Warranty
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("created_at DESC").
-		Find(&warranties).Error; err != nil {
+	warranties, err := page.Paginate[*Warranty](query, pag)
+	if err != nil {
 		return page.Page[*Warranty]{}, fmt.Errorf("failed to find consented warranties: %w", err)
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*Warranty]{}, fmt.Errorf("failed to count consented warranties: %w", err)
-	}
-
-	return page.New(warranties, pag, int(total)), nil
+	return warranties, nil
 }
 
 func (s Service) ConsentedRealesePayments(
@@ -197,23 +173,15 @@ func (s Service) ConsentedRealesePayments(
 
 	query := s.db.WithContext(ctx).
 		Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID).
-		Where("contract_id = ?", contractID)
+		Where("contract_id = ?", contractID).
+		Order("created_at DESC")
 
-	var payments []*ReleasePayment
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("created_at DESC").
-		Find(&payments).Error; err != nil {
+	payments, err := page.Paginate[*ReleasePayment](query, pag)
+	if err != nil {
 		return nil, page.Page[*ReleasePayment]{}, fmt.Errorf("failed to find consented payments: %w", err)
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return nil, page.Page[*ReleasePayment]{}, fmt.Errorf("failed to count consented payments: %w", err)
-	}
-
-	return contract, page.New(payments, pag, int(total)), nil
+	return contract, payments, nil
 }
 
 func (s Service) ConsentedBalloonPayments(
@@ -229,23 +197,15 @@ func (s Service) ConsentedBalloonPayments(
 
 	query := s.db.WithContext(ctx).
 		Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID).
-		Where("contract_id = ?", contractID)
+		Where("contract_id = ?", contractID).
+		Order("created_at DESC")
 
-	var balloonPayments []*BalloonPayment
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("created_at DESC").
-		Find(&balloonPayments).Error; err != nil {
+	balloonPayments, err := page.Paginate[*BalloonPayment](query, pag)
+	if err != nil {
 		return nil, page.Page[*BalloonPayment]{}, fmt.Errorf("failed to find consented balloon payments: %w", err)
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return nil, page.Page[*BalloonPayment]{}, fmt.Errorf("failed to count consented balloon payments: %w", err)
-	}
-
-	return contract, page.New(balloonPayments, pag, int(total)), nil
+	return contract, balloonPayments, nil
 }
 
 func (s Service) createConsentContract(ctx context.Context, consentContract *ConsentContract) error {

@@ -136,23 +136,15 @@ func (s Service) Account(ctx context.Context, query Query, orgID string) (*Accou
 func (s Service) Accounts(ctx context.Context, ownerID, orgID string, pag page.Pagination) (page.Page[*Account], error) {
 	query := s.db.WithContext(ctx).
 		Where("org_id = ? OR (org_id = ? AND cross_org = true)", orgID, s.mockOrgID).
-		Where("owner_id = ?", ownerID)
+		Where("owner_id = ?", ownerID).
+		Order("created_at DESC")
 
-	var accounts []*Account
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("created_at DESC").
-		Find(&accounts).Error; err != nil {
+	accounts, err := page.Paginate[*Account](query, pag)
+	if err != nil {
 		return page.Page[*Account]{}, fmt.Errorf("could not find consented accounts: %w", err)
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*Account]{}, fmt.Errorf("count failed: %w", err)
-	}
-
-	return page.New(accounts, pag, int(total)), nil
+	return accounts, nil
 }
 
 func (s Service) ConsentedAccount(ctx context.Context, accountID, consentID, orgID string) (*Account, error) {
@@ -190,30 +182,22 @@ func (s Service) ConsentedAccounts(ctx context.Context, consentID, orgID string,
 		// Only return accounts that are available or accounts that are pending authorization
 		// and were updated more than 3 minutes ago.
 		Where("status = ? OR (status = ? AND updated_at < ?)",
-			resource.StatusAvailable, resource.StatusPendingAuthorization, timeutil.DateTimeNow().Add(-3*time.Minute))
+			resource.StatusAvailable, resource.StatusPendingAuthorization, timeutil.DateTimeNow().Add(-3*time.Minute)).
+		Order("created_at DESC")
 
-	var consentAccs []*ConsentAccount
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("created_at DESC").
-		Find(&consentAccs).Error; err != nil {
+	consentAccs, err := page.Paginate[*ConsentAccount](query, pag)
+	if err != nil {
 		return page.Page[*Account]{}, fmt.Errorf("failed to find consented accounts: %w", err)
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*Account]{}, fmt.Errorf("failed to count consented accounts: %w", err)
-	}
-
 	var accs []*Account
-	for _, consentAcc := range consentAccs {
+	for _, consentAcc := range consentAccs.Records {
 		if err := s.runConsentPostCreationAutomations(ctx, consentAcc); err != nil {
 			return page.Page[*Account]{}, err
 		}
 		accs = append(accs, consentAcc.Account)
 	}
-	return page.New(accs, pag, int(total)), nil
+	return page.New(accs, pag, consentAccs.TotalRecords), nil
 }
 
 func (s Service) Delete(ctx context.Context, id uuid.UUID, orgID string) error {

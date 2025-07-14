@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -39,18 +40,10 @@ func (s Service) Schedules(ctx context.Context, pag page.Pagination) (page.Page[
 		// Fetch only schedules that are due but at most 6 hours in the past.
 		Where("next_run_at < ? AND next_run_at > ?", now, now.Add(-6*time.Hour))
 
-	var schedules []*Schedule
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Find(&schedules).Error; err != nil {
-		return page.Page[*Schedule]{}, err
+	schedules, err := page.Paginate[*Schedule](query, pag)
+	if err != nil {
+		return page.Page[*Schedule]{}, fmt.Errorf("could not find schedules: %w", err)
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*Schedule]{}, err
-	}
-
-	return page.New(schedules, pag, int(total)), nil
+	return schedules, nil
 }

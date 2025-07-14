@@ -3,6 +3,7 @@ package consent
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"reflect"
 	"strings"
@@ -82,29 +83,20 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 }
 
 func (s Service) Consents(ctx context.Context, ownerID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Consent], error) {
-	query := s.db.WithContext(ctx).Model(&Consent{}).Where("owner_id = ? AND org_id = ?", ownerID, orgID)
+	query := s.db.WithContext(ctx).Model(&Consent{}).Where("owner_id = ? AND org_id = ?", ownerID, orgID).Order("created_at DESC")
 
-	var consents []*Consent
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("created_at DESC").
-		Find(&consents).Error; err != nil {
+	consents, err := page.Paginate[*Consent](query, pag)
+	if err != nil {
 		return page.Page[*Consent]{}, err
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*Consent]{}, err
-	}
-
-	for _, c := range consents {
+	for _, c := range consents.Records {
 		if err := s.runPostCreationAutomations(ctx, c); err != nil {
 			return page.Page[*Consent]{}, err
 		}
 	}
 
-	return page.New(consents, pag, int(total)), nil
+	return consents, nil
 }
 
 func (s Service) Reject(ctx context.Context, id, orgID string, by RejectedBy, reason RejectionReason) error {
@@ -158,23 +150,14 @@ func (s Service) Extend(ctx context.Context, id, orgID string, ext *Extension) (
 
 func (s Service) Extensions(ctx context.Context, consentURN, orgID string, pag page.Pagination) (page.Page[*Extension], error) {
 	consentID := strings.TrimPrefix(consentURN, URNPrefix)
-	query := s.db.WithContext(ctx).Model(&Extension{}).Where("consent_id = ? AND org_id = ?", consentID, orgID)
+	query := s.db.WithContext(ctx).Model(&Extension{}).Where("consent_id = ? AND org_id = ?", consentID, orgID).Order("created_at DESC")
 
-	var extensions []*Extension
-	if err := query.
-		Limit(pag.Limit()).
-		Offset(pag.Offset()).
-		Order("created_at DESC").
-		Find(&extensions).Error; err != nil {
-		return page.Page[*Extension]{}, err
+	extensions, err := page.Paginate[*Extension](query, pag)
+	if err != nil {
+		return page.Page[*Extension]{}, fmt.Errorf("could not find extensions: %w", err)
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return page.Page[*Extension]{}, err
-	}
-
-	return page.New(extensions, pag, int(total)), nil
+	return extensions, nil
 }
 
 func (s Service) validate(_ context.Context, c *Consent) error {
