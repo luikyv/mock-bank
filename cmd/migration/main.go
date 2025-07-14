@@ -95,12 +95,12 @@ func runMigrations(db *gorm.DB, migrationsPath string) error {
 }
 
 func seedDatabase(ctx context.Context, db *gorm.DB) error {
-	if err := seedRalphBragg(ctx, db); err != nil {
-		return fmt.Errorf("failed to seed Ralph Bragg: %w", err)
+	if err := seedBob(ctx, db); err != nil {
+		return fmt.Errorf("failed to seed Bob: %w", err)
 	}
 
-	if err := seedGabrielNunes(ctx, db); err != nil {
-		return fmt.Errorf("failed to seed Gabriel Nunes: %w", err)
+	if err := seedAlice(ctx, db); err != nil {
+		return fmt.Errorf("failed to seed Alice: %w", err)
 	}
 
 	if Env == runutil.LocalEnvironment {

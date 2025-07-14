@@ -100,7 +100,7 @@
         "creditor": {
           "personType": "PESSOA_NATURAL",
           "cpfCnpj": "76109277673",
-          "name": "Ralph Bragg"
+          "name": "Mr Bob"
         },
         "payment": {
           "type": "PIX",
@@ -134,7 +134,7 @@
     "debtorAccountNumber": "94088392",
     "debtorAccountType": "CACC",
     "paymentAmount": "1333.00",
-    "creditorName": "Ralph Bragg",
+    "creditorName": "Mr Bob",
     "creditorAccountIspb": "99999004",
     "creditorAccountIssuer": "0001",
     "creditorAccountNumber": "11188222",

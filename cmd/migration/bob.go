@@ -15,12 +15,12 @@ import (
 	"gorm.io/gorm"
 )
 
-func seedRalphBragg(ctx context.Context, db *gorm.DB) error {
+func seedBob(ctx context.Context, db *gorm.DB) error {
 	cnpj := "50685362006773"
 	testUser := &user.User{
 		ID:        uuid.MustParse("ff8cd4db-a1c8-4966-a9ca-26ab0b19c6d1"),
-		Username:  "ralph.bragg@gmail.com",
-		Name:      "Ralph Bragg",
+		Username:  "bob@email.com",
+		Name:      "Mr Bob",
 		CPF:       "76109277673",
 		CNPJ:      &cnpj,
 		CrossOrg:  true,

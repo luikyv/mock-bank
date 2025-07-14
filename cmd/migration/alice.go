@@ -11,10 +11,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func seedGabrielNunes(ctx context.Context, db *gorm.DB) error {
+func seedAlice(ctx context.Context, db *gorm.DB) error {
 	testUser := &user.User{
 		ID:        uuid.MustParse("6fcad304-2d83-4b9c-9efe-2be4ef16d16f"),
-		Username:  "gabriel.nunes@email.com",
+		Username:  "alice@email.com",
 		Name:      "Gabriel Nunes",
 		CPF:       "87517400444",
 		CrossOrg:  true,

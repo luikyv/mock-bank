@@ -34,8 +34,8 @@ All users listed below share the default password: `P@ssword01`.
 
 | Username              | CPF           | CNPJ              | Description                                  |
 |-----------------------|---------------|-------------------|----------------------------------------------|
-| ralph.bragg@gmail.com | 761.092.776-73 | 50.685.362/0006-73 | Primary test user with resources in all APIs |
-| gabriel.nunes@email.com | 87517400444 | N/A | Test user with joint account for multiple consents scenarios |
+| bob@email.com | 761.092.776-73 | 50.685.362/0006-73 | Primary test user with resources in all APIs |
+| alice@email.com | 87517400444 | N/A | Test user with joint account for multiple consents scenarios |
 
 
 ## Payments
