@@ -9,6 +9,7 @@ Mock Bank is a mock implementation of the Open Finance Brasil API specifications
 |-----|---------|--------|
 | Consents | [3.2.0](https://openbanking-brasil.github.io/openapi/swagger-apis/consents/3.2.0.yml) | Implemented |
 | Accounts | [2.4.2](https://raw.githubusercontent.com/OpenBanking-Brasil/openapi/main/swagger-apis/accounts/2.4.2.yml) | Implemented |
+| Customers | [2.2.1](https://raw.githubusercontent.com/OpenBanking-Brasil/openapi/main/swagger-apis/customers/2.2.1.yml) | Developing |
 | Loans | [2.4.0](https://raw.githubusercontent.com/OpenBanking-Brasil/openapi/main/swagger-apis/loans/2.4.0.yml) | Developing |
 | Resources | [3.0.0](https://openbanking-brasil.github.io/openapi/swagger-apis/resources/3.0.0.yml) | Developing |
 | Payments | [4.0.0](https://raw.githubusercontent.com/OpenBanking-Brasil/openapi/main/swagger-apis/payments/4.0.0.yml) | Developing |
@@ -72,6 +73,7 @@ Add the entries below to `/etc/hosts` (or `C:\Windows\System32\drivers\etc\hosts
 127.0.0.1 directory.local
 127.0.0.1 keystore.local
 127.0.0.1 database.local
+127.0.0.1 localstack.local
 ```
 
 ### Quick Start
