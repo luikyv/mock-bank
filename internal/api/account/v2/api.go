@@ -1,5 +1,5 @@
-//go:generate oapi-codegen -config=./config.yml -package=accountv2 -o=./api_gen.go ./swagger.yml
-package accountv2
+//go:generate oapi-codegen -config=./config.yml -package=v2 -o=./api_gen.go ./swagger.yml
+package v2
 
 import (
 	"context"
@@ -56,11 +56,11 @@ func NewServer(
 	}
 }
 
-func (s Server) RegisterRoutes(mux *http.ServeMux) {
-	accountMux := http.NewServeMux()
+func (s Server) Handler() (http.Handler, string) {
+	mux := http.NewServeMux()
 
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)
-	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) api.Error {
+	swaggerMiddleware, version := middleware.Swagger(GetSwagger, func(err error) api.Error {
 		return api.NewError("PARAMETRO_INVALIDO", http.StatusBadRequest, err.Error())
 	})
 
@@ -86,7 +86,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	)(handler)
 	handler = authCodeAuthMiddleware(handler)
 	handler = middleware.FAPIIDWithOptions(&middleware.Options{ErrorPagination: true})(handler)
-	accountMux.Handle("GET /accounts", handler)
+	mux.Handle("GET /accounts", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountID)
 	handler = middleware.PermissionWithOptions(
@@ -96,7 +96,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	)(handler)
 	handler = authCodeAuthMiddleware(handler)
 	handler = middleware.FAPIIDWithOptions(&middleware.Options{ErrorPagination: true})(handler)
-	accountMux.Handle("GET /accounts/{accountId}", handler)
+	mux.Handle("GET /accounts/{accountId}", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDBalances)
 	handler = middleware.PermissionWithOptions(
@@ -106,28 +106,28 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	)(handler)
 	handler = authCodeAuthMiddleware(handler)
 	handler = middleware.FAPIIDWithOptions(&middleware.Options{ErrorPagination: true})(handler)
-	accountMux.Handle("GET /accounts/{accountId}/balances", handler)
+	mux.Handle("GET /accounts/{accountId}/balances", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDOverdraftLimits)
 	handler = middleware.PermissionWithOptions(s.consentService, &middleware.Options{ErrorPagination: true},
 		consent.PermissionAccountsOverdraftLimitsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
 	handler = middleware.FAPIIDWithOptions(&middleware.Options{ErrorPagination: true})(handler)
-	accountMux.Handle("GET /accounts/{accountId}/overdraft-limits", handler)
+	mux.Handle("GET /accounts/{accountId}/overdraft-limits", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDTransactions)
 	handler = middleware.Permission(s.consentService, consent.PermissionAccountsTransactionsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
 	handler = middleware.FAPIID()(handler)
-	accountMux.Handle("GET /accounts/{accountId}/transactions", handler)
+	mux.Handle("GET /accounts/{accountId}/transactions", handler)
 
 	handler = http.HandlerFunc(wrapper.AccountsGetAccountsAccountIDTransactionsCurrent)
 	handler = middleware.Permission(s.consentService, consent.PermissionAccountsTransactionsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
 	handler = middleware.FAPIID()(handler)
-	accountMux.Handle("GET /accounts/{accountId}/transactions-current", handler)
+	mux.Handle("GET /accounts/{accountId}/transactions-current", handler)
 
-	mux.Handle("/open-banking/accounts/v2/", http.StripPrefix("/open-banking/accounts/v2", accountMux))
+	return http.StripPrefix("/open-banking/accounts/v2", mux), version
 }
 
 func (s Server) AccountsGetAccounts(ctx context.Context, req AccountsGetAccountsRequestObject) (AccountsGetAccountsResponseObject, error) {

@@ -15,7 +15,6 @@ import (
 	"github.com/luikyv/mock-bank/internal/api"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/errorutil"
-	"github.com/luikyv/mock-bank/internal/schedule"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 	"github.com/luikyv/mock-bank/internal/user"
 	"github.com/luikyv/mock-bank/internal/webhook"
@@ -23,11 +22,10 @@ import (
 )
 
 type Service struct {
-	db              *gorm.DB
-	userService     user.Service
-	accountService  account.Service
-	webhookService  webhook.Service
-	scheduleService schedule.Service
+	db             *gorm.DB
+	userService    user.Service
+	accountService account.Service
+	webhookService webhook.Service
 }
 
 func NewService(
@@ -35,14 +33,12 @@ func NewService(
 	userService user.Service,
 	accountService account.Service,
 	webhookService webhook.Service,
-	scheduleService schedule.Service,
 ) Service {
 	return Service{
-		db:              db,
-		userService:     userService,
-		accountService:  accountService,
-		webhookService:  webhookService,
-		scheduleService: scheduleService,
+		db:             db,
+		userService:    userService,
+		accountService: accountService,
+		webhookService: webhookService,
 	}
 }
 
@@ -113,11 +109,7 @@ func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
 	}
 
 	if c.DebtorAccount != nil && c.DebtorAccount.SubType == account.SubTypeJointSimple {
-		if err := s.updateConsentStatus(ctx, c, ConsentStatusPartiallyAccepted); err != nil {
-			return err
-		}
-		s.scheduleConsent(ctx, c, timeutil.DateTimeNow().Add(scheduleDelay))
-		return nil
+		return s.updateConsentStatus(ctx, c, ConsentStatusPartiallyAccepted)
 	}
 	return s.updateConsentStatus(ctx, c, ConsentStatusAuthorized)
 }
@@ -190,7 +182,6 @@ func (s Service) RejectConsent(ctx context.Context, c *Consent, code ConsentReje
 	if err := s.updateConsentStatus(ctx, c, ConsentStatusRejected); err != nil {
 		return err
 	}
-	s.unscheduleConsent(ctx, c)
 	s.notifyConsentStatusChange(ctx, c)
 	return nil
 }
@@ -510,7 +501,6 @@ func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Conse
 		if err := s.updateConsentStatus(ctx, c, ConsentStatusAuthorized); err != nil {
 			return err
 		}
-		s.unscheduleConsent(ctx, c)
 		s.notifyConsentStatusChange(ctx, c)
 		return nil
 	case ConsentStatusAuthorized:
@@ -529,7 +519,6 @@ func (s Service) consumeConsent(ctx context.Context, c *Consent) error {
 		return err
 	}
 
-	s.unscheduleConsent(ctx, c)
 	s.notifyConsentStatusChange(ctx, c)
 	return nil
 }
@@ -558,19 +547,6 @@ func (s Service) updateConsent(ctx context.Context, c *Consent) error {
 func (s Service) notifyConsentStatusChange(ctx context.Context, c *Consent) {
 	slog.DebugContext(ctx, "notifying client about payment consent status change", "status", c.Status)
 	s.webhookService.NotifyPaymentConsent(ctx, c.ClientID, c.URN(), c.Version)
-}
-
-func (s Service) scheduleConsent(ctx context.Context, c *Consent, nextRunAt timeutil.DateTime) {
-	s.scheduleService.Schedule(ctx, &schedule.Schedule{
-		ID:        c.ID,
-		OrgID:     c.OrgID,
-		TaskType:  schedule.TaskTypePaymentConsent,
-		NextRunAt: nextRunAt,
-	})
-}
-
-func (s Service) unscheduleConsent(ctx context.Context, c *Consent) {
-	s.scheduleService.Unschedule(ctx, c.ID.String(), c.OrgID)
 }
 
 func (s Service) validatePayments(_ context.Context, c *Consent, payments []*Payment) error {
@@ -627,7 +603,6 @@ func (s Service) runPreCreationAutomations(ctx context.Context, p *Payment) erro
 		return ErrInvalidPayment
 	}
 
-	s.schedule(ctx, p, timeutil.DateTimeNow().Add(scheduleDelay))
 	return nil
 }
 
@@ -710,20 +685,12 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 		if err := s.updateStatus(ctx, p, StatusACCP); err != nil {
 			return err
 		}
-		s.schedule(ctx, p, now.Add(scheduleDelay))
 		return nil
 
 	case StatusACCP:
 		if p.Date.After(timeutil.BrazilDateNow()) {
 			if err := s.updateStatus(ctx, p, StatusSCHD); err != nil {
 				return err
-			}
-
-			switch p.Amount {
-			case "1400.00":
-				s.schedule(ctx, p, now.Add(scheduleDelay))
-			default:
-				s.schedule(ctx, p, p.Date.DateTime())
 			}
 
 			s.notifyStatusChange(ctx, p)
@@ -733,7 +700,6 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 		if err := s.updateStatus(ctx, p, StatusACPD); err != nil {
 			return err
 		}
-		s.schedule(ctx, p, now.Add(scheduleDelay))
 		return nil
 
 	case StatusSCHD:
@@ -756,14 +722,12 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 		if err := s.updateStatus(ctx, p, StatusACPD); err != nil {
 			return err
 		}
-		s.schedule(ctx, p, now.Add(scheduleDelay))
 		return nil
 
 	case StatusACPD:
 		if err := s.updateStatus(ctx, p, StatusACSC); err != nil {
 			return err
 		}
-		s.unschedule(ctx, p)
 		s.notifyStatusChange(ctx, p)
 		return nil
 	default:
@@ -794,7 +758,6 @@ func (s Service) cancel(ctx context.Context, p *Payment, from CancelledFrom, by 
 		return err
 	}
 
-	s.unschedule(ctx, p)
 	s.notifyStatusChange(ctx, p)
 	return nil
 }
@@ -805,7 +768,6 @@ func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCod
 		return err
 	}
 
-	s.unschedule(ctx, p)
 	s.notifyStatusChange(ctx, p)
 	return nil
 }
@@ -855,19 +817,6 @@ func (s Service) payments(ctx context.Context, orgID string, opts *Filter) ([]*P
 	}
 
 	return payments, nil
-}
-
-func (s Service) schedule(ctx context.Context, p *Payment, nextRunAt timeutil.DateTime) {
-	s.scheduleService.Schedule(ctx, &schedule.Schedule{
-		ID:        p.ID,
-		OrgID:     p.OrgID,
-		TaskType:  schedule.TaskTypePayment,
-		NextRunAt: nextRunAt,
-	})
-}
-
-func (s Service) unschedule(ctx context.Context, p *Payment) {
-	s.scheduleService.Unschedule(ctx, p.ID.String(), p.OrgID)
 }
 
 func (s Service) notifyStatusChange(ctx context.Context, p *Payment) {

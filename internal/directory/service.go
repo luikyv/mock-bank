@@ -29,7 +29,7 @@ var (
 	cacheTime = 1 * time.Hour
 
 	directoryWellKnownMu            sync.Mutex
-	directoryWellKnownCache         *directoryWellKnown
+	directoryWellKnownCache         *openIDConfiguration
 	directoryWellKnownLastFetchedAt timeutil.DateTime
 
 	directoryJWKSMu            sync.Mutex
@@ -240,7 +240,7 @@ func (s Service) clientAssertion() (string, error) {
 	return assertion, nil
 }
 
-func (ds Service) wellKnown() (directoryWellKnown, error) {
+func (ds Service) wellKnown() (openIDConfiguration, error) {
 
 	directoryWellKnownMu.Lock()
 	defer directoryWellKnownMu.Unlock()
@@ -252,17 +252,17 @@ func (ds Service) wellKnown() (directoryWellKnown, error) {
 	url := fmt.Sprintf("%s/.well-known/openid-configuration", ds.issuer)
 	resp, err := ds.mtlsClient.Get(url)
 	if err != nil {
-		return directoryWellKnown{}, err
+		return openIDConfiguration{}, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return directoryWellKnown{}, fmt.Errorf("directory well known unexpected status code: %d", resp.StatusCode)
+		return openIDConfiguration{}, fmt.Errorf("directory well known unexpected status code: %d", resp.StatusCode)
 	}
 
-	var config directoryWellKnown
+	var config openIDConfiguration
 	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
-		return directoryWellKnown{}, fmt.Errorf("failed to decode directory well known response: %w", err)
+		return openIDConfiguration{}, fmt.Errorf("failed to decode directory well known response: %w", err)
 	}
 
 	directoryWellKnownCache = &config

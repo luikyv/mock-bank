@@ -1,5 +1,5 @@
 //go:generate oapi-codegen -config=./config.yml -package=autopaymentv2 -o=./api_gen.go ./swagger.yml
-package autopaymentv2
+package v2
 
 import (
 	"context"
@@ -67,8 +67,8 @@ func NewServer(
 	}
 }
 
-func (s Server) RegisterRoutes(mux *http.ServeMux) {
-	autoPaymentMux := http.NewServeMux()
+func (s Server) Handler() (http.Handler, string) {
+	mux := http.NewServeMux()
 
 	jwtMiddleware := middleware.JWT(s.baseURL, s.orgID, s.keystoreHost, s.signer, s.jwtService)
 	idempotencyMiddleware := middleware.Idempotency(s.idempotencyService)
@@ -80,7 +80,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		}
 		return api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error())
 	})
-	xvMiddleware := middleware.Version(swaggerVersion)
+	xvMiddleware := middleware.VersionHeader(swaggerVersion)
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
@@ -103,44 +103,44 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	autoPaymentMux.Handle("POST /recurring-consents", handler)
+	mux.Handle("POST /recurring-consents", handler)
 
 	handler = http.HandlerFunc(wrapper.AutomaticPaymentsGetRecurringConsentsConsentID)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	autoPaymentMux.Handle("GET /recurring-consents/{recurringConsentId}", handler)
+	mux.Handle("GET /recurring-consents/{recurringConsentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.AutomaticPaymentsPatchRecurringConsentsConsentID)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	autoPaymentMux.Handle("PATCH /recurring-consents/{recurringConsentId}", handler)
+	mux.Handle("PATCH /recurring-consents/{recurringConsentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.AutomaticPaymentsPostPixRecurringPayments)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = authCodeAuthMiddleware(handler)
-	autoPaymentMux.Handle("POST /pix/recurring-payments", handler)
+	mux.Handle("POST /pix/recurring-payments", handler)
 
 	handler = http.HandlerFunc(wrapper.AutomaticPaymentsGetPixRecurringPaymentsPaymentID)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	autoPaymentMux.Handle("GET /pix/recurring-payments/{recurringPaymentId}", handler)
+	mux.Handle("GET /pix/recurring-payments/{recurringPaymentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.AutomaticPaymentsGetPixRecurringPayments)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	autoPaymentMux.Handle("GET /pix/recurring-payments", handler)
+	mux.Handle("GET /pix/recurring-payments", handler)
 
 	handler = http.HandlerFunc(wrapper.AutomaticPaymentsPatchPixRecurringPaymentsPaymentID)
 
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	autoPaymentMux.Handle("PATCH /pix/recurring-payments/{recurringPaymentId}", handler)
+	mux.Handle("PATCH /pix/recurring-payments/{recurringPaymentId}", handler)
 
-	handler = middleware.FAPIID()(autoPaymentMux)
-	mux.Handle("/open-banking/automatic-payments/v2/", http.StripPrefix("/open-banking/automatic-payments/v2", handler))
+	handler = middleware.FAPIID()(mux)
+	return http.StripPrefix("/open-banking/automatic-payments/v2", mux), swaggerVersion
 }
 
 func (s Server) AutomaticPaymentsPostRecurringConsents(ctx context.Context, req AutomaticPaymentsPostRecurringConsentsRequestObject) (AutomaticPaymentsPostRecurringConsentsResponseObject, error) {

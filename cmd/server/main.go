@@ -14,10 +14,9 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/luikyv/mock-bank/cmd/runutil"
-	"github.com/luikyv/mock-bank/internal/api/accountv2"
+	"github.com/luikyv/mock-bank/cmd/cmdutil"
+	accountapi "github.com/luikyv/mock-bank/internal/api/account"
 	"github.com/luikyv/mock-bank/internal/api/app"
-	"github.com/luikyv/mock-bank/internal/api/autopaymentv2"
 	"github.com/luikyv/mock-bank/internal/api/consentv3"
 	"github.com/luikyv/mock-bank/internal/api/enrollmentv2"
 	"github.com/luikyv/mock-bank/internal/api/loanv2"
@@ -31,7 +30,6 @@ import (
 	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/idempotency"
 	"github.com/luikyv/mock-bank/internal/jwtutil"
-	"github.com/luikyv/mock-bank/internal/schedule"
 	"github.com/luikyv/mock-bank/internal/session"
 	"github.com/luikyv/mock-bank/internal/webhook"
 
@@ -45,6 +43,7 @@ import (
 	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/api"
+	autopaymentapi "github.com/luikyv/mock-bank/internal/api/autopayment"
 	"github.com/luikyv/mock-bank/internal/autopayment"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/oidc"
@@ -67,34 +66,34 @@ const (
 )
 
 var (
-	Env = runutil.EnvValue("ENV", runutil.LocalEnvironment)
+	Env = cmdutil.EnvValue("ENV", cmdutil.LocalEnvironment)
 	// OrgID is the Mock Bank organization identifier.
-	OrgID        = runutil.EnvValue("ORG_ID", "00000000-0000-0000-0000-000000000000")
-	BaseDomain   = runutil.EnvValue("BASE_DOMAIN", "mockbank.local")
+	OrgID        = cmdutil.EnvValue("ORG_ID", "00000000-0000-0000-0000-000000000000")
+	BaseDomain   = cmdutil.EnvValue("BASE_DOMAIN", "mockbank.local")
 	APPHost      = "https://app." + BaseDomain
 	APIMTLSHost  = "https://matls-api." + BaseDomain
 	AuthHost     = "https://auth." + BaseDomain
 	AuthMTLSHost = "https://matls-auth." + BaseDomain
 	// DirectoryIssuer is the issuer used by the directory to sign ID tokens, etc.
-	DirectoryIssuer = runutil.EnvValue("DIRECTORY_ISSUER", "https://directory.local")
+	DirectoryIssuer = cmdutil.EnvValue("DIRECTORY_ISSUER", "https://directory.local")
 	// DirectoryClientID is the client ID for Mock Bank to make OAuth requests to the directory.
-	DirectoryClientID       = runutil.EnvValue("DIRECTORY_CLIENT_ID", "mockbank")
-	KeyStoreHost            = runutil.EnvValue("KEYSTORE_HOST", "https://keystore.local")
-	SoftwareStatementIssuer = runutil.EnvValue("SS_ISSUER", "Open Banking Brasil sandbox SSA issuer")
-	Port                    = runutil.EnvValue("PORT", "80")
-	DBSecretName            = runutil.EnvValue("DB_SECRET_NAME", "mockbank/db-credentials")
+	DirectoryClientID       = cmdutil.EnvValue("DIRECTORY_CLIENT_ID", "mockbank")
+	KeyStoreHost            = cmdutil.EnvValue("KEYSTORE_HOST", "https://keystore.local")
+	SoftwareStatementIssuer = cmdutil.EnvValue("SS_ISSUER", "Open Banking Brasil sandbox SSA issuer")
+	Port                    = cmdutil.EnvValue("PORT", "80")
+	DBSecretName            = cmdutil.EnvValue("DB_SECRET_NAME", "mockbank/db-credentials")
 	// OPSigningKeySSMParamName is the parameter used to sign JWTs for the OpenID Provider.
-	OPSigningKeySSMParamName = runutil.EnvValue("OP_SIGNING_KEY_SSM_PARAM", "/mockbank/op-signing-key")
+	OPSigningKeySSMParamName = cmdutil.EnvValue("OP_SIGNING_KEY_SSM_PARAM", "/mockbank/op-signing-key")
 	// DirectoryClientSigningKeySSMParamName is the parameter used to sign JWTs for the directory client.
-	DirectoryClientSigningKeySSMParamName = runutil.EnvValue("DIRECTORY_CLIENT_SIGNING_KEY_SSM_PARAM", "/mockbank/directory-client-signing-key")
+	DirectoryClientSigningKeySSMParamName = cmdutil.EnvValue("DIRECTORY_CLIENT_SIGNING_KEY_SSM_PARAM", "/mockbank/directory-client-signing-key")
 	// DirectoryClientMTLSCertSSMParamName and DirectoryClientMTLSKeySSMParamName are the parameters used for mutual TLS connection with the directory.
-	DirectoryClientMTLSCertSSMParamName = runutil.EnvValue("DIRECTORY_CLIENT_MTLS_CERT_SSM_PARAM", "/mockbank/directory-client-transport-cert")
-	DirectoryClientMTLSKeySSMParamName  = runutil.EnvValue("DIRECTORY_CLIENT_MTLS_KEY_SSM_PARAM", "/mockbank/directory-client-transport-key")
+	DirectoryClientMTLSCertSSMParamName = cmdutil.EnvValue("DIRECTORY_CLIENT_MTLS_CERT_SSM_PARAM", "/mockbank/directory-client-transport-cert")
+	DirectoryClientMTLSKeySSMParamName  = cmdutil.EnvValue("DIRECTORY_CLIENT_MTLS_KEY_SSM_PARAM", "/mockbank/directory-client-transport-key")
 	// OrgSigningKeySSMParamName is the parameter used by Mock Bank to sign API responses.
-	OrgSigningKeySSMParamName = runutil.EnvValue("ORG_SIGNING_KEY_SSM_PARAM", "/mockbank/org-signing-key")
+	OrgSigningKeySSMParamName = cmdutil.EnvValue("ORG_SIGNING_KEY_SSM_PARAM", "/mockbank/org-signing-key")
 	// TransportCertSSMParamName and TransportKeySSMParamName are the parameters used for mutual TLS connection with the webhook client.
-	TransportCertSSMParamName = runutil.EnvValue("TRANSPORT_CERT_SSM_PARAM", "/mockbank/transport-cert")
-	TransportKeySSMParamName  = runutil.EnvValue("TRANSPORT_KEY_SSM_PARAM", "/mockbank/transport-key")
+	TransportCertSSMParamName = cmdutil.EnvValue("TRANSPORT_CERT_SSM_PARAM", "/mockbank/transport-cert")
+	TransportKeySSMParamName  = cmdutil.EnvValue("TRANSPORT_KEY_SSM_PARAM", "/mockbank/transport-key")
 )
 
 func main() {
@@ -104,7 +103,7 @@ func main() {
 	slog.SetDefault(logger())
 	slog.Info("setting up mock bank", "env", Env)
 	http.DefaultClient = httpClient()
-	awsConfig, err := runutil.AWSConfig(ctx, Env)
+	awsConfig, err := cmdutil.AWSConfig(ctx, Env)
 	if err != nil {
 		slog.Error("failed to load aws config", "error", err)
 		os.Exit(1)
@@ -126,7 +125,7 @@ func main() {
 	slog.Info("creating secrets manager client")
 	secretsClient := secretsmanager.NewFromConfig(*awsConfig)
 	slog.Info("secrets manager client created")
-	db, err := runutil.DB(ctx, secretsClient, DBSecretName)
+	db, err := cmdutil.DB(ctx, secretsClient, DBSecretName)
 	if err != nil {
 		slog.Error("failed connecting to database", "error", err)
 		os.Exit(1)
@@ -149,7 +148,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	directoryClientTLSCert, err := runutil.TLSCertFromSSM(ctx, ssmClient, DirectoryClientMTLSCertSSMParamName, DirectoryClientMTLSKeySSMParamName)
+	directoryClientTLSCert, err := cmdutil.TLSCertFromSSM(ctx, ssmClient, DirectoryClientMTLSCertSSMParamName, DirectoryClientMTLSKeySSMParamName)
 	if err != nil {
 		slog.Error("could not load directory client TLS certificate", "error", err)
 		os.Exit(1)
@@ -161,7 +160,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	transportTLSCert, err := runutil.TLSCertFromSSM(ctx, ssmClient, TransportCertSSMParamName, TransportKeySSMParamName)
+	transportTLSCert, err := cmdutil.TLSCertFromSSM(ctx, ssmClient, TransportCertSSMParamName, TransportKeySSMParamName)
 	if err != nil {
 		slog.Error("could not load transport TLS certificate", "error", err)
 		os.Exit(1)
@@ -169,20 +168,19 @@ func main() {
 
 	// Services.
 	directoryService := directory.NewService(DirectoryIssuer, DirectoryClientID, APPHost+"/api/directory/callback",
-		directoryClientSigner, runutil.MTLSHTTPClient(directoryClientTLSCert, Env))
+		directoryClientSigner, cmdutil.MTLSHTTPClient(directoryClientTLSCert, Env))
 	sessionService := session.NewService(db, directoryService)
 	clientService := client.NewService(db)
 	idempotencyService := idempotency.NewService(db)
-	scheduleService := schedule.NewService(db)
 	jwtService := jwtutil.NewService(db)
-	webhookService := webhook.NewService(clientService, runutil.MTLSHTTPClient(transportTLSCert, Env))
+	webhookService := webhook.NewService(clientService, cmdutil.MTLSHTTPClient(transportTLSCert, Env))
 	userService := user.NewService(db, OrgID)
 	resourceService := resource.NewService(db)
 	consentService := consent.NewService(db, userService, resourceService)
 	accountService := account.NewService(db, OrgID)
 	creditOpService := creditop.NewService(db, OrgID)
-	paymentService := payment.NewService(db, userService, accountService, webhookService, scheduleService)
-	autoPaymentService := autopayment.NewService(db, userService, accountService, webhookService, scheduleService)
+	paymentService := payment.NewService(db, userService, accountService, webhookService)
+	autoPaymentService := autopayment.NewService(db, userService, accountService, webhookService)
 	enrollmentService := enrollment.NewService(db, userService, accountService, paymentService, autoPaymentService, webhookService)
 
 	op, err := openidProvider(db, opSigner, clientService, userService, consentService, accountService,
@@ -199,16 +197,16 @@ func main() {
 	app.NewServer(bankConfig, APPHost, sessionService, userService, consentService, resourceService, accountService).RegisterRoutes(mux)
 	consentv3.NewServer(APIMTLSHost, consentService, op).RegisterRoutes(mux)
 	resourcev3.NewServer(APIMTLSHost, resourceService, consentService, op).RegisterRoutes(mux)
-	accountv2.NewServer(bankConfig, accountService, consentService, op).RegisterRoutes(mux)
+	accountapi.NewServer(bankConfig, accountService, consentService, op).RegisterRoutes(mux)
 	loanv2.NewServer(bankConfig, creditOpService, consentService, op).RegisterRoutes(mux)
 	paymentv4.NewServer(bankConfig, paymentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
-	autopaymentv2.NewServer(bankConfig, autoPaymentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
+	autopaymentapi.NewServer(bankConfig, autoPaymentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 	enrollmentv2.NewServer(bankConfig, enrollmentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 
 	handler := middleware(mux)
 	slog.Info("starting mock bank")
 
-	if Env == runutil.LocalEnvironment {
+	if Env == cmdutil.LocalEnvironment {
 		if err := http.ListenAndServe(":"+Port, handler); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("failed to start mock bank", "error", err)
 			os.Exit(1)
@@ -309,7 +307,7 @@ func httpClient() *http.Client {
 	tlsConfig := &tls.Config{
 		Renegotiation: tls.RenegotiateOnceAsClient,
 	}
-	if Env == runutil.LocalEnvironment {
+	if Env == cmdutil.LocalEnvironment {
 		tlsConfig.InsecureSkipVerify = true
 	}
 	return &http.Client{

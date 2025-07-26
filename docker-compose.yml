@@ -128,19 +128,6 @@ services:
       psql:
         condition: service_started
 
-  scheduler:
-    build:
-      context: .
-      dockerfile: ./cmd/scheduler/Dockerfile
-    environment:
-      - ENV=LOCAL
-      - AWS_REGION=us-east-1
-    depends_on:
-      localstack:
-        condition: service_healthy
-      psql:
-        condition: service_started
-
   cs-httpd:
     profiles:
       - conformance

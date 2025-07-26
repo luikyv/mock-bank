@@ -231,7 +231,7 @@
               "task": "Login",
               "match": "https://auth.mockbank.local/authorize/*/login",
               "commands": [
-                  ["text", "name", "username", "bob@email.com"],
+                  ["text", "name", "username", "alice@email.com"],
                   ["text", "name", "password", "P@ssword01"],
                   ["click", "id", "login-button"]
               ]
@@ -263,7 +263,7 @@
                   "task": "Login",
                   "match": "https://auth.mockbank.local/authorize/*/login",
                   "commands": [
-                      ["text", "name", "username", "bob@email.com"],
+                      ["text", "name", "username", "alice@email.com"],
                       ["text", "name", "password", "P@ssword01"],
                       ["click", "id", "login-button"]
                   ]

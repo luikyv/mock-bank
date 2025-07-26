@@ -19,10 +19,6 @@ var (
 	Scope = goidc.NewScope("payments")
 )
 
-var (
-	scheduleDelay = 5 * time.Minute
-)
-
 type Payment struct {
 	ID                        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Status                    Status

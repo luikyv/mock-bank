@@ -100,7 +100,7 @@
         "creditor": {
           "personType": "PESSOA_NATURAL",
           "cpfCnpj": "76109277673",
-          "name": "Mr Bob"
+          "name": "Ms Alice"
         },
         "payment": {
           "type": "PIX",
@@ -134,7 +134,7 @@
     "debtorAccountNumber": "94088392",
     "debtorAccountType": "CACC",
     "paymentAmount": "1333.00",
-    "creditorName": "Mr Bob",
+    "creditorName": "Ms Alice",
     "creditorAccountIspb": "99999004",
     "creditorAccountIssuer": "0001",
     "creditorAccountNumber": "11188222",

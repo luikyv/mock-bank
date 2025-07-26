@@ -12,7 +12,7 @@ import (
 	migratepostgres "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/luikyv/go-oidc/pkg/goidc"
-	"github.com/luikyv/mock-bank/cmd/runutil"
+	"github.com/luikyv/mock-bank/cmd/cmdutil"
 	"github.com/luikyv/mock-bank/internal/client"
 	"github.com/luikyv/mock-bank/internal/oidc"
 	"github.com/luikyv/mock-bank/internal/timeutil"
@@ -20,9 +20,9 @@ import (
 )
 
 var (
-	Env          = runutil.EnvValue("ENV", runutil.LocalEnvironment)
-	OrgID        = runutil.EnvValue("ORG_ID", "00000000-0000-0000-0000-000000000000")
-	DBSecretName = runutil.EnvValue("DB_SECRET_NAME", "mockbank/db-credentials")
+	Env          = cmdutil.EnvValue("ENV", cmdutil.LocalEnvironment)
+	OrgID        = cmdutil.EnvValue("ORG_ID", "00000000-0000-0000-0000-000000000000")
+	DBSecretName = cmdutil.EnvValue("DB_SECRET_NAME", "mockbank/db-credentials")
 )
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 	defer cancel()
 
 	slog.Info("setting up db migration and seeding", "env", Env)
-	awsConfig, err := runutil.AWSConfig(ctx, Env)
+	awsConfig, err := cmdutil.AWSConfig(ctx, Env)
 	if err != nil {
 		slog.Error("failed to load aws config", "error", err)
 		os.Exit(1)
@@ -40,7 +40,7 @@ func main() {
 	slog.Info("creating secrets manager client")
 	secretsClient := secretsmanager.NewFromConfig(*awsConfig)
 	slog.Info("secrets manager client created")
-	db, err := runutil.DB(ctx, secretsClient, DBSecretName)
+	db, err := cmdutil.DB(ctx, secretsClient, DBSecretName)
 	if err != nil {
 		slog.Error("failed connecting to database", "error", err)
 		os.Exit(1)
@@ -103,7 +103,7 @@ func seedDatabase(ctx context.Context, db *gorm.DB) error {
 		return fmt.Errorf("failed to seed Alice: %w", err)
 	}
 
-	if Env == runutil.LocalEnvironment {
+	if Env == cmdutil.LocalEnvironment {
 		if err := createOAuthClients(ctx, db); err != nil {
 			return fmt.Errorf("failed to create OAuth client: %w", err)
 		}

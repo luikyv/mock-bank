@@ -17,6 +17,7 @@ const (
 	HeaderCustomerIPAddress  = "X-FAPI-Customer-IP-Address"
 	HeaderCustomerUserAgent  = "X-Customer-User-Agent"
 	HeaderXFAPIInteractionID = "X-FAPI-Interaction-ID"
+	HeaderVersion            = "X-V"
 )
 
 type Options struct {
@@ -82,11 +83,32 @@ func Swagger(getSwagger func() (*openapi3.T, error), errCodeFunc func(error) api
 	}), spec.Info.Version
 }
 
-func Version(v string) func(http.Handler) http.Handler {
+func VersionHeader(v string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-V", v)
+			w.Header().Set(HeaderVersion, v)
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func VersionRouting(defaultHandler http.Handler, versionHandlers map[string]http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		version := r.Header.Get(HeaderVersion)
+		if version == "" {
+			slog.Info("version not informed, using default")
+			defaultHandler.ServeHTTP(w, r)
+			return
+		}
+
+		handler, ok := versionHandlers[version]
+		if !ok {
+			slog.Info("informed version not found, using default", "version", version)
+			defaultHandler.ServeHTTP(w, r)
+			return
+		}
+
+		slog.Info("version found, using version handler", "version", version)
+		handler.ServeHTTP(w, r)
+	})
 }

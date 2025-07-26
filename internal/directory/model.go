@@ -13,7 +13,7 @@ type IDToken struct {
 	} `json:"trust_framework_profile"`
 }
 
-type directoryWellKnown struct {
+type openIDConfiguration struct {
 	AuthEndpoint   string                    `json:"authorization_endpoint"`
 	JWKSURI        string                    `json:"jwks_uri"`
 	TokenEndpoint  string                    `json:"token_endpoint"`

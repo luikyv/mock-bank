@@ -114,7 +114,7 @@ type Address struct {
 	Address               string                 `json:"address"`
 	AdditionalInfo        *string                `json:"additional_info,omitempty"`
 	District              *string                `json:"district,omitempty"`
-	Town                  *string                `json:"town,omitempty"`
+	Town                  string                 `json:"town"`
 	IBGECode              *string                `json:"ibge_code,omitempty"`
 	CountrySubdivision    *CountrySubdivision    `json:"country_subdivision,omitempty"`
 	PostCode              string                 `json:"post_code"`

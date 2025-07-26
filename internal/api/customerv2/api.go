@@ -50,7 +50,6 @@ func (s Server) CustomersGetPersonalFinancialRelations(ctx context.Context, req 
 	return nil, nil
 }
 
-// TODO: Finish this.
 func (s Server) CustomersGetPersonalIdentifications(ctx context.Context, req CustomersGetPersonalIdentificationsRequestObject) (CustomersGetPersonalIdentificationsResponseObject, error) {
 	ownerID := ctx.Value(api.CtxKeySubject).(string)
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
@@ -68,20 +67,84 @@ func (s Server) CustomersGetPersonalIdentifications(ctx context.Context, req Cus
 
 	for _, id := range ids.Records {
 		data := PersonalIdentificationData{
-			BirthDate:     id.BirthDate,
-			BrandName:     s.config.Brand(),
-			CivilName:     id.CivilName,
-			CompaniesCnpj: id.CompanyCNPJs,
-			// Contacts:                    "",
-			// Documents:                   "",
-			// Filiation:                   "",
+			BirthDate:                   id.BirthDate,
+			BrandName:                   s.config.Brand(),
+			CivilName:                   id.CivilName,
+			CompaniesCnpj:               id.CompanyCNPJs,
 			HasBrazilianNationality:     id.IsBrazilian,
 			MaritalStatusAdditionalInfo: id.MaritalStatusAdditionalInfo,
-			// Nationality:                 "",
-			// OtherDocuments:              "",
-			PersonalID:     id.ID.String(),
-			SocialName:     id.SocialName,
-			UpdateDateTime: id.UpdatedAt,
+			PersonalID:                  id.ID.String(),
+			SocialName:                  id.SocialName,
+			UpdateDateTime:              id.UpdatedAt,
+		}
+
+		if id.Passport != nil {
+			data.Documents.Passport = &PersonalPassport{
+				Number:         id.Passport.Number,
+				Country:        id.Passport.Country,
+				ExpirationDate: id.Passport.ExpiresAt,
+				IssueDate:      id.Passport.IssuedAt,
+			}
+		}
+
+		if id.Filiations != nil {
+			filiationData := make([]struct {
+				CivilName  string            `json:"civilName"`
+				SocialName *string           `json:"socialName,omitempty"`
+				Type       EnumFiliationType `json:"type"`
+			}, len(*id.Filiations))
+
+			for i, fil := range *id.Filiations {
+				filiationType := EnumFiliationType(fil.Type)
+				filiationData[i] = struct {
+					CivilName  string            `json:"civilName"`
+					SocialName *string           `json:"socialName,omitempty"`
+					Type       EnumFiliationType `json:"type"`
+				}{
+					CivilName:  fil.CivilName,
+					SocialName: fil.SocialName,
+					Type:       filiationType,
+				}
+			}
+			data.Filiation = &filiationData
+		}
+
+		if len(id.Nationalities) > 0 {
+			nationalityData := make([]Nationality, len(id.Nationalities))
+			for i, nat := range id.Nationalities {
+				documents := make([]NationalityOtherDocument, len(nat.Documents))
+				for j, doc := range nat.Documents {
+					documents[j] = NationalityOtherDocument{
+						AdditionalInfo: doc.AdditionalInfo,
+						Country:        doc.Country,
+						ExpirationDate: doc.ExpiresAt,
+						IssueDate:      doc.IssuedAt,
+						Number:         doc.Number,
+						Type:           doc.Type,
+					}
+				}
+				nationalityData[i] = Nationality{
+					Documents:              documents,
+					OtherNationalitiesInfo: nat.CountryCode,
+				}
+			}
+			data.Nationality = &nationalityData
+		}
+
+		if id.OtherDocuments != nil {
+			otherDocsData := make([]PersonalOtherDocument, len(*id.OtherDocuments))
+			for i, doc := range *id.OtherDocuments {
+				docType := EnumPersonalOtherDocumentType(doc.Type)
+				otherDocsData[i] = PersonalOtherDocument{
+					AdditionalInfo:     doc.AdditionalInfo,
+					CheckDigit:         doc.CheckDigit,
+					ExpirationDate:     doc.ExpiresAt,
+					Number:             doc.Number,
+					Type:               docType,
+					TypeAdditionalInfo: doc.TypeAdditionalInfo,
+				}
+			}
+			data.OtherDocuments = &otherDocsData
 		}
 
 		if id.MaritalStatus != nil {
@@ -101,8 +164,41 @@ func (s Server) CustomersGetPersonalIdentifications(ctx context.Context, req Cus
 			})
 		}
 
-		for range id.Contact.Phones {
-			data.Contacts.Phones = append(data.Contacts.Phones, CustomerPhone{})
+		for _, phone := range id.Contact.Phones {
+			data.Contacts.Phones = append(data.Contacts.Phones, CustomerPhone{
+				AdditionalInfo:     phone.AdditionalInfo,
+				AreaCode:           phone.AreaCode,
+				CountryCallingCode: phone.CountryCode,
+				IsMain:             phone.IsMain,
+				Number:             phone.Number,
+				PhoneExtension:     phone.Extension,
+				Type:               EnumCustomerPhoneType(phone.Type),
+			})
+		}
+
+		for _, address := range id.Contact.Addresses {
+			postalAddress := PersonalPostalAddress{
+				AdditionalInfo: address.AdditionalInfo,
+				Address:        address.Address,
+				Country:        address.Country,
+				CountryCode:    address.CountryCode,
+				DistrictName:   address.District,
+				GeographicCoordinates: &GeographicCoordinates{
+					Latitude:  address.GeographicCoordinates.Latitude,
+					Longitude: address.GeographicCoordinates.Longitude,
+				},
+				IbgeTownCode: address.IBGECode,
+				IsMain:       address.IsMain,
+				PostCode:     address.PostCode,
+				TownName:     address.Town,
+			}
+
+			if address.CountrySubdivision != nil {
+				countrySubdivision := EnumCountrySubDivision(*address.CountrySubdivision)
+				postalAddress.CountrySubDivision = &countrySubdivision
+			}
+
+			data.Contacts.PostalAddresses = append(data.Contacts.PostalAddresses, postalAddress)
 		}
 
 		resp.Data = append(resp.Data, data)
