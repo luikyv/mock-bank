@@ -65,13 +65,13 @@ require (
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
-	golang.org/x/sync v0.15.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/sync v0.16.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/text v0.28.0 // indirect
 )
 
 require (
-	github.com/go-jose/go-jose/v4 v4.1.0
-	github.com/luikyv/go-oidc v0.11.0
-	golang.org/x/crypto v0.39.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.2
+	github.com/luikyv/go-oidc v0.12.0
+	golang.org/x/crypto v0.41.0 // indirect
 )

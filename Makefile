@@ -19,9 +19,14 @@ setup-cs:
 	  echo "Cloning open finance conformance suite repository..."; \
 	  git clone https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance-suite; \
 	  cd conformance-suite && git checkout $(CS_VERSION); \
+	  make build-cs; \
 	fi
-
-	@make build-cs
+	
+	@if [ ! -d "conformance-suite/venv" ]; then \
+	  python3 -m venv conformance-suite/venv; \
+	  . ./conformance-suite/venv/bin/activate; \
+	  python3 -m pip install httpx; \
+	fi
 
 setup-ui:
 	@if [ ! -d "mock-bank-ui" ]; then \
@@ -56,12 +61,12 @@ build-mockgw:
 build-migration:
 	@docker compose build migration
 
-build-scheduler:
-	@docker compose build scheduler
-
 # Build the Conformance Suite JAR file.
 build-cs:
-	@docker compose run cs-builder
+	@docker compose -f ./conformance-suite/builder-compose.yml run builder
+
+lint:
+	@golangci-lint run ./...
 
 test:
 	@go test ./internal/...
@@ -72,12 +77,6 @@ test-coverage:
 	@echo "Total Coverage: `go tool cover -func=coverage.out | grep total | grep -Eo '[0-9]+\.[0-9]+'` %"
 
 cs-tests:
-	@if [ ! -d "conformance-suite/venv" ]; then \
-	  python3 -m venv conformance-suite/venv; \
-	  . ./conformance-suite/venv/bin/activate; \
-	  python3 -m pip install httpx; \
-	fi
-
 	@conformance-suite/venv/bin/python conformance-suite/scripts/run-test-plan.py \
 		consents_test-plan_v3-2 ./testdata/conformance/phase2-config.json \
 		accounts_test-plan_v2-4 ./testdata/conformance/phase2-config.json \

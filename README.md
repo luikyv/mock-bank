@@ -25,7 +25,6 @@ Mock Bank is a mock implementation of the Open Finance Brasil API specifications
 | https://matls-auth.mockbank.{HOST}    | Authorization Server                           | Yes   |
 | https://matls-api.mockbank.{HOST}     | Bank Backend                                   | Yes   |
 
-
 ## Users
 
 Mock Bank comes with predefined users preloaded with test data to facilitate development and testing across all APIs.
