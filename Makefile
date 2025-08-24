@@ -19,8 +19,8 @@ setup-cs:
 	  echo "Cloning open finance conformance suite repository..."; \
 	  git clone https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance-suite; \
 	  cd conformance-suite && git checkout $(CS_VERSION); \
-	  echo "Updating httpd/Dockerfile to use debian/eol:buster instead of debian:buster..."; \
-	  sed -i.bak 's|debian:buster|debian/eol:buster|g' httpd/Dockerfile && rm httpd/Dockerfile.bak; \
+	  echo "Updating httpd/Dockerfile-static to use debian/eol:buster instead of debian:buster..."; \
+	  sed -i.bak 's|debian:buster|debian/eol:buster|g' httpd/Dockerfile-static && rm httpd/Dockerfile-static.bak; \
 	  docker compose -f ./builder-compose.yml run builder; \
 	fi
 	
