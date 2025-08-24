@@ -187,11 +187,7 @@ func (s Service) RegisterCredential(ctx context.Context, id, orgID string, crede
 	return s.updateStatus(ctx, e, StatusAuthorized)
 }
 
-func (s Service) InitAuthorization(
-	ctx context.Context,
-	consentID, enrollmentID, orgID string,
-	opts FIDOOptions,
-) (string, error) {
+func (s Service) InitAuthorization(ctx context.Context, consentID, enrollmentID, orgID string, opts FIDOOptions) (string, error) {
 	e, err := s.Enrollment(ctx, Query{ID: enrollmentID, LoadClient: true}, orgID)
 	if err != nil {
 		return "", err
@@ -333,7 +329,25 @@ func (s Service) Enrollment(ctx context.Context, query Query, orgID string) (*En
 		return nil, ErrClientNotAllowed
 	}
 
-	return e, s.runPostCreationAutomations(ctx, e)
+	switch e.Status {
+	case StatusAwaitingRiskSignals:
+		if timeutil.DateTimeNow().After(e.CreatedAt.Add(5 * time.Minute)) {
+			reason := RejectionReasonAwaitingRiskSignals
+			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.CancelledFromHolder})
+		}
+	case StatusAwaitingAccountHolderValidation:
+		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(15 * time.Minute)) {
+			reason := RejectionReasonAwaitingAccountHolderValidation
+			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.CancelledFromHolder})
+		}
+	case StatusAwaitingEnrollment:
+		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(CredentialRegistrationTimeout)) {
+			reason := RejectionReasonAwaitingEnrollment
+			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.CancelledFromHolder})
+		}
+	}
+
+	return e, nil
 }
 
 func (s Service) CancelByID(ctx context.Context, id, orgID string, cancellation Cancellation) error {
@@ -360,12 +374,7 @@ func (s Service) Cancel(ctx context.Context, e *Enrollment, cancellation Cancell
 	}
 
 	e.Cancellation = &cancellation
-	if err := s.updateStatus(ctx, e, status); err != nil {
-		return err
-	}
-
-	s.webhookService.NotifyEnrollment(ctx, e.ClientID, e.URN(), e.Version)
-	return nil
+	return s.updateStatus(ctx, e, status)
 }
 
 func (s Service) validate(_ context.Context, e *Enrollment, debtorAccount *payment.Account) error {
@@ -397,32 +406,15 @@ func (s Service) validate(_ context.Context, e *Enrollment, debtorAccount *payme
 	return nil
 }
 
-func (s Service) runPostCreationAutomations(ctx context.Context, e *Enrollment) error {
-	switch e.Status {
-	case StatusAwaitingRiskSignals:
-		if timeutil.DateTimeNow().After(e.CreatedAt.Add(5 * time.Minute)) {
-			reason := RejectionReasonAwaitingRiskSignals
-			return s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.CancelledFromHolder})
-		}
-	case StatusAwaitingAccountHolderValidation:
-		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(15 * time.Minute)) {
-			reason := RejectionReasonAwaitingAccountHolderValidation
-			return s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.CancelledFromHolder})
-		}
-	case StatusAwaitingEnrollment:
-		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(CredentialRegistrationTimeout)) {
-			reason := RejectionReasonAwaitingEnrollment
-			return s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.CancelledFromHolder})
-		}
-	}
-	return nil
-}
-
 func (s Service) updateStatus(ctx context.Context, e *Enrollment, status Status) error {
 	e.Status = status
 	e.StatusUpdatedAt = timeutil.DateTimeNow()
 	if err := s.update(ctx, e); err != nil {
 		return fmt.Errorf("could not update enrollment status: %w", err)
+	}
+
+	if slices.Contains([]Status{StatusRejected, StatusRevoked}, status) {
+		s.webhookService.NotifyEnrollment(ctx, e.ClientID, e.URN(), e.Version)
 	}
 
 	return nil

@@ -1,5 +1,5 @@
-//go:generate oapi-codegen -config=./config.yml -package=enrollmentv2 -o=./api_gen.go ./swagger.yml
-package enrollmentv2
+//go:generate oapi-codegen -config=./config.yml -package=v2 -o=./api_gen.go ./swagger.yml
+package v2
 
 import (
 	"context"
@@ -67,14 +67,14 @@ func NewServer(
 	}
 }
 
-func (s Server) RegisterRoutes(mux *http.ServeMux) {
-	enrollmentMux := http.NewServeMux()
+func (s Server) Handler() (http.Handler, string) {
+	mux := http.NewServeMux()
 
 	jwtMiddleware := middleware.JWT(s.baseURL, s.orgID, s.keystoreHost, s.signer, s.jwtService)
 	idempotencyMiddleware := middleware.Idempotency(s.idempotencyService)
 	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, payment.Scope)
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, enrollment.ScopeID, enrollment.ScopeConsent, payment.Scope)
-	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) api.Error {
+	swaggerMiddleware, swaggerVersion := middleware.Swagger(GetSwagger, func(err error) api.Error {
 		var schemaErr *openapi3.SchemaError
 		if errors.As(err, &schemaErr) && schemaErr.SchemaField == "required" {
 			return api.NewError("PARAMETRO_NAO_INFORMADO", http.StatusUnprocessableEntity, err.Error())
@@ -101,51 +101,51 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = jwtMiddleware(handler)
 	handler = middleware.CertCN(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	enrollmentMux.Handle("POST /enrollments", handler)
+	mux.Handle("POST /enrollments", handler)
 
 	handler = http.HandlerFunc(wrapper.GetEnrollment)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	enrollmentMux.Handle("GET /enrollments/{enrollmentId}", handler)
+	mux.Handle("GET /enrollments/{enrollmentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.RiskSignals)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	enrollmentMux.Handle("POST /enrollments/{enrollmentId}/risk-signals", handler)
+	mux.Handle("POST /enrollments/{enrollmentId}/risk-signals", handler)
 
 	handler = http.HandlerFunc(wrapper.EnrollmentCreateFidoRegistrationOptions)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = authCodeAuthMiddleware(handler)
-	enrollmentMux.Handle("POST /enrollments/{enrollmentId}/fido-registration-options", handler)
+	mux.Handle("POST /enrollments/{enrollmentId}/fido-registration-options", handler)
 
 	handler = http.HandlerFunc(wrapper.EnrollmentRegisterFidoCredential)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = authCodeAuthMiddleware(handler)
-	enrollmentMux.Handle("POST /enrollments/{enrollmentId}/fido-registration", handler)
+	mux.Handle("POST /enrollments/{enrollmentId}/fido-registration", handler)
 
 	handler = http.HandlerFunc(wrapper.EnrollmentCreateFidoSigningOptions)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	enrollmentMux.Handle("POST /enrollments/{enrollmentId}/fido-sign-options", handler)
+	mux.Handle("POST /enrollments/{enrollmentId}/fido-sign-options", handler)
 
 	handler = http.HandlerFunc(wrapper.AuthorizeConsent)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = authCodeAuthMiddleware(handler)
-	enrollmentMux.Handle("POST /consents/{consentId}/authorise", handler)
+	mux.Handle("POST /consents/{consentId}/authorise", handler)
 
 	handler = http.HandlerFunc(wrapper.DeleteEnrollment)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	enrollmentMux.Handle("PATCH /enrollments/{enrollmentId}", handler)
+	mux.Handle("PATCH /enrollments/{enrollmentId}", handler)
 
-	handler = middleware.FAPIID()(enrollmentMux)
-	mux.Handle("/open-banking/enrollments/v2/", http.StripPrefix("/open-banking/enrollments/v2", handler))
+	handler = middleware.FAPIID()(mux)
+	return http.StripPrefix("/open-banking/enrollments/v2", handler), swaggerVersion
 }
 
 func (s Server) PostEnrollments(ctx context.Context, req PostEnrollmentsRequestObject) (PostEnrollmentsResponseObject, error) {

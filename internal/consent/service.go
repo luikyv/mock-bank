@@ -79,7 +79,7 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 		return nil, ErrAccessNotAllowed
 	}
 
-	return c, s.runPostCreationAutomations(ctx, c)
+	return c, s.runAutomations(ctx, c)
 }
 
 func (s Service) Consents(ctx context.Context, ownerID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Consent], error) {
@@ -91,7 +91,7 @@ func (s Service) Consents(ctx context.Context, ownerID uuid.UUID, orgID string, 
 	}
 
 	for _, c := range consents.Records {
-		if err := s.runPostCreationAutomations(ctx, c); err != nil {
+		if err := s.runAutomations(ctx, c); err != nil {
 			return page.Page[*Consent]{}, err
 		}
 	}
@@ -173,7 +173,7 @@ func (s Service) validate(_ context.Context, c *Consent) error {
 	return nil
 }
 
-func (s Service) runPostCreationAutomations(ctx context.Context, c *Consent) error {
+func (s Service) runAutomations(ctx context.Context, c *Consent) error {
 	switch c.Status {
 	case StatusAwaitingAuthorization:
 		if timeutil.DateTimeNow().After(c.CreatedAt.Add(3600 * time.Second)) {

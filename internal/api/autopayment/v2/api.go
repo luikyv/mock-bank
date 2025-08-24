@@ -1,4 +1,4 @@
-//go:generate oapi-codegen -config=./config.yml -package=autopaymentv2 -o=./api_gen.go ./swagger.yml
+//go:generate oapi-codegen -config=./config.yml -package=v2 -o=./api_gen.go ./swagger.yml
 package v2
 
 import (
@@ -140,7 +140,7 @@ func (s Server) Handler() (http.Handler, string) {
 	mux.Handle("PATCH /pix/recurring-payments/{recurringPaymentId}", handler)
 
 	handler = middleware.FAPIID()(mux)
-	return http.StripPrefix("/open-banking/automatic-payments/v2", mux), swaggerVersion
+	return http.StripPrefix("/open-banking/automatic-payments/v2", handler), swaggerVersion
 }
 
 func (s Server) AutomaticPaymentsPostRecurringConsents(ctx context.Context, req AutomaticPaymentsPostRecurringConsentsRequestObject) (AutomaticPaymentsPostRecurringConsentsResponseObject, error) {
@@ -747,7 +747,7 @@ func (s Server) AutomaticPaymentsPostPixRecurringPayments(ctx context.Context, r
 
 func (s Server) AutomaticPaymentsGetPixRecurringPaymentsPaymentID(ctx context.Context, req AutomaticPaymentsGetPixRecurringPaymentsPaymentIDRequestObject) (AutomaticPaymentsGetPixRecurringPaymentsPaymentIDResponseObject, error) {
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
-	p, err := s.service.Payment(ctx, req.RecurringPaymentID, orgID)
+	p, err := s.service.Payment(ctx, autopayment.Query{ID: req.RecurringPaymentID, DebtorAccount: true}, orgID)
 	if err != nil {
 		return nil, err
 	}

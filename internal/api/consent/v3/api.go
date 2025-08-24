@@ -1,5 +1,5 @@
-//go:generate oapi-codegen -config=./config.yml -package=consentv3 -o=./api_gen.go ./swagger.yml
-package consentv3
+//go:generate oapi-codegen -config=./config.yml -package=v3 -o=./api_gen.go ./swagger.yml
+package v3
 
 import (
 	"context"
@@ -30,12 +30,12 @@ func NewServer(host string, service consent.Service, op *provider.Provider) Serv
 	}
 }
 
-func (s Server) RegisterRoutes(mux *http.ServeMux) {
-	consentMux := http.NewServeMux()
+func (s Server) Handler() (http.Handler, string) {
+	mux := http.NewServeMux()
 
 	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, consent.Scope)
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)
-	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) api.Error {
+	swaggerMiddleware, swaggerVersion := middleware.Swagger(GetSwagger, func(err error) api.Error {
 		return api.NewError("PARAMETRO_INVALIDO", http.StatusBadRequest, err.Error())
 	})
 
@@ -55,26 +55,26 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 
 	handler = http.HandlerFunc(wrapper.ConsentsPostConsents)
 	handler = clientCredentialsAuthMiddleware(handler)
-	consentMux.Handle("POST /consents", handler)
+	mux.Handle("POST /consents", handler)
 
 	handler = http.HandlerFunc(wrapper.ConsentsDeleteConsentsConsentID)
 	handler = clientCredentialsAuthMiddleware(handler)
-	consentMux.Handle("DELETE /consents/{consentId}", handler)
+	mux.Handle("DELETE /consents/{consentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.ConsentsGetConsentsConsentID)
 	handler = clientCredentialsAuthMiddleware(handler)
-	consentMux.Handle("GET /consents/{consentId}", handler)
+	mux.Handle("GET /consents/{consentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.ConsentsPostConsentsConsentIDExtends)
 	handler = authCodeAuthMiddleware(handler)
-	consentMux.Handle("POST /consents/{consentId}/extends", handler)
+	mux.Handle("POST /consents/{consentId}/extends", handler)
 
 	handler = http.HandlerFunc(wrapper.ConsentsGetConsentsConsentIDExtensions)
 	handler = clientCredentialsAuthMiddleware(handler)
-	consentMux.Handle("GET /consents/{consentId}/extensions", handler)
+	mux.Handle("GET /consents/{consentId}/extensions", handler)
 
-	handler = middleware.FAPIID()(consentMux)
-	mux.Handle("/open-banking/consents/v3/", http.StripPrefix("/open-banking/consents/v3", handler))
+	handler = middleware.FAPIID()(mux)
+	return http.StripPrefix("/open-banking/consents/v3", handler), swaggerVersion
 }
 
 func (s Server) ConsentsPostConsents(ctx context.Context, req ConsentsPostConsentsRequestObject) (ConsentsPostConsentsResponseObject, error) {

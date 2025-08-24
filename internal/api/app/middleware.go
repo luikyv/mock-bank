@@ -25,7 +25,7 @@ func authSessionMiddlewareHandler(next http.Handler, service session.Service) ht
 
 		ctx := r.Context()
 
-		cookie, err := r.Cookie(cookieSessionId)
+		cookie, err := r.Cookie(cookieSessionID)
 		if err != nil {
 			api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "session not found"))
 			return

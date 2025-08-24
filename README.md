@@ -37,25 +37,6 @@ All users listed below share the default password: `P@ssword01`.
 | alice@email.com | 761.092.776-73 | 50.685.362/0006-73 | Primary test user with resources in all APIs |
 | bob@email.com | 875.174.004-44 | N/A | Test user with joint account for multiple consents scenarios |
 
-
-## Payments
-
-The predefined rules below are used to simulate specific behaviors in the payment flow based on the payment amount. They help test how client applications handle different responses from the API.
-
-| Amount | Action |
-|--------|--------|
-| 300.01 | Reject payment consent request with reject reason VALOR_INVALIDO |
-| 300.02 | Reject payment consent request with reject reason NAO_INFORMADO |
-| 300.03 | Reject payment consent request with reject reason FALHA_INFRAESTRUTURA |
-| 300.04 | Reject payment consent request with reject reason TEMPO_EXPIRADO_CONSUMO |
-| 300.05 | Reject payment consent request with reject reason CONTA_NAO_PERMITE_PAGAMENTO |
-| 300.06 | Reject payment consent request with reject reason SALDO_INSUFICIENTE |
-| 300.07 | Reject payment consent request with reject reason VALOR_ACIMA_LIMITE |
-| 300.08 | Reject payment consent request with reject reason QRCODE_INVALIDO |
-| 10422.00 | Reject payment consent request with an HTTP 422 without any code |
-| 10422.01 | Reject payment consent request with an HTTP 422 with code DETALHE_PAGAMENTO_INVALIDO |
-| 10422.02 | Reject payment consent request with an HTTP 422 and detail as FORMA_PAGAMENTO_INVALIDA |
-
 ## Getting Started
 
 ### Prerequisites
@@ -118,13 +99,11 @@ To run MockBank with the Open Finance Conformance Suite:
 
 ## TODO
 - Add doc.go's.
-- Test the scheduler.
 - Finish accounts and loans.
 - Improve the html.
 - Update swaggers to undo modifications.
 - Improve loops that query the db.
 - Remove descriptions.
-- Transactions.
 - Improve error handling.
 - Add logs.
 - https://openfinancebrasil.atlassian.net/wiki/spaces/OF/pages/246120449/EN+Open+Finance+Brasil+Financial-grade+API+Dynamic+Client+Registration+2.0+RC1+Implementers+Draft+3

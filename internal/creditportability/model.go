@@ -13,6 +13,7 @@ var (
 
 type Portability struct {
 	ID                                  uuid.UUID
+	ConsentID                           uuid.UUID
 	Status                              Status
 	StatusUpdatedAt                     timeutil.DateTime
 	ContractID                          uuid.UUID
@@ -111,3 +112,7 @@ const (
 	IneligibilityReasonIncompatibleMode   IneligibilityReason = "MODALIDADE_OPERACAO_INCOMPATIVEL"
 	IneligibilityReasonOther              IneligibilityReason = "OUTROS"
 )
+
+type AccountData struct {
+	Number string
+}

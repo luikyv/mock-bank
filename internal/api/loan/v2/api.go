@@ -1,5 +1,5 @@
-//go:generate oapi-codegen -config=./config.yml -package=loanv2 -o=./api_gen.go ./swagger.yml
-package loanv2
+//go:generate oapi-codegen -config=./config.yml -package=v2 -o=./api_gen.go ./swagger.yml
+package v2
 
 import (
 	"context"
@@ -47,8 +47,8 @@ func NewServer(
 	}
 }
 
-func (s Server) RegisterRoutes(mux *http.ServeMux) {
-	loanMux := http.NewServeMux()
+func (s Server) Handler() (http.Handler, string) {
+	mux := http.NewServeMux()
 
 	middlewareOpts := &middleware.Options{ErrorPagination: true}
 	authCodeAuthMiddleware := middleware.AuthWithOptions(
@@ -58,7 +58,7 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 		goidc.ScopeOpenID,
 		consent.ScopeID,
 	)
-	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) api.Error {
+	swaggerMiddleware, swaggerVersion := middleware.Swagger(GetSwagger, func(err error) api.Error {
 		return api.NewError("PARAMETRO_INVALIDO", http.StatusBadRequest, err.Error())
 	})
 
@@ -79,30 +79,30 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = http.HandlerFunc(wrapper.LoansGetContracts)
 	handler = middleware.PermissionWithOptions(s.consentService, middlewareOpts, consent.PermissionLoansRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
-	loanMux.Handle("GET /contracts", handler)
+	mux.Handle("GET /contracts", handler)
 
 	handler = http.HandlerFunc(wrapper.LoansGetContractsContractID)
 	handler = middleware.PermissionWithOptions(s.consentService, middlewareOpts, consent.PermissionLoansRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
-	loanMux.Handle("GET /contracts/{contractId}", handler)
+	mux.Handle("GET /contracts/{contractId}", handler)
 
 	handler = http.HandlerFunc(wrapper.LoansGetContractsContractIDWarranties)
 	handler = middleware.PermissionWithOptions(s.consentService, middlewareOpts, consent.PermissionLoansWarrantiesRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
-	loanMux.Handle("GET /contracts/{contractId}/warranties", handler)
+	mux.Handle("GET /contracts/{contractId}/warranties", handler)
 
 	handler = http.HandlerFunc(wrapper.LoansGetContractsContractIDPayments)
 	handler = middleware.PermissionWithOptions(s.consentService, middlewareOpts, consent.PermissionLoansPaymentsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
-	loanMux.Handle("GET /contracts/{contractId}/payments", handler)
+	mux.Handle("GET /contracts/{contractId}/payments", handler)
 
 	handler = http.HandlerFunc(wrapper.LoansGetContractsContractIDScheduledInstalments)
 	handler = middleware.PermissionWithOptions(s.consentService, middlewareOpts, consent.PermissionLoansScheduledInstalmentsRead)(handler)
 	handler = authCodeAuthMiddleware(handler)
-	loanMux.Handle("GET /contracts/{contractId}/scheduled-instalments", handler)
+	mux.Handle("GET /contracts/{contractId}/scheduled-instalments", handler)
 
-	handler = middleware.FAPIIDWithOptions(middlewareOpts)(loanMux)
-	mux.Handle("/open-banking/loans/v2/", http.StripPrefix("/open-banking/loans/v2", handler))
+	handler = middleware.FAPIIDWithOptions(middlewareOpts)(mux)
+	return http.StripPrefix("/open-banking/loans/v2", handler), swaggerVersion
 }
 
 func (s Server) LoansGetContracts(ctx context.Context, req LoansGetContractsRequestObject) (LoansGetContractsResponseObject, error) {

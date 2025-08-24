@@ -1,5 +1,5 @@
-//go:generate oapi-codegen -config=./config.yml -package=paymentv4 -o=./api_gen.go ./swagger.yml
-package paymentv4
+//go:generate oapi-codegen -config=./config.yml -package=v4 -o=./api_gen.go ./swagger.yml
+package v4
 
 import (
 	"context"
@@ -68,14 +68,14 @@ func NewServer(
 	}
 }
 
-func (s Server) RegisterRoutes(mux *http.ServeMux) {
-	paymentMux := http.NewServeMux()
+func (s Server) Handler() (http.Handler, string) {
+	mux := http.NewServeMux()
 
 	jwtMiddleware := middleware.JWT(s.baseURL, s.orgID, s.keystoreHost, s.signer, s.jwtService)
 	idempotencyMiddleware := middleware.Idempotency(s.idempotencyService)
 	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, payment.Scope)
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID)
-	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) api.Error {
+	swaggerMiddleware, swaggerVersion := middleware.Swagger(GetSwagger, func(err error) api.Error {
 		var schemaErr *openapi3.SchemaError
 		if errors.As(err, &schemaErr) && schemaErr.SchemaField == "required" {
 			return api.NewError("PARAMETRO_NAO_INFORMADO", http.StatusUnprocessableEntity, err.Error())
@@ -100,37 +100,37 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = http.HandlerFunc(wrapper.PaymentsPostConsents)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	paymentMux.Handle("POST /consents", handler)
+	mux.Handle("POST /consents", handler)
 
 	handler = http.HandlerFunc(wrapper.PaymentsGetConsentsConsentID)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	paymentMux.Handle("GET /consents/{consentId}", handler)
+	mux.Handle("GET /consents/{consentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.PaymentsPostPixPayments)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = authCodeAuthMiddleware(handler)
-	paymentMux.Handle("POST /pix/payments", handler)
+	mux.Handle("POST /pix/payments", handler)
 
 	handler = http.HandlerFunc(wrapper.PaymentsGetPixPaymentsPaymentID)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	paymentMux.Handle("GET /pix/payments/{paymentId}", handler)
+	mux.Handle("GET /pix/payments/{paymentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.PaymentsPatchPixPaymentsConsentID)
 	handler = idempotencyMiddleware(handler)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	paymentMux.Handle("PATCH /pix/payments/consents/{consentId}", handler)
+	mux.Handle("PATCH /pix/payments/consents/{consentId}", handler)
 
 	handler = http.HandlerFunc(wrapper.PaymentsPatchPixPaymentsPaymentID)
 	handler = jwtMiddleware(handler)
 	handler = clientCredentialsAuthMiddleware(handler)
-	paymentMux.Handle("PATCH /pix/payments/{paymentId}", handler)
+	mux.Handle("PATCH /pix/payments/{paymentId}", handler)
 
-	handler = middleware.FAPIID()(paymentMux)
-	mux.Handle("/open-banking/payments/v4/", http.StripPrefix("/open-banking/payments/v4", handler))
+	handler = middleware.FAPIID()(mux)
+	return http.StripPrefix("/open-banking/payments/v4", handler), swaggerVersion
 }
 
 func (s Server) PaymentsPostConsents(ctx context.Context, req PaymentsPostConsentsRequestObject) (PaymentsPostConsentsResponseObject, error) {

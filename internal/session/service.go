@@ -2,29 +2,38 @@ package session
 
 import (
 	"context"
+	"crypto"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
-	"github.com/luikyv/mock-bank/internal/directory"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 	"gorm.io/gorm"
 )
 
 type Service struct {
-	db               *gorm.DB
-	directoryService directory.Service
+	db                   *gorm.DB
+	directoryIssuer      string
+	directoryClientID    string
+	directoryRedirectURI string
+	directoryJWTSigner   crypto.Signer
+	directoryMTLSClient  *http.Client
 }
 
-func NewService(db *gorm.DB, directoryService directory.Service) Service {
+func NewService(db *gorm.DB, issuer, clientID, redirectURI string, jwtSigner crypto.Signer, mtlsClient *http.Client) Service {
 	return Service{
-		db:               db,
-		directoryService: directoryService,
+		db:                   db,
+		directoryIssuer:      issuer,
+		directoryClientID:    clientID,
+		directoryRedirectURI: redirectURI,
+		directoryJWTSigner:   jwtSigner,
+		directoryMTLSClient:  mtlsClient,
 	}
 }
 
 func (s Service) Create(ctx context.Context) (session *Session, authURL string, err error) {
-	authURL, codeVerifier, err := s.directoryService.AuthURL(ctx)
+	authURL, codeVerifier, err := s.AuthURL(ctx)
 	if err != nil {
 		return nil, "", err
 	}
@@ -46,7 +55,7 @@ func (s Service) Authorize(ctx context.Context, sessionID, authCode string) erro
 		return fmt.Errorf("could not find session: %w", err)
 	}
 
-	idTkn, err := s.directoryService.IDToken(ctx, authCode, session.CodeVerifier)
+	idTkn, err := s.IDToken(ctx, authCode, session.CodeVerifier)
 	if err != nil {
 		return err
 	}

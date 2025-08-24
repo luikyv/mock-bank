@@ -17,33 +17,30 @@ import (
 	"github.com/luikyv/mock-bank/cmd/cmdutil"
 	accountapi "github.com/luikyv/mock-bank/internal/api/account"
 	"github.com/luikyv/mock-bank/internal/api/app"
-	"github.com/luikyv/mock-bank/internal/api/consentv3"
-	"github.com/luikyv/mock-bank/internal/api/enrollmentv2"
-	"github.com/luikyv/mock-bank/internal/api/loanv2"
+	autopaymentapi "github.com/luikyv/mock-bank/internal/api/autopayment"
+	consentapi "github.com/luikyv/mock-bank/internal/api/consent"
+	enrollmentapi "github.com/luikyv/mock-bank/internal/api/enrollment"
+	loanapi "github.com/luikyv/mock-bank/internal/api/loan"
 	oidcapi "github.com/luikyv/mock-bank/internal/api/oidc"
-	"github.com/luikyv/mock-bank/internal/api/paymentv4"
-	"github.com/luikyv/mock-bank/internal/api/resourcev3"
+	paymentapi "github.com/luikyv/mock-bank/internal/api/payment"
+	resourceapi "github.com/luikyv/mock-bank/internal/api/resource"
 	"github.com/luikyv/mock-bank/internal/client"
 	"github.com/luikyv/mock-bank/internal/creditop"
 	"github.com/luikyv/mock-bank/internal/customer"
-	"github.com/luikyv/mock-bank/internal/directory"
 	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/idempotency"
 	"github.com/luikyv/mock-bank/internal/jwtutil"
 	"github.com/luikyv/mock-bank/internal/session"
 	"github.com/luikyv/mock-bank/internal/webhook"
 
-	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/api"
-	autopaymentapi "github.com/luikyv/mock-bank/internal/api/autopayment"
 	"github.com/luikyv/mock-bank/internal/autopayment"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/oidc"
@@ -167,9 +164,8 @@ func main() {
 	}
 
 	// Services.
-	directoryService := directory.NewService(DirectoryIssuer, DirectoryClientID, APPHost+"/api/directory/callback",
+	sessionService := session.NewService(db, DirectoryIssuer, DirectoryClientID, APPHost+"/api/directory/callback",
 		directoryClientSigner, cmdutil.MTLSHTTPClient(directoryClientTLSCert, Env))
-	sessionService := session.NewService(db, directoryService)
 	clientService := client.NewService(db)
 	idempotencyService := idempotency.NewService(db)
 	jwtService := jwtutil.NewService(db)
@@ -195,27 +191,21 @@ func main() {
 
 	oidcapi.NewServer(AuthHost, op).RegisterRoutes(mux)
 	app.NewServer(bankConfig, APPHost, sessionService, userService, consentService, resourceService, accountService).RegisterRoutes(mux)
-	consentv3.NewServer(APIMTLSHost, consentService, op).RegisterRoutes(mux)
-	resourcev3.NewServer(APIMTLSHost, resourceService, consentService, op).RegisterRoutes(mux)
+	consentapi.NewServer(bankConfig, consentService, op).RegisterRoutes(mux)
+	resourceapi.NewServer(bankConfig, resourceService, consentService, op).RegisterRoutes(mux)
 	accountapi.NewServer(bankConfig, accountService, consentService, op).RegisterRoutes(mux)
-	loanv2.NewServer(bankConfig, creditOpService, consentService, op).RegisterRoutes(mux)
-	paymentv4.NewServer(bankConfig, paymentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
+	loanapi.NewServer(bankConfig, creditOpService, consentService, op).RegisterRoutes(mux)
+	paymentapi.NewServer(bankConfig, paymentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 	autopaymentapi.NewServer(bankConfig, autoPaymentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
-	enrollmentv2.NewServer(bankConfig, enrollmentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
+	enrollmentapi.NewServer(bankConfig, enrollmentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 
 	handler := middleware(mux)
 	slog.Info("starting mock bank")
 
-	if Env == cmdutil.LocalEnvironment {
-		if err := http.ListenAndServe(":"+Port, handler); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("failed to start mock bank", "error", err)
-			os.Exit(1)
-		}
-		return
+	if err := http.ListenAndServe(":"+Port, handler); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		slog.Error("failed to start mock bank", "error", err)
+		os.Exit(1)
 	}
-
-	lambdaAdapter := httpadapter.NewV2(handler)
-	lambda.Start(lambdaAdapter.ProxyWithContext)
 }
 
 type BankConfig struct {

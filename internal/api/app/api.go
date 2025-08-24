@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	cookieSessionId = "sessionId"
+	cookieSessionID = "sessionId"
 	sessionValidity = 3 * time.Hour
 )
 
@@ -122,7 +122,7 @@ func (s Server) GetDirectoryAuthURL(ctx context.Context, request GetDirectoryAut
 	}
 	headers := GetDirectoryAuthURL200ResponseHeaders{
 		SetCookie: (&http.Cookie{
-			Name:     cookieSessionId,
+			Name:     cookieSessionID,
 			Value:    session.ID.String(),
 			Path:     "/api",
 			Expires:  timeutil.DateTimeNow().Add(sessionValidity).Time,
@@ -161,7 +161,7 @@ func (s Server) LogoutUser(ctx context.Context, req LogoutUserRequestObject) (Lo
 
 	headers := LogoutUser303ResponseHeaders{
 		SetCookie: (&http.Cookie{
-			Name:     cookieSessionId,
+			Name:     cookieSessionID,
 			Path:     "/api",
 			Expires:  time.Unix(0, 0),
 			MaxAge:   -1,

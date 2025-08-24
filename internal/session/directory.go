@@ -1,8 +1,7 @@
-package directory
+package session
 
 import (
 	"context"
-	"crypto"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -37,43 +36,25 @@ var (
 	directoryJWKSLastFetchedAt timeutil.DateTime
 )
 
-type Service struct {
-	issuer      string
-	clientID    string
-	redirectURI string
-	jwtSigner   crypto.Signer
-	mtlsClient  *http.Client
-}
-
-func NewService(issuer, clientID, redirectURI string, jwtSigner crypto.Signer, mtlsClient *http.Client) Service {
-	return Service{
-		issuer:      issuer,
-		clientID:    clientID,
-		redirectURI: redirectURI,
-		jwtSigner:   jwtSigner,
-		mtlsClient:  mtlsClient,
-	}
-}
-
-func (ds Service) AuthURL(ctx context.Context) (uri, codeVerifier string, err error) {
+func (s Service) AuthURL(ctx context.Context) (uri, codeVerifier string, err error) {
 	codeVerifier, codeChallenge := generateCodeVerifierAndChallenge()
-	reqURI, err := ds.requestURI(ctx, codeChallenge)
+	reqURI, err := s.requestURI(ctx, codeChallenge)
 	if err != nil {
 		return "", "", err
 	}
 
-	wellKnown, err := ds.wellKnown()
+	wellKnown, err := s.wellKnown()
 	if err != nil {
 		return "", "", err
 	}
 
 	authURL, _ := url.Parse(wellKnown.AuthEndpoint)
 	query := authURL.Query()
-	query.Set("client_id", ds.clientID)
+	query.Set("client_id", s.directoryClientID)
 	query.Set("request_uri", reqURI)
 	query.Set("response_type", "code")
 	query.Set("scope", "openid trust_framework_profile")
-	query.Set("redirect_uri", ds.redirectURI)
+	query.Set("redirect_uri", s.directoryRedirectURI)
 	authURL.RawQuery = query.Encode()
 	return authURL.String(), codeVerifier, nil
 }
@@ -114,8 +95,8 @@ func (s Service) IDToken(ctx context.Context, authCode, codeVerifier string) (ID
 	}
 
 	if err := idTokenClaims.Validate(jwt.Expected{
-		Issuer:      s.issuer,
-		AnyAudience: []string{s.clientID},
+		Issuer:      s.directoryIssuer,
+		AnyAudience: []string{s.directoryClientID},
 	}); err != nil {
 		return IDToken{}, fmt.Errorf("invalid id token claims: %w", err)
 	}
@@ -135,12 +116,12 @@ func (s Service) idToken(ctx context.Context, authCode, codeVerifier string) (st
 	}
 
 	form := url.Values{}
-	form.Set("client_id", s.clientID)
+	form.Set("client_id", s.directoryClientID)
 	form.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
 	form.Set("client_assertion", assertion)
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", authCode)
-	form.Set("redirect_uri", s.redirectURI)
+	form.Set("redirect_uri", s.directoryRedirectURI)
 	form.Set("code_verifier", codeVerifier)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, wellKnown.MTLS.TokenEndpoint, strings.NewReader(form.Encode()))
@@ -149,7 +130,7 @@ func (s Service) idToken(ctx context.Context, authCode, codeVerifier string) (st
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := s.mtlsClient.Do(req)
+	resp, err := s.directoryMTLSClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("token request failed: %w", err)
 	}
@@ -170,23 +151,23 @@ func (s Service) idToken(ctx context.Context, authCode, codeVerifier string) (st
 	return result.IDToken, nil
 }
 
-func (ds Service) requestURI(ctx context.Context, codeChallenge string) (string, error) {
-	wellKnown, err := ds.wellKnown()
+func (s Service) requestURI(ctx context.Context, codeChallenge string) (string, error) {
+	wellKnown, err := s.wellKnown()
 	if err != nil {
 		return "", err
 	}
 
-	assertion, err := ds.clientAssertion()
+	assertion, err := s.clientAssertion()
 	if err != nil {
 		return "", err
 	}
 	form := url.Values{}
-	form.Set("client_id", ds.clientID)
+	form.Set("client_id", s.directoryClientID)
 	form.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
 	form.Set("client_assertion", assertion)
 	form.Set("response_type", "code")
 	form.Set("scope", "openid trust_framework_profile")
-	form.Set("redirect_uri", ds.redirectURI)
+	form.Set("redirect_uri", s.directoryRedirectURI)
 	form.Set("code_challenge", codeChallenge)
 	form.Set("code_challenge_method", "S256")
 
@@ -196,7 +177,7 @@ func (ds Service) requestURI(ctx context.Context, codeChallenge string) (string,
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := ds.mtlsClient.Do(req)
+	resp, err := s.directoryMTLSClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("par request failed: %w", err)
 	}
@@ -224,15 +205,15 @@ func (s Service) clientAssertion() (string, error) {
 
 	now := timeutil.Timestamp()
 	claims := map[string]any{
-		"iss": s.clientID,
-		"sub": s.clientID,
+		"iss": s.directoryClientID,
+		"sub": s.directoryClientID,
 		"aud": wellKnown.TokenEndpoint,
 		"jti": uuid.NewString(),
 		"iat": now,
 		"exp": now + 300,
 	}
 
-	assertion, err := jwtutil.Sign(claims, s.jwtSigner)
+	assertion, err := jwtutil.Sign(claims, s.directoryJWTSigner)
 	if err != nil {
 		return "", fmt.Errorf("could not sign the client assertion: %w", err)
 	}
@@ -240,7 +221,7 @@ func (s Service) clientAssertion() (string, error) {
 	return assertion, nil
 }
 
-func (ds Service) wellKnown() (openIDConfiguration, error) {
+func (s Service) wellKnown() (openIDConfiguration, error) {
 
 	directoryWellKnownMu.Lock()
 	defer directoryWellKnownMu.Unlock()
@@ -249,8 +230,8 @@ func (ds Service) wellKnown() (openIDConfiguration, error) {
 		return *directoryWellKnownCache, nil
 	}
 
-	url := fmt.Sprintf("%s/.well-known/openid-configuration", ds.issuer)
-	resp, err := ds.mtlsClient.Get(url)
+	url := fmt.Sprintf("%s/.well-known/openid-configuration", s.directoryIssuer)
+	resp, err := s.directoryMTLSClient.Get(url)
 	if err != nil {
 		return openIDConfiguration{}, err
 	}
@@ -270,7 +251,7 @@ func (ds Service) wellKnown() (openIDConfiguration, error) {
 	return config, nil
 }
 
-func (ds Service) jwks() (goidc.JSONWebKeySet, error) {
+func (s Service) jwks() (goidc.JSONWebKeySet, error) {
 
 	directoryJWKSMu.Lock()
 	defer directoryJWKSMu.Unlock()
@@ -279,12 +260,12 @@ func (ds Service) jwks() (goidc.JSONWebKeySet, error) {
 		return *directoryJWKSCache, nil
 	}
 
-	wellKnown, err := ds.wellKnown()
+	wellKnown, err := s.wellKnown()
 	if err != nil {
 		return goidc.JSONWebKeySet{}, err
 	}
 
-	resp, err := ds.mtlsClient.Get(wellKnown.JWKSURI)
+	resp, err := s.directoryMTLSClient.Get(wellKnown.JWKSURI)
 	if err != nil {
 		return goidc.JSONWebKeySet{}, err
 	}
@@ -304,12 +285,12 @@ func (ds Service) jwks() (goidc.JSONWebKeySet, error) {
 	return jwks, nil
 }
 
-func (ds Service) PublicJWKS() jose.JSONWebKeySet {
+func (s Service) PublicJWKS() jose.JSONWebKeySet {
 	return jose.JSONWebKeySet{
 		Keys: []jose.JSONWebKey{{
 			KeyID:     "signer",
 			Algorithm: string(jose.PS256),
-			Key:       ds.jwtSigner.Public(),
+			Key:       s.directoryJWTSigner.Public(),
 		}},
 	}
 }

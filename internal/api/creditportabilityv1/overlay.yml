@@ -38,3 +38,79 @@ actions:
 
 - target: $.components.responses[*].headers.x-fapi-interaction-id
   remove: true
+
+- target: $.components.responses[*].headers.x-v
+  remove: true
+
+- target: $.paths./portabilities.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./portabilities.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/RequestCreditPortability'
+
+- target: $.paths./portabilities/{portabilityId}/cancel.patch.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./portabilities/{portabilityId}/cancel.patch.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/RequestCreditPortabilityCancel'
+
+- target: $.paths./portabilities/{portabilityId}/payment.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./portabilities/{portabilityId}/payment.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/RequestCreditPortabilityPayment'
+
+# JWT to JSON conversion for response bodies
+- target: $.components.responses.POSTResponseCreditPortability.content.application/jwt
+  remove: true
+- target: $.components.responses.POSTResponseCreditPortability.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/POSTResponseCreditPortability'
+
+- target: $.components.responses.OKResponsePortabilityEligibility.content.application/jwt
+  remove: true
+- target: $.components.responses.OKResponsePortabilityEligibility.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponsePortabilityEligibility'
+
+- target: $.components.responses.OKResponsePortabilitiesByPortabilityId.content.application/jwt
+  remove: true
+- target: $.components.responses.OKResponsePortabilitiesByPortabilityId.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponsePortabilitiesByPortabilityId'
+
+- target: $.components.responses.OKResponseAccountData.content.application/jwt
+  remove: true
+- target: $.components.responses.OKResponseAccountData.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponseAccountData'
+
+- target: $.components.responses.PatchResponseCreditPortabilityCancel.content.application/jwt
+  remove: true
+- target: $.components.responses.PatchResponseCreditPortabilityCancel.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/PatchResponseCreditPortabilityCancel'
+
+- target: $.components.responses.POSTResponseCreditPortabilityPayment.content.application/jwt
+  remove: true
+- target: $.components.responses.POSTResponseCreditPortabilityPayment.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/POSTResponseCreditPortabilityPayment'

@@ -3,8 +3,8 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    username TEXT NOT NULL,
-    organizations JSONB NOT NULL,
+    username TEXT,
+    organizations JSONB,
     expires_at TIMESTAMPTZ NOT NULL,
     code_verifier TEXT,
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
@@ -75,7 +75,7 @@ CREATE INDEX idx_oauth_sessions_pushed_auth_req_id ON oauth_sessions (pushed_aut
 CREATE TABLE oauth_grants (
     id TEXT PRIMARY KEY,
     token_id TEXT NOT NULL,
-    refresh_token_id TEXT,
+    refresh_token TEXT,
     auth_code TEXT,
     expires_at TIMESTAMPTZ NOT NULL,
     data JSONB,
@@ -86,7 +86,7 @@ CREATE TABLE oauth_grants (
 );
 CREATE INDEX idx_oauth_grants_org_id ON oauth_grants (org_id);
 CREATE INDEX idx_oauth_grants_token_id ON oauth_grants (token_id);
-CREATE INDEX idx_oauth_grants_refresh_token_id ON oauth_grants (refresh_token_id);
+CREATE INDEX idx_oauth_grants_refresh_token ON oauth_grants (refresh_token);
 CREATE INDEX idx_oauth_grants_auth_code ON oauth_grants (auth_code);
 
 CREATE TABLE consents (

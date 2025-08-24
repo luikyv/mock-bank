@@ -1,5 +1,5 @@
-//go:generate oapi-codegen -config=./config.yml -package=resourcev3 -o=./api_gen.go ./swagger.yml
-package resourcev3
+//go:generate oapi-codegen -config=./config.yml -package=v3 -o=./api_gen.go ./swagger.yml
+package v3
 
 import (
 	"context"
@@ -32,10 +32,10 @@ func NewServer(host string, service resource.Service, consentService consent.Ser
 	}
 }
 
-func (s Server) RegisterRoutes(mux *http.ServeMux) {
-	resourceMux := http.NewServeMux()
+func (s Server) Handler() (http.Handler, string) {
+	mux := http.NewServeMux()
 
-	swaggerMiddleware, _ := middleware.Swagger(GetSwagger, func(err error) api.Error {
+	swaggerMiddleware, swaggerVersion := middleware.Swagger(GetSwagger, func(err error) api.Error {
 		return api.NewError("INVALID_REQUEST", http.StatusBadRequest, err.Error())
 	})
 
@@ -56,9 +56,10 @@ func (s Server) RegisterRoutes(mux *http.ServeMux) {
 	handler = http.HandlerFunc(wrapper.ResourcesGetResources)
 	handler = middleware.Permission(s.consentService, consent.PermissionResourcesRead)(handler)
 	handler = middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)(handler)
-	resourceMux.Handle("GET /resources", handler)
+	mux.Handle("GET /resources", handler)
 
-	mux.Handle("/open-banking/resources/v3/", http.StripPrefix("/open-banking/resources/v3", resourceMux))
+	handler = middleware.FAPIID()(mux)
+	return http.StripPrefix("/open-banking/resources/v3", handler), swaggerVersion
 }
 
 func (s Server) ResourcesGetResources(ctx context.Context, req ResourcesGetResourcesRequestObject) (ResourcesGetResourcesResponseObject, error) {

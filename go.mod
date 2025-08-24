@@ -7,13 +7,11 @@ toolchain go1.24.2
 require github.com/google/uuid v1.6.0
 
 require (
-	github.com/aws/aws-lambda-go v1.48.0
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/config v1.29.14
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.67
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.35.4
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.59.0
-	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
 	github.com/getkin/kin-openapi v0.132.0
 	github.com/go-webauthn/webauthn v0.13.0
 	github.com/golang-migrate/migrate/v4 v4.18.3
@@ -74,6 +72,6 @@ require (
 
 require (
 	github.com/go-jose/go-jose/v4 v4.1.0
-	github.com/luikyv/go-oidc v0.10.0
+	github.com/luikyv/go-oidc v0.11.0
 	golang.org/x/crypto v0.39.0 // indirect
 )

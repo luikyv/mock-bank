@@ -159,10 +159,6 @@ func (s Service) ConsentedAccount(ctx context.Context, accountID, consentID, org
 		return nil, fmt.Errorf("could not fetch consent account: %w", err)
 	}
 
-	if err := s.runConsentPostCreationAutomations(ctx, consentAcc); err != nil {
-		return nil, err
-	}
-
 	if consentAcc.Status == resource.StatusPendingAuthorization {
 		return nil, ErrJointAccountPendingAuthorization
 	}
@@ -192,16 +188,17 @@ func (s Service) ConsentedAccounts(ctx context.Context, consentID, orgID string,
 
 	var accs []*Account
 	for _, consentAcc := range consentAccs.Records {
-		if err := s.runConsentPostCreationAutomations(ctx, consentAcc); err != nil {
-			return page.Page[*Account]{}, err
-		}
 		accs = append(accs, consentAcc.Account)
 	}
 	return page.New(accs, pag, consentAccs.TotalRecords), nil
 }
 
 func (s Service) Delete(ctx context.Context, id uuid.UUID, orgID string) error {
-	return s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).Delete(&Account{}).Error
+	if err := s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).Delete(&Account{}).Error; err != nil {
+		return fmt.Errorf("could not delete account: %w", err)
+	}
+
+	return nil
 }
 
 func (s Service) Transactions(ctx context.Context, accID, orgID string, pag page.Pagination, filter TransactionFilter) (page.Page[*Transaction], error) {
@@ -243,15 +240,9 @@ func (s Service) createConsent(ctx context.Context, consentAcc *ConsentAccount) 
 	now := timeutil.DateTimeNow()
 	consentAcc.CreatedAt = now
 	consentAcc.UpdatedAt = now
-	return s.db.WithContext(ctx).Create(consentAcc).Error
-}
-
-func (s Service) runConsentPostCreationAutomations(ctx context.Context, consentAcc *ConsentAccount) error {
-	// Allow access to joint account if consent is pending authorization for more than 3 minutes.
-	if consentAcc.Status == resource.StatusPendingAuthorization &&
-		timeutil.DateTimeNow().After(consentAcc.UpdatedAt.Add(3*time.Minute)) {
-		consentAcc.Status = resource.StatusAvailable
-		return s.UpdateConsent(ctx, consentAcc.ConsentID, consentAcc.AccountID, consentAcc.OrgID, resource.StatusAvailable)
+	if err := s.db.WithContext(ctx).Create(consentAcc).Error; err != nil {
+		return fmt.Errorf("could not create consent account: %w", err)
 	}
+
 	return nil
 }

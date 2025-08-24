@@ -77,7 +77,10 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payme
 	}
 
 	if debtorAcc == nil {
-		return s.db.WithContext(ctx).Create(c).Error
+		if err := s.db.WithContext(ctx).Create(c).Error; err != nil {
+			return fmt.Errorf("could not create recurring consent: %w", err)
+		}
+		return nil
 	}
 
 	acc, err := s.accountService.Account(ctx, account.Query{Number: debtorAcc.Number}, c.OrgID)
@@ -90,11 +93,11 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payme
 	}
 
 	c.DebtorAccountID = &acc.ID
-	if err := s.runConsentPreCreationAutomations(ctx, c); err != nil {
-		return err
+	if err := s.db.WithContext(ctx).Create(c).Error; err != nil {
+		return fmt.Errorf("could not create recurring consent: %w", err)
 	}
 
-	return s.db.WithContext(ctx).Create(c).Error
+	return nil
 }
 
 func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
@@ -151,12 +154,38 @@ func (s Service) EnrollConsent(ctx context.Context, id, orgID string, opts payme
 }
 
 func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error) {
-	c, err := s.consent(ctx, id, orgID)
-	if err != nil {
+	id = strings.TrimPrefix(id, ConsentURNPrefix)
+	c := &Consent{}
+	if err := s.db.WithContext(ctx).Preload("DebtorAccount").First(c, "id = ? AND org_id = ?", id, orgID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
 		return nil, err
 	}
 
-	return c, s.runConsentPostCreationAutomations(ctx, c)
+	if ctx.Value(api.CtxKeyClientID) != nil && ctx.Value(api.CtxKeyClientID) != c.ClientID {
+		return nil, ErrClientNotAllowed
+	}
+
+	switch c.Status {
+	case ConsentStatusAwaitingAuthorization:
+		if timeutil.DateTimeNow().After(c.CreatedAt.Add(60 * time.Minute)) {
+			slog.DebugContext(ctx, "recurring consent awaiting authorization for too long, moving to rejected")
+			return c, s.RejectConsent(ctx, c, ConsentRejection{
+				By:     TerminatedByHolder,
+				From:   TerminatedFromHolder,
+				Code:   ConsentRejectionAuthorizationTimeout,
+				Detail: "consent awaiting authorization for too long",
+			})
+		}
+	case ConsentStatusAuthorized:
+		if c.ExpiresAt != nil && timeutil.DateTimeNow().After(*c.ExpiresAt) {
+			slog.DebugContext(ctx, "recurring consent is authorized, but expired, moving to consumed")
+			return c, s.consumeConsent(ctx, c)
+		}
+	}
+
+	return c, nil
 }
 
 func (s Service) RejectConsentByID(ctx context.Context, id, orgID string, rejection ConsentRejection) (*Consent, error) {
@@ -273,37 +302,105 @@ func (s Service) Create(ctx context.Context, p *Payment) error {
 		return err
 	}
 
-	if err := s.runPreCreationAutomations(ctx, p); err != nil {
-		return err
-	}
 	if err := s.db.WithContext(ctx).Create(p).Error; err != nil {
 		return fmt.Errorf("could not create payment: %w", err)
 	}
 
+	slog.DebugContext(ctx, "creating recurring payment", "id", p.ID, "status", p.Status, "amount", p.Amount)
+
+	go func() {
+		ctx = context.WithoutCancel(ctx)
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				slog.DebugContext(ctx, "evaluating recurring payment automations", "id", p.ID, "status", p.Status, "amount", p.Amount)
+				if err := s.runAutomations(ctx, p); err != nil {
+					slog.ErrorContext(ctx, "error running recurring payment automations", "id", p.ID, "error", err)
+					return
+				}
+				if !slices.Contains([]payment.Status{
+					payment.StatusRCVD,
+					payment.StatusPDNG,
+					payment.StatusACCP,
+					payment.StatusACPD,
+				}, p.Status) {
+					slog.DebugContext(ctx, "recurring payment in final status, stopping automations", "id", p.ID, "status", p.Status)
+					return
+				}
+			case <-ctx.Done():
+				slog.DebugContext(ctx, "recurring payment automation deadline reached, stopping ticker", "id", p.ID)
+				return
+			}
+		}
+	}()
+
 	return nil
 }
 
-func (s Service) Payment(ctx context.Context, id, orgID string) (*Payment, error) {
-	p, err := s.payment(ctx, Query{ID: id, DebtorAccount: true}, orgID)
-	if err != nil {
+func (s Service) Payment(ctx context.Context, query Query, orgID string) (*Payment, error) {
+	dbQuery := s.db.WithContext(ctx).Where("org_id = ?", orgID)
+	if query.ID != "" {
+		dbQuery = dbQuery.Where("id = ?", query.ID)
+	}
+	if query.ConsentID != "" {
+		dbQuery = dbQuery.Where("consent_id = ?", query.ConsentID)
+	}
+	if query.Statuses != nil {
+		dbQuery = dbQuery.Where("status IN ?", query.Statuses)
+	}
+	if query.DebtorAccount {
+		dbQuery = dbQuery.Preload("DebtorAccount")
+	}
+	if query.Order != "" {
+		dbQuery = dbQuery.Order(query.Order)
+	}
+	p := &Payment{}
+	if err := dbQuery.First(p).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
 		return nil, err
 	}
 
-	return p, s.runPostCreationAutomations(ctx, p)
+	if clientID := ctx.Value(api.CtxKeyClientID); clientID != nil && clientID != p.ClientID {
+		return nil, ErrClientNotAllowed
+	}
+
+	return p, nil
 }
 
 func (s Service) Payments(ctx context.Context, orgID string, opts *Filter) ([]*Payment, error) {
-	payments, err := s.payments(ctx, orgID, opts)
-	if err != nil {
-		return nil, err
+	if opts == nil {
+		opts = &Filter{}
 	}
+	query := s.db.WithContext(ctx).Where("org_id = ?", orgID)
+	if opts.ConsentID != "" {
+		query = query.Where("consent_id = ?", strings.TrimPrefix(opts.ConsentID, ConsentURNPrefix))
+	}
+	if opts.Statuses != nil {
+		query = query.Where("status IN ?", opts.Statuses)
+	}
+	if opts.From != nil {
+		query = query.Where("date >= ?", opts.From)
+	}
+	if opts.To != nil {
+		query = query.Where("date <= ?", opts.To)
+	}
+
+	var payments []*Payment
+	if err := query.Find(&payments).Error; err != nil {
+		return nil, fmt.Errorf("could not find payments: %w", err)
+	}
+
 	for _, p := range payments {
 		if clientID := ctx.Value(api.CtxKeyClientID); clientID != nil && clientID != p.ClientID {
 			return nil, ErrClientNotAllowed
-		}
-
-		if err := s.runPostCreationAutomations(ctx, p); err != nil {
-			return nil, err
 		}
 	}
 
@@ -311,7 +408,7 @@ func (s Service) Payments(ctx context.Context, orgID string, opts *Filter) ([]*P
 }
 
 func (s Service) Cancel(ctx context.Context, id, orgID string, doc consent.Document) (*Payment, error) {
-	p, err := s.Payment(ctx, id, orgID)
+	p, err := s.Payment(ctx, Query{ID: id, DebtorAccount: true}, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -482,77 +579,6 @@ func (s Service) validateConsentEdition(_ context.Context, c *Consent, edition C
 	return nil
 }
 
-func (s Service) runConsentPreCreationAutomations(_ context.Context, _ *Consent) error {
-	return nil
-}
-
-func (s Service) runConsentPostCreationAutomations(ctx context.Context, c *Consent) error {
-	slog.DebugContext(ctx, "evaluating recurring payment consent automations", "status", c.Status)
-
-	switch c.Status {
-	case ConsentStatusAwaitingAuthorization:
-		if timeutil.DateTimeNow().After(c.CreatedAt.Add(60 * time.Minute)) {
-			slog.DebugContext(ctx, "recurring consent awaiting authorization for too long, moving to rejected")
-			return s.RejectConsent(ctx, c, ConsentRejection{
-				By:     TerminatedByHolder,
-				From:   TerminatedFromHolder,
-				Code:   ConsentRejectionAuthorizationTimeout,
-				Detail: "consent awaiting authorization for too long",
-			})
-		}
-	case ConsentStatusPartiallyAccepted:
-		if timeutil.DateTimeNow().Before(c.CreatedAt.Add(3 * time.Minute)) {
-			return nil
-		}
-
-		slog.DebugContext(ctx, "recurring payment consent partially accepted for more than 3 minutes, moving to authorized")
-		if err := s.updateConsentStatus(ctx, c, ConsentStatusAuthorized); err != nil {
-			return err
-		}
-		s.notifyConsentStatusChange(ctx, c)
-		return nil
-	case ConsentStatusAuthorized:
-		if c.ExpiresAt != nil && timeutil.DateTimeNow().After(*c.ExpiresAt) {
-			slog.DebugContext(ctx, "recurring consent is authorized, but expired, moving to consumed")
-			return s.consumeConsent(ctx, c)
-		}
-
-		if sweeping := c.Configuration.Sweeping; sweeping != nil {
-			if totalAllowedAmount := sweeping.TotalAllowedAmount; totalAllowedAmount != nil {
-				payments, err := s.payments(ctx, c.OrgID, &Filter{
-					ConsentID: c.ID.String(),
-					Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
-				})
-				if err != nil {
-					return err
-				}
-				if payment.SumPayments(payments) >= payment.ConvertAmount(*totalAllowedAmount) {
-					return s.consumeConsent(ctx, c)
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (s Service) consent(ctx context.Context, id, orgID string) (*Consent, error) {
-	id = strings.TrimPrefix(id, ConsentURNPrefix)
-	c := &Consent{}
-	if err := s.db.WithContext(ctx).Preload("DebtorAccount").First(c, "id = ? AND org_id = ?", id, orgID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-
-	if ctx.Value(api.CtxKeyClientID) != nil && ctx.Value(api.CtxKeyClientID) != c.ClientID {
-		return nil, ErrClientNotAllowed
-	}
-
-	return c, nil
-}
-
 func (s Service) consumeConsent(ctx context.Context, c *Consent) error {
 	if err := s.updateConsentStatus(ctx, c, ConsentStatusConsumed); err != nil {
 		return err
@@ -682,24 +708,7 @@ func (s Service) validate(_ context.Context, c *Consent, p *Payment) error {
 	return nil
 }
 
-func (s Service) runPreCreationAutomations(ctx context.Context, p *Payment) error {
-	switch p.Amount {
-	case "20422.01":
-		return ErrInvalidPayment
-	}
-
-	return nil
-}
-
-func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) error {
-	slog.DebugContext(ctx, "evaluating payment automations", "id", p.ID, "status", p.Status, "amount", p.Amount)
-
-	now := timeutil.DateTimeNow()
-	if now.Before(p.UpdatedAt.Add(5 * time.Second)) {
-		slog.DebugContext(ctx, "payment was updated less than 5 secs ago, skipping transitions", "updated_at", p.UpdatedAt.String())
-		return nil
-	}
-
+func (s Service) runAutomations(ctx context.Context, p *Payment) error {
 	c, err := s.Consent(ctx, p.ConsentID.String(), p.OrgID)
 	if err != nil {
 		return err
@@ -714,7 +723,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 		if automatic := c.Configuration.Automatic; automatic != nil {
 
 			if firstPaymentConfig := automatic.FirstPayment; firstPaymentConfig != nil {
-				firstPayment, err := s.payment(ctx, Query{ConsentID: c.ID.String(), Order: "created_at ASC"}, c.OrgID)
+				firstPayment, err := s.Payment(ctx, Query{ConsentID: c.ID.String(), Order: "created_at ASC"}, c.OrgID)
 				if err != nil {
 					return err
 				}
@@ -780,7 +789,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 				return s.reject(ctx, p, RejectionTransactionValueLimitExceeded, "payment amount is less than the configured minimum variable amount in the consent")
 			}
 
-			lastSuccessfulPayment, err := s.payment(ctx, Query{
+			lastSuccessfulPayment, err := s.Payment(ctx, Query{
 				ConsentID: c.ID.String(),
 				Statuses:  []payment.Status{payment.StatusSCHD, payment.StatusACSC},
 				Order:     "date DESC",
@@ -814,7 +823,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 			}
 
 			if sweeping.TotalAllowedAmount != nil {
-				payments, err := s.payments(ctx, c.OrgID, &Filter{
+				payments, err := s.Payments(ctx, c.OrgID, &Filter{
 					ConsentID: c.ID.String(),
 					Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
 				})
@@ -829,7 +838,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 			if periodicLimits := sweeping.PeriodicLimits; periodicLimits != nil {
 				if dayLimit := periodicLimits.Day; dayLimit != nil {
 					today := timeutil.BrazilDateNow()
-					payments, err := s.payments(ctx, c.OrgID, &Filter{
+					payments, err := s.Payments(ctx, c.OrgID, &Filter{
 						ConsentID: c.ID.String(),
 						Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
 						From:      &today,
@@ -850,7 +859,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 					today := timeutil.BrazilDateNow()
 					startOfWeek := today.StartOfWeek()
 					endOfWeek := today.EndOfWeek()
-					payments, err := s.payments(ctx, c.OrgID, &Filter{
+					payments, err := s.Payments(ctx, c.OrgID, &Filter{
 						ConsentID: c.ID.String(),
 						Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
 						From:      &startOfWeek,
@@ -871,7 +880,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 					today := timeutil.BrazilDateNow()
 					startOfMonth := today.StartOfMonth()
 					endOfMonth := today.EndOfMonth()
-					payments, err := s.payments(ctx, c.OrgID, &Filter{
+					payments, err := s.Payments(ctx, c.OrgID, &Filter{
 						ConsentID: c.ID.String(),
 						Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
 						From:      &startOfMonth,
@@ -892,7 +901,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 					today := timeutil.BrazilDateNow()
 					startOfYear := today.StartOfYear()
 					endOfYear := today.EndOfYear()
-					payments, err := s.payments(ctx, c.OrgID, &Filter{
+					payments, err := s.Payments(ctx, c.OrgID, &Filter{
 						ConsentID: c.ID.String(),
 						Statuses:  []payment.Status{payment.StatusACSC, payment.StatusSCHD},
 						From:      &startOfYear,
@@ -917,7 +926,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 
 		if c.EnrollmentDailyLimit != nil {
 			today := timeutil.BrazilDateNow()
-			payments, err := s.payments(ctx, c.OrgID, &Filter{
+			payments, err := s.Payments(ctx, c.OrgID, &Filter{
 				EnrollmentID: p.EnrollmentID.String(),
 				Statuses:     []payment.Status{payment.StatusACSC, payment.StatusSCHD},
 				From:         &today,
@@ -935,11 +944,7 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 
 	case payment.StatusACCP:
 		if p.Date.After(timeutil.BrazilDateNow()) {
-			if err := s.updateStatus(ctx, p, payment.StatusSCHD); err != nil {
-				return err
-			}
-			s.notifyStatusChange(ctx, p)
-			return nil
+			return s.updateStatus(ctx, p, payment.StatusSCHD)
 		}
 		return s.updateStatus(ctx, p, payment.StatusACPD)
 
@@ -953,45 +958,10 @@ func (s Service) runPostCreationAutomations(ctx context.Context, p *Payment) err
 		return s.updateStatus(ctx, p, payment.StatusACPD)
 
 	case payment.StatusACPD:
-		if err := s.updateStatus(ctx, p, payment.StatusACSC); err != nil {
-			return err
-		}
-		s.notifyStatusChange(ctx, p)
+		return s.updateStatus(ctx, p, payment.StatusACSC)
 	}
 
 	return nil
-}
-
-func (s Service) payment(ctx context.Context, query Query, orgID string) (*Payment, error) {
-	dbQuery := s.db.WithContext(ctx).Where("org_id = ?", orgID)
-	if query.ID != "" {
-		dbQuery = dbQuery.Where("id = ?", query.ID)
-	}
-	if query.ConsentID != "" {
-		dbQuery = dbQuery.Where("consent_id = ?", query.ConsentID)
-	}
-	if query.Statuses != nil {
-		dbQuery = dbQuery.Where("status IN ?", query.Statuses)
-	}
-	if query.DebtorAccount {
-		dbQuery = dbQuery.Preload("DebtorAccount")
-	}
-	if query.Order != "" {
-		dbQuery = dbQuery.Order(query.Order)
-	}
-	p := &Payment{}
-	if err := dbQuery.First(p).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-
-	if clientID := ctx.Value(api.CtxKeyClientID); clientID != nil && clientID != p.ClientID {
-		return nil, ErrClientNotAllowed
-	}
-
-	return p, nil
 }
 
 func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCode, detail string) error {
@@ -1000,7 +970,8 @@ func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCod
 		payment.StatusPDNG,
 		payment.StatusACCP,
 		payment.StatusACPD,
-		payment.StatusSCHD}, p.Status) {
+		payment.StatusSCHD,
+	}, p.Status) {
 		return errorutil.Format("%w: payment in status %s cannot be rejected", ErrRejectionNotAllowed, p.Status)
 	}
 
@@ -1013,38 +984,7 @@ func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCod
 		Code:   code,
 		Detail: detail,
 	}
-	if err := s.updateStatus(ctx, p, payment.StatusRJCT); err != nil {
-		return err
-	}
-
-	s.notifyStatusChange(ctx, p)
-	return nil
-}
-
-func (s Service) payments(ctx context.Context, orgID string, opts *Filter) ([]*Payment, error) {
-	if opts == nil {
-		opts = &Filter{}
-	}
-	query := s.db.WithContext(ctx).Where("org_id = ?", orgID)
-	if opts.ConsentID != "" {
-		query = query.Where("consent_id = ?", strings.TrimPrefix(opts.ConsentID, ConsentURNPrefix))
-	}
-	if opts.Statuses != nil {
-		query = query.Where("status IN ?", opts.Statuses)
-	}
-	if opts.From != nil {
-		query = query.Where("date >= ?", opts.From)
-	}
-	if opts.To != nil {
-		query = query.Where("date <= ?", opts.To)
-	}
-
-	var payments []*Payment
-	if err := query.Find(&payments).Error; err != nil {
-		return nil, fmt.Errorf("could not find payments: %w", err)
-	}
-
-	return payments, nil
+	return s.updateStatus(ctx, p, payment.StatusRJCT)
 }
 
 func (s Service) cancel(ctx context.Context, p *Payment, from payment.CancelledFrom, by string) error {
@@ -1066,12 +1006,7 @@ func (s Service) cancel(ctx context.Context, p *Payment, from payment.CancelledF
 		From:   from,
 		By:     by,
 	}
-	if err := s.updateStatus(ctx, p, payment.StatusCANC); err != nil {
-		return err
-	}
-
-	s.notifyStatusChange(ctx, p)
-	return nil
+	return s.updateStatus(ctx, p, payment.StatusCANC)
 }
 
 func (s Service) updateStatus(ctx context.Context, p *Payment, status payment.Status) error {
@@ -1089,9 +1024,13 @@ func (s Service) updateStatus(ctx context.Context, p *Payment, status payment.St
 		return fmt.Errorf("could not update payment status: %w", err)
 	}
 
-	return nil
-}
+	if slices.Contains([]payment.Status{
+		payment.StatusSCHD,
+		payment.StatusACPD,
+		payment.StatusRJCT,
+	}, status) {
+		s.webhookService.NotifyRecurringPayment(ctx, p.ClientID, p.ID.String(), p.Version)
+	}
 
-func (s Service) notifyStatusChange(ctx context.Context, p *Payment) {
-	s.webhookService.NotifyRecurringPayment(ctx, p.ClientID, p.ID.String(), p.Version)
+	return nil
 }

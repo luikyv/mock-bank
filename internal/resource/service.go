@@ -3,10 +3,8 @@ package resource
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/luikyv/mock-bank/internal/page"
-	"github.com/luikyv/mock-bank/internal/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -35,13 +33,6 @@ func (s Service) Resources(ctx context.Context, orgID string, filter Filter, pag
 	rs, err := page.Paginate[*Resource](query, pag)
 	if err != nil {
 		return page.Page[*Resource]{}, fmt.Errorf("could not find consented resources: %w", err)
-	}
-
-	for i := range rs.Records {
-		// Allow access to resource if it is pending authorization for more than 3 minutes.
-		if rs.Records[i].Status == StatusPendingAuthorization && timeutil.DateTimeNow().After(rs.Records[i].UpdatedAt.Add(3*time.Minute)) {
-			rs.Records[i].Status = StatusAvailable
-		}
 	}
 
 	return rs, nil
