@@ -19,7 +19,7 @@ setup-cs:
 	  echo "Cloning open finance conformance suite repository..."; \
 	  git clone https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance-suite; \
 	  cd conformance-suite && git checkout $(CS_VERSION); \
-	  make build-cs; \
+	  docker compose -f ./builder-compose.yml run builder; \
 	fi
 	
 	@if [ ! -d "conformance-suite/venv" ]; then \
