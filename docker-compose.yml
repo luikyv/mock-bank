@@ -7,6 +7,8 @@ services:
     environment:
       - ENV=LOCAL
       - AWS_REGION=us-east-1
+    ports:
+      - "80:80"
     depends_on:
       localstack:
         condition: service_healthy
