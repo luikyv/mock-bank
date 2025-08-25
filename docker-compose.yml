@@ -40,7 +40,7 @@ services:
       interval: 5s
       timeout: 10s
       retries: 10
-      start_period: 10s
+      start_period: 15s
     networks:
       default:
         aliases:
