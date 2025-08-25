@@ -31,6 +31,8 @@ jobs:
           if: steps.cache-cs.outputs.cache-hit != 'true'
           run: |
             make setup-cs
+        
+
 
         - name: Run Mock Bank With Conformance Suite
           run: |
@@ -49,8 +51,8 @@ jobs:
             }
 
             echo "Wait for mock bank to be ready"
-            timeout 120 bash -c '
-            while [ "$(curl -skf -o /dev/null -w ''%{http_code}'' https://localhost/.well-known/openid-configuration)" != "200" ]; do
+            timeout 60 bash -c '
+            while [ "$(curl -skf -o /dev/null -w ''%{http_code}'' http://localhost/.well-known/openid-configuration)" != "200" ]; do
               echo "Mock bank not ready, sleeping for 2 seconds"
               sleep 2
             done
