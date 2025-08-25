@@ -48,3 +48,9 @@ awslocal ssm put-parameter \
   --type "SecureString" \
   --value "$(cat /keys/server_transport.crt)" \
   --overwrite
+
+awslocal ssm put-parameter \
+  --name "/mockbank/ready" \
+  --type "SecureString" \
+  --value "true" \
+  --overwrite

@@ -38,11 +38,11 @@ setup-ui:
 	@cd mock-bank-ui && git pull
 
 run:
-	@docker compose up
+	@docker compose --profile ui up
 
 # Start MockBank along with the Open Finance Conformance Suite.
 run-with-cs:
-	@docker compose --profile conformance up
+	@docker compose --profile conformance --profile ui up
 
 # Generate certificates, private keys, and JWKS files for both the server and clients.
 keys:

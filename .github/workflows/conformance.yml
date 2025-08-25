@@ -32,8 +32,6 @@ jobs:
           run: |
             make setup-cs
         
-
-
         - name: Run Mock Bank With Conformance Suite
           run: |
             docker compose --profile conformance up -d

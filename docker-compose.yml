@@ -30,17 +30,10 @@ services:
       - ./testdata/setup-localstack.sh:/etc/localstack/init/ready.d/setup.sh:ro
       - ./testdata/keys/:/keys:ro
     healthcheck:
-      test:
-        [
-          "CMD",
-          "sh",
-          "-c",
-          "curl -f http://localhost:4566/_localstack/health || exit 1",
-        ]
+      test: bash -c 'awslocal ssm get-parameter --name /mockbank/ready >/dev/null 2>&1'
       interval: 5s
       timeout: 10s
-      retries: 10
-      start_period: 15s
+      retries: 15
     networks:
       default:
         aliases:
@@ -109,6 +102,8 @@ services:
           - keystore.local
 
   mockbank-ui:
+    profiles:
+      - ui
     image: node:20-alpine
     working_dir: /app
     volumes:
