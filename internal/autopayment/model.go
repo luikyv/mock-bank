@@ -221,15 +221,19 @@ type ConsentEdition struct {
 			MaximumVariableAmount *string `json:"maximumVariableAmount,omitempty"`
 		} `json:"automatic,omitempty"`
 	} `json:"recurringConfiguration,omitempty"`
-	LoggedUser     *consent.Document `json:"loggedUser,omitempty"`
-	BusinessEntity *consent.Document `json:"businessEntity,omitempty"`
+	LoggedUser *struct {
+		Document consent.Document `json:"document"`
+	} `json:"loggedUser,omitempty"`
+	BusinessEntity *struct {
+		Document consent.Document `json:"document"`
+	} `json:"businessEntity,omitempty"`
 }
 
 type ConsentRejection struct {
-	By     TerminatedBy         `json:"by"`
-	From   TerminatedFrom       `json:"from"`
-	Code   ConsentRejectionCode `json:"code"`
-	Detail string               `json:"detail"`
+	By     TerminatedBy           `json:"by"`
+	From   payment.TerminatedFrom `json:"from"`
+	Code   ConsentRejectionCode   `json:"code"`
+	Detail string                 `json:"detail"`
 }
 
 type ConsentRejectionCode string
@@ -247,10 +251,10 @@ const (
 )
 
 type ConsentRevocation struct {
-	By     TerminatedBy          `json:"by"`
-	From   TerminatedFrom        `json:"from"`
-	Code   ConsentRevocationCode `json:"code"`
-	Detail string                `json:"detail"`
+	By     TerminatedBy           `json:"by"`
+	From   payment.TerminatedFrom `json:"from"`
+	Code   ConsentRevocationCode  `json:"code"`
+	Detail string                 `json:"detail"`
 }
 
 type ConsentRevocationCode string
@@ -259,13 +263,6 @@ const (
 	ConsentRevocationNotProvided ConsentRevocationCode = "NAO_INFORMADO"
 	ConsentRevocationByUser      ConsentRevocationCode = "REVOGADO_USUARIO"
 	ConsentRevocationByCreditor  ConsentRevocationCode = "REVOGADO_RECEBEDOR"
-)
-
-type TerminatedFrom string
-
-const (
-	TerminatedFromInitiator TerminatedFrom = "INICIADORA"
-	TerminatedFromHolder    TerminatedFrom = "DETENTORA"
 )
 
 type TerminatedBy string

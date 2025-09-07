@@ -2,16 +2,28 @@ openapi: 3.0.0
 info:
   title: API Enrollments for Payment Initiation - Open Finance Brasil
   description: |
-    Família de API para permitir o pagamento sem redirecionamento via Open Finance Brasil.
+    Família de API para permitir o pagamento sem redirecionamento via Open Finance Brasil.  
     Permite tanto o gerenciamento dos dispositivos vinculados as contas quanto a autorização de consentimentos criados via fluxo sem redirecionamento.
-
+    
     ## Validação de origin nos endpoints FIDO
 
-    Durante o cadastro do cliente (DCR/DCM), o software statement assertion possui um atributo nomeado software_origin_uris.
-    Esse atributo armazena as origens permitidas para utilização do protocolo FIDO.
-    Nas chamadas que possuem o argumento clientDataJSON (fido-registration e authorise), o atributo origin deve ser extraído do clientDataJSON e deve ser realizada a verificação se a origin do mesmo está contida no software_origin_uris informado no momento do DCR/DCM.
-    Caso a instituição iniciadora altere ou inclua o valor do atributo software_origin_uris, será necessária realização de um novo processo de DCM com as detentoras
-  version: 2.1.0
+    Durante o cadastro do cliente (DCR/DCM), o software statement assertion possui um atributo nomeado software_origin_uris. 
+    Esse atributo armazena as origens permitidas para utilização do protocolo FIDO. 
+    Nas chamadas que possuem o argumento clientDataJSON (fido-registration e authorise), o atributo origin deve ser extraído do clientDataJSON e deve ser realizada a verificação se a origin do mesmo está contida no software_origin_uris informado no momento do DCR/DCM. 
+
+    Caso a instituição iniciadora altere ou inclua o valor do atributo software_origin_uris, será necessária realização de um novo processo de DCM com as detentoras.
+
+    ## Sobre os limites do dispositivo vinculado no Pix Automático
+
+    Existem alguns limites que estão envolvidos durante o processo de autorização de um consentimento e o envio dos pagamentos, seja do inicial avulso ou das recorrências, para Pix Automático. Os limites envolvidos e o tratamento esperado pela instituição detentora são:  
+    - Limite diário do vínculo: Deve ser considerado apenas durante o pagamento inicial avulso e não deve ser considerado para pagamentos que representem as recorrências de Pix Automático. 
+    - Limite por transação do vínculo: Deve ser considerado apenas durante o pagamento inicial avulso e não deve ser considerado para pagamentos que representem as recorrências de Pix Automático.   
+    
+    Considerando que a falha no pagamento inicial avulso não implica em rejeite síncrono do consentimento de Pix Automático, problemas de limite e/ou saldo não devem impedir a criação ou autorização do consentimento.   
+    O valor mínimo definido pelo recebedor no âmbito do Pix Automático também não é alvo de validação durante a autorização do consentimento através desta API.   
+    Por fim, os limites do pagamento das recorrências a ser considerado são os definidos no consentimento de Pix Automático.
+  
+  version: 2.2.0-rc.2
   license:
     name: Apache 2.0
     url: 'https://www.apache.org/licenses/LICENSE-2.0'
@@ -29,6 +41,8 @@ tags:
     description: Gerenciamento dos dispositivos vinculados as contas
   - name: Consentimento
     description: Autorização de consentimentos criados via fluxo sem redirecionamento.
+  - name: Pix Automático
+    description: Autorização de consentimentos de Pix Automático criados via fluxo sem redirecionamento.
 paths:
   /enrollments:
     post:
@@ -37,7 +51,7 @@ paths:
       summary: Criar vínculo de conta.
       operationId: postEnrollments
       description: |
-        Método para criar um novo vínculo de conta. Retorna um enrollment em status AWAITING_RISK_SIGNALS.
+        Método para criar um novo vínculo de conta. Retorna um enrollment em status AWAITING_RISK_SIGNALS.  
       parameters:
         - $ref: '#/components/parameters/Authorization'
         - $ref: '#/components/parameters/xFapiAuthDate'
@@ -135,11 +149,11 @@ paths:
         Método para revogar ou rejeitar um vínculo de conta. Após a execução com sucesso deste método irreversível, o vínculo de conta
         não poderá mais ser utilizado para autenticação nem autorização de iniciação de pagamentos.
         Os conceitos de revogação e rejeição estão associados à máquina de estados do vínculo de conta\:
-
+        
         • Revogação: Cancelamento de um vínculo de conta no status "AUTHORISED";
-
+        
         • Rejeição: Cancelamento do vínculo de conta nos status "AWATING_RISK_SIGNALS", "AWATING_ENROLLMENT" e "AWAITING_ACCOUNT_HOLDER_VALIDATION"
-
+        
         Cabe ao cliente desta API distinguir entre os dois cenários para determinar o motivo adequado.
       parameters:
         - $ref: '#/components/parameters/enrollmentId'
@@ -256,8 +270,7 @@ paths:
       summary: Obter parâmetros para criação de credenciais FIDO2.
       operationId: enrollmentCreateFidoRegistrationOptions
       description: |
-        Método para obter os parâmetros para criação de uma nova credencial FIDO2. Um novo challenge deve ser criado a cada chamada.
-        Os parâmetros da resposta devem ser compatíveis com a definição [W3C](https://www.w3.org/TR/webauthn-2/#dictionary-makecredentialoptions)
+        Método para obter os parâmetros para criação de uma nova credencial FIDO2. Um novo challenge deve ser criado **para cada enrollment, limitando a um challenge por enrollmentId**. Os parâmetros da resposta devem ser compatíveis com a definição [W3C](https://www.w3.org/TR/webauthn-2/#dictionary-makecredentialoptions)
       parameters:
         - $ref: '#/components/parameters/enrollmentId'
         - $ref: '#/components/parameters/Authorization'
@@ -314,7 +327,7 @@ paths:
       summary: Associação da credencial FIDO2 ao vínculo de conta.
       operationId: enrollmentRegisterFidoCredential
       description: |
-        O vínculo de conta deve estar no status "AWAITING_ENROLLMENT".
+        O vínculo de conta deve estar no status "AWAITING_ENROLLMENT". 
         Após o registro com sucesso, o vínculo de conta deve transitar ao status "AUTHORISED".
         A falha de verificação da credencial FIDO2 deve causar a rejeição do vínculo de conta por parte da detentora, uma vez que não é possível reusar um mesmo "challenge" para mais de um registro.
       parameters:
@@ -397,26 +410,47 @@ paths:
                   type: object
                   description: |
                     Objeto que contém as informações sobre a Relying Party e a plataforma sobre a qual o usuário está utilizando o serviço da iniciadora para utilização de FIDO2.
-                  required:
-                    - rp
-                    - platform
-                    - consentId
-                  properties:
-                    rp:
-                      type: string
-                      description: Identificador único da Relying Party, que corresponde ao valor do CN do certificado de transporte da iniciadora.
-                    platform:
-                      type: string
-                      description: |
-                        Indica a plataforma em que o usuário criará a nova credencial FIDO2.
-                        Este campo permite que o servidor FIDO inclua extensões de acordo com a plataforma utilizada.
-                      enum:
-                        - ANDROID
-                        - BROWSER
-                        - CROSS_PLATFORM
-                        - IOS
-                    consentId:
-                      $ref: '#/components/schemas/consentId'
+                  oneOf:
+                    - required:
+                      - rp
+                      - platform
+                      - consentId
+                      properties:
+                        rp:
+                          type: string
+                          description: Identificador único da Relying Party, que corresponde ao valor do CN do certificado de transporte da iniciadora.
+                        platform:
+                          type: string
+                          description: |
+                            Indica a plataforma em que o usuário criará a nova credencial FIDO2. 
+                            Este campo permite que o servidor FIDO inclua extensões de acordo com a plataforma utilizada.
+                          enum:
+                            - ANDROID
+                            - BROWSER
+                            - CROSS_PLATFORM
+                            - IOS
+                        consentId:
+                          $ref: '#/components/schemas/consentId'
+                    - required:
+                      - rp
+                      - platform
+                      - recurringConsentId
+                      properties:
+                        rp:
+                          type: string
+                          description: Identificador único da Relying Party, que corresponde ao valor do CN do certificado de transporte da iniciadora.
+                        platform:
+                          type: string
+                          description: |
+                            Indica a plataforma em que o usuário criará a nova credencial FIDO2. 
+                            Este campo permite que o servidor FIDO inclua extensões de acordo com a plataforma utilizada.
+                          enum:
+                            - ANDROID
+                            - BROWSER
+                            - CROSS_PLATFORM
+                            - IOS
+                        recurringConsentId:
+                          $ref: '#/components/schemas/recurringConsentIdSignOptions'
       responses:
         '201':
           $ref: '#/components/responses/201EnrollmentFidoSignOptions'
@@ -456,7 +490,9 @@ paths:
       summary: Envio de sinais de risco para iniciação do vínculo de dispositivo
       operationId: riskSignals
       description: |
-        Envio de sinais de risco para iniciação do vínculo de dispositivo, o status do enrollment deve estar em `AWAITING_RISK_SIGNALS`. Após recebimento com sucesso dos sinais, o status do enrollment deve transitar para `AWAITING_ACCOUNT_HOLDER_VALIDATION`.
+        Envio de sinais de risco para iniciação do vínculo de dispositivo, o status do enrollment deve estar em ```AWAITING_RISK_SIGNALS```. Após recebimento com sucesso dos sinais, o status do enrollment deve transitar para ```AWAITING_ACCOUNT_HOLDER_VALIDATION```.  
+        Em casos de falha nesse método (HTTP Status 422), o vínculo deve transitar para ```REJECTED``` sincronamente.  
+        Em caso de sucesso no recebimento, a instituição detentora, a seu critério e após análise das informações fornecidas, pode rejeitar esse vínculo por validações internas de segurança.
       parameters:
         - $ref: '#/components/parameters/enrollmentId'
         - $ref: '#/components/parameters/Authorization'
@@ -511,11 +547,11 @@ paths:
       summary: Autorização de um consentimento de pagamentos na jornada sem redirecionamento
       operationId: authorizeConsent
       description: |
-        Autorização de um consentimento de pagamentos em status `AWAITING_AUTHORISATION` a partir do access_token emitido pela jornada sem redirecionamento e envio de sinais de risco.
-        Para pagamentos de alçadas únicas, o consentimento de pagamento deve transitar ao status `AUTHORISED` na execução com sucesso desse método.
-        Para pagamentos com múltiplas alçadas aprovadoras, o consentimento de pagamento ficará em `PARTIALLY_ACCEPTED` até que todos tenham autorizado.
+        Autorização de um consentimento de pagamentos em status `AWAITING_AUTHORISATION` a partir do access_token emitido pela jornada sem redirecionamento e envio de sinais de risco. 
+        Para pagamentos de alçadas únicas, o consentimento de pagamento deve transitar ao status `AUTHORISED` na execução com sucesso desse método. 
+        Para pagamentos com múltiplas alçadas aprovadoras, o consentimento de pagamento ficará em `PARTIALLY_ACCEPTED` até que todos tenham autorizado. 
         Em caso de falha de negócio (HTTP Status Code 422), o consentimento de pagamento precisa transitar para o status `REJECTED` e seguir os motivos de rejeição presentes na API de pagamentos.
-        Caso a detentora identifique que a conta de débito informada pelo iniciador na criação do consentimento diverge da conta de débito vinculada ao dispositivo, o detentor deve retornar o erro HTTP 422 com código `CONTA_DEBITO_DIVERGENTE_CONSENTIMENTO_VINCULO` e rejeitar o consentimento com o motivo `CONTA_NAO_PERMITE_PAGAMENTO`.
+        Caso a detentora identifique que a conta de débito informada pelo iniciador na criação do consentimento diverge da conta de débito vinculada ao dispositivo, o detentor deve retornar o erro HTTP 422 com código `CONTA_DEBITO_DIVERGENTE_CONSENTIMENTO_VINCULO` e rejeitar o consentimento com o motivo `CONTA_NAO_PERMITE_PAGAMENTO`. 
         Se o iniciador, durante a criação do consentimento, omitir a conta de débito, o detentor deve considerar a conta de débito associada ao vínculo para o preenchimento do objeto `/data/debtorAccount`, presente no consentimento, após a sua autorização.
         Os limites relacionados ao vínculo devem ser validados apenas em momento de liquidação do pagamento, independente dele ser agendado ou imediato.
       parameters:
@@ -529,7 +565,7 @@ paths:
         - $ref: '#/components/parameters/x-bcb-nfc'
       requestBody:
         required: true
-        description: Payload para criação de vínculo de conta.
+        description: Payload para autorização de um consentimento através do dispositivo vinculado.
         content:
           application/jwt:
             schema:
@@ -569,6 +605,66 @@ paths:
           - 'enrollment:enrollmentId'
           - payments
           - nrp-consents
+  /recurring-consents/{recurringConsentId}/authorise:
+    post:
+      tags:
+        - Pix Automático
+      summary: Autorização de um consentimento de Pix Automático na jornada sem redirecionamento
+      operationId: authorizeRecurringConsent
+      description: |
+        Autorização de um consentimento de Pix Automático em status AWAITING_AUTHORISATION a partir do access_token emitido pela jornada sem redirecionamento e envio de sinais de risco.
+        Consentimentos de alçadas únicas devem transitar para o status AUTHORISED na execução com sucesso desse método. Para consentimentos com múltiplas alçadas aprovadoras, o consentimento deverá permanecer em PARTIALLY_ACCEPTED até que todos os aprovadores tenham autorizado. Em caso de falha de negócio (HTTP Status Code 422), o consentimento de pagamento deve transitar para o status REJECTED e seguir os motivos de rejeição presentes na API de pagamentos Automáticos.  
+        Caso a detentora identifique que a conta de débito informada pelo iniciador na criação do consentimento diverge da conta de débito vinculada ao dispositivo, o detentor deve retornar neste método o erro HTTP 422 com código CONTA_DEBITO_DIVERGENTE_CONSENTIMENTO_VINCULO e rejeitar o consentimento com o motivo CONTA_NAO_PERMITE_PAGAMENTO.  
+        Se o iniciador, durante a criação do consentimento, omitir a conta de débito, o detentor deve considerar a conta de débito associada ao vínculo autorizado para o preenchimento do objeto /data/debtorAccount, presente no consentimento.  
+        Os limites relacionados ao vínculo não devem ser validados durante o processo de autorização deste consentimento nem durante o ciclo de vida.
+      parameters:
+        - $ref: '#/components/parameters/recurringConsentId'
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/xFapiAuthDate'
+        - $ref: '#/components/parameters/xFapiCustomerIpAddress'
+        - $ref: '#/components/parameters/xFapiInteractionId'
+        - $ref: '#/components/parameters/xCustomerUserAgent'
+        - $ref: '#/components/parameters/XIdempotencyKey'
+      requestBody:
+        required: true
+        description: Payload para autorização de consentimento a partir de um vínculo de conta.
+        content:
+          application/jwt:
+            schema:
+              $ref: '#/components/schemas/ConsentAuthorization'
+      responses:
+        '204':
+          $ref: '#/components/responses/204PaymentsConsentsAuthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '406':
+          $ref: '#/components/responses/NotAcceptable'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntityRecurringConsentsAuthorization'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '529':
+          $ref: '#/components/responses/SiteIsOverloaded'
+        default:
+          description: Erro inesperado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponseError'
+      security:
+        - OAuth2AuthorizationCode:
+          - openid
+          - 'enrollment:enrollmentId'
+          - recurring-payments
+          - nrp-consents
 components:
   headers:
     xFapiInteractionId:
@@ -579,6 +675,11 @@ components:
     xFapiInteractionIdBadRequest:
         description: |
           Um UUID [RFC4122](https://tools.ietf.org/html/rfc4122) usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela iniciadora (client) e o seu valor deve ser "espelhado" pela detentora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a detentora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP status code 400. A iniciadora deve acatar o valor recebido da detentora.
+        schema:
+          $ref: '#/components/schemas/XFapiInteractionId'
+    xFapiInteractionServerError:
+        description: |
+          Um UUID RFC4122 usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela iniciadora (client). Seu valor deve obrigatoriamente ser replicado pela detentora (server) no cabeçalho de resposta, exceto em casos de falhas estruturais que impeçam a replicação. Caso não seja possível ser replicado, não deve ser enviado.
         schema:
           $ref: '#/components/schemas/XFapiInteractionId'
   schemas:
@@ -633,7 +734,7 @@ components:
                 example: 'Permissões inválidas'
                 description: |
                   Descrição específica do erro de acordo com o código reportado:
-                  - PERMISSOES_INVALIDAS: As permissões associadas ao vínculo de conta não contêm "PAYMENTS_INITIATE" ou contêm valores não suportados para esta operação.
+                  - PERMISSOES_INVALIDAS: As permissões associadas ao vínculo de conta não contêm "PAYMENTS_INITIATE" ou contêm valores não suportados para esta operação.  
                   - CONTA_INVALIDA: A conta informada inexiste ou não é compatível com o fluxo de não-redirecionamento.
                   - PARAMETRO_NAO_INFORMADO: Parâmetro [nome_campo] obrigatório não informado.
                   - PARAMETRO_INVALIDO: Parâmetro [nome_campo] não obedece as regras de formatação esperadas.
@@ -734,6 +835,7 @@ components:
                   - PARAMETRO_NAO_INFORMADO
                   - PARAMETRO_INVALIDO
                   - ERRO_IDEMPOTENCIA
+                  - MAXIMO_CHALLENGES_ATINGIDO
                 example: STATUS_VINCULO_INVALIDO
                 description: |
                   Códigos de erros previstos:
@@ -742,6 +844,7 @@ components:
                   - PARAMETRO_NAO_INFORMADO: Parâmetro não informado.
                   - PARAMETRO_INVALIDO: Parâmetro inválido.
                   - ERRO_IDEMPOTENCIA: Erro idempotência.
+                  - MAXIMO_CHALLENGES_ATINGIDO: Parâmetros de assinatura FIDO já foram gerados para o enrollmentId especificado.
               title:
                 type: string
                 maxLength: 255
@@ -754,6 +857,7 @@ components:
                   - PARAMETRO_NAO_INFORMADO: Parâmetro não informado.
                   - PARAMETRO_INVALIDO: Parâmetro inválido.
                   - ERRO_IDEMPOTENCIA: Erro idempotência.
+                  - MAXIMO_CHALLENGES_ATINGIDO: Parâmetros de assinatura FIDO já foram gerados para o enrollmentId especificado.
               detail:
                 type: string
                 maxLength: 2048
@@ -766,6 +870,7 @@ components:
                   - PARAMETRO_NAO_INFORMADO: Parâmetro [nome_campo] obrigatório não informado.
                   - PARAMETRO_INVALIDO: Parâmetro [nome_campo] não obedece as regras de formatação esperadas.
                   - ERRO_IDEMPOTENCIA: Conteúdo da mensagem (claim data) diverge do conteúdo associado a esta chave de idempotência (x-idempotency-key).
+                  - MAXIMO_CHALLENGES_ATINGIDO: Parâmetros de assinatura FIDO já foram gerados para o enrollmentId especificado.
         meta:
           $ref: '#/components/schemas/Meta'
     422ResponseErrorRiskSignals:
@@ -854,15 +959,17 @@ components:
                   - PARAMETRO_NAO_INFORMADO
                   - PARAMETRO_INVALIDO
                   - ERRO_IDEMPOTENCIA
+                  - PERMISSAO_INVALIDA_VINCULO_CONSENTIMENTO 
                 example: STATUS_VINCULO_INVALIDO
                 description: |
                   Códigos de erros previstos:
                   - RP_INVALIDA: O identificador da Relying Party informado não pode ser verificado.
-                  - STATUS_VINCULO_INVALIDO: O status do vínculo de conta é tal que não permite assinatura.
+                  - STATUS_VINCULO_INVALIDO: O status do vínculo de conta é tal que não permite assinatura. 
                   - STATUS_CONSENTIMENTO_INVALIDO: O status do consentimento não permite autorização.
                   - PARAMETRO_NAO_INFORMADO: Parâmetro não informado.
                   - PARAMETRO_INVALIDO: Parâmetro inválido.
                   - ERRO_IDEMPOTENCIA: Erro idempotência.
+                  - PERMISSAO_INVALIDA_VINCULO_CONSENTIMENTO: A permissão definida no vínculo não é válida para o tipo de consentimento informado
               title:
                 type: string
                 maxLength: 255
@@ -876,6 +983,7 @@ components:
                   - PARAMETRO_NAO_INFORMADO: Parâmetro não informado.
                   - PARAMETRO_INVALIDO: Parâmetro inválido.
                   - ERRO_IDEMPOTENCIA: Erro idempotência.
+                  - PERMISSAO_INVALIDA_VINCULO_CONSENTIMENTO: A permissão definida no vínculo não é válida para o tipo de consentimento informado
               detail:
                 type: string
                 maxLength: 2048
@@ -884,11 +992,12 @@ components:
                 description: |
                   Descrição específica do erro de acordo com o código reportado:
                   - RP_INVALIDA: O identificador da Relying Party informado não pode ser verificado.
-                  - STATUS_VINCULO_INVALIDO: O status do vínculo de conta é tal que não permite assinatura.
+                  - STATUS_VINCULO_INVALIDO: O status do vínculo de conta é tal que não permite assinatura. 
                   - STATUS_CONSENTIMENTO_INVALIDO: O status do consentimento não permite autorização.
                   - PARAMETRO_NAO_INFORMADO: Parâmetro [nome_campo] obrigatório não informado.
                   - PARAMETRO_INVALIDO: Parâmetro [nome_campo] não obedece as regras de formatação esperadas.
                   - ERRO_IDEMPOTENCIA: Conteúdo da mensagem (claim data) diverge do conteúdo associado a esta chave de idempotência (x-idempotency-key).
+                  - PERMISSAO_INVALIDA_VINCULO_CONSENTIMENTO: A permissão definida no vínculo não é válida para o tipo de consentimento informado.
         meta:
           $ref: '#/components/schemas/Meta'
     422ResponseErrorFidoRegistration:
@@ -923,8 +1032,8 @@ components:
                 description: |
                   Códigos de erros previstos:
                   - STATUS_VINCULO_INVALIDO: O status do vínculo de conta é tal que não permite o registro de nova credencial.
-                  - ORIGEM_FIDO_INVALIDA: O valor contido no campo [response.clientDataJSON.origin](https://www.w3.org/TR/webauthn-2/#dom-authenticatorresponse-clientdatajson) não pode ser verificado.
-                  - RP_INVALIDA: O valor contido no campo [data.response.attestationObject.authData.rpIdHash](https://www.w3.org/TR/webauthn-2/#sctn-authenticator-data) não pode ser verificado.
+                  - ORIGEM_FIDO_INVALIDA: O valor contido no campo [response.clientDataJSON.origin](https://www.w3.org/TR/webauthn-2/#dom-authenticatorresponse-clientdatajson) não pode ser verificado. 
+                  - RP_INVALIDA: O valor contido no campo [data.response.attestationObject.authData.rpIdHash](https://www.w3.org/TR/webauthn-2/#sctn-authenticator-data) não pode ser verificado. 
                   - CHALLENGE_INVALIDO: O campo [response.clientDataJSON.challenge](https://www.w3.org/TR/webauthn-2/#dom-authenticatorresponse-clientdatajson) possui valor codificado diferente do valor gerado pelo servidor.
                   - PUBLIC_KEY_INVALIDA: A chave pública enviada é incompatível com as definições do servidor FIDO2.
                   - EXTENSION_INVALIDA: As extensões extraídas são incompatíveis com as diretrizes de segurança do servidor FIDO2.
@@ -939,7 +1048,7 @@ components:
                 description: |
                   Título específico do erro reportado, de acordo com o código enviado:
                   - STATUS_VINCULO_INVALIDO: Status inválido do vínculo de conta.
-                  - ORIGEM_FIDO_INVALIDA: "Origin" não pode ser verificada.
+                  - ORIGEM_FIDO_INVALIDA: "Origin" não pode ser verificada. 
                   - RP_INVALIDA: "RpIdHash" não pode ser verificado.
                   - CHALLENGE_INVALIDO: Challenge inválido.
                   - PUBLIC_KEY_INVALIDA: Chave pública inválida.
@@ -992,13 +1101,90 @@ components:
                   - PARAMETRO_NAO_INFORMADO
                   - PARAMETRO_INVALIDO
                   - ERRO_IDEMPOTENCIA
+                  - ORIGEM_FIDO_INVALIDA
                 example: STATUS_VINCULO_INVALIDO
                 description: |
                   Códigos de erros previstos:
 
                   - STATUS_VINCULO_INVALIDO: O vínculo de conta não possui status AUTHORISED.
                   - STATUS_CONSENTIMENTO_INVALIDO: O consentimento de pagamentos não possui status AWAITING_AUTHORISATION.
+                  - RISCO: Validação síncrona dos sinais de risco impediram a ativação do consentimento.                  
+                  - FALTAM_SINAIS_OBRIGATORIOS_DA_PLATAFORMA: Os sinais obrigatórios para a plataforma do usuário não foram enviados em sua totalidade.
+                  - CONTA_DEBITO_DIVERGENTE_CONSENTIMENTO_VINCULO: A conta de débito informada pelo iniciador não condiz com a conta de débito vinculada ao dispositivo.
+                  - PARAMETRO_NAO_INFORMADO: Parâmetro não informado.
+                  - PARAMETRO_INVALIDO: Parâmetro inválido.
+                  - ERRO_IDEMPOTENCIA: Erro idempotência.
+                  - ORIGEM_FIDO_INVALIDA: O valor contido no campo ```fidoAssertion.response.clientDataJSON.origin``` não pode ser verificado.
+              title:
+                type: string
+                maxLength: 255
+                pattern: '[\w\W\s]*'
+                example: Permissões inválidas
+                description: |
+                  Título específico do erro reportado, de acordo com o código enviado:
+
+                  - STATUS_VINCULO_INVALIDO: Status do vínculo de conta inválido.
+                  - STATUS_CONSENTIMENTO_INVALIDO: Status do consentimento inválido.
                   - RISCO: Validação síncrona dos sinais de risco impediram a ativação do consentimento.
+                  - FALTAM_SINAIS_OBRIGATORIOS_DA_PLATAFORMA: Falta de sinais obrigatórios para a plataforma do usuário.
+                  - CONTA_DEBITO_DIVERGENTE_CONSENTIMENTO_VINCULO: A conta de débito informada pelo iniciador não condiz com a conta de débito vinculada ao dispositivo.
+                  - PARAMETRO_NAO_INFORMADO: Parâmetro não informado.
+                  - PARAMETRO_INVALIDO: Parâmetro inválido.
+                  - ERRO_IDEMPOTENCIA: Erro idempotência.
+                  - ORIGEM_FIDO_INVALIDA: "Origin" não pode ser verificada.
+              detail:
+                type: string
+                maxLength: 2048
+                pattern: '[\w\W\s]*'
+                example: 'Permissões inválidas'
+                description: |
+                  Descrição específica do erro de acordo com o código reportado:
+
+                  - STATUS_VINCULO_INVALIDO: O vínculo de conta não possui status AUTHORISED.
+                  - STATUS_CONSENTIMENTO_INVALIDO: O consentimento de pagamentos não possui status AWAITING_AUTHORISATION.
+                  - RISCO: Validação síncrona dos sinais de risco impediram a ativação do consentimento.
+                  - FALTAM_SINAIS_OBRIGATORIOS_DA_PLATAFORMA: Os sinais obrigatórios para a plataforma do usuário não foram enviados em sua totalidade.
+                  - CONTA_DEBITO_DIVERGENTE_CONSENTIMENTO_VINCULO: A conta de débito informada pelo iniciador não condiz com a conta de débito vinculada ao dispositivo.
+                  - PARAMETRO_NAO_INFORMADO: Parâmetro [nome_campo] obrigatório não informado.
+                  - PARAMETRO_INVALIDO: Parâmetro [nome_campo] não obedece as regras de formatação esperadas.
+                  - ERRO_IDEMPOTENCIA: Conteúdo da mensagem (claim data) diverge do conteúdo associado a esta chave de idempotência (x-idempotency-key).
+                  - ORIGEM_FIDO_INVALIDA: O valor contido no campo ```fidoAssertion.response.clientDataJSON.origin``` não pode ser verificado.
+        meta:
+          $ref: '#/components/schemas/Meta'
+    422ResponseRecurringConsentsAuthorization:
+      type: object
+      required:
+        - errors
+        - meta
+      properties:
+        errors:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - code
+              - title
+              - detail
+            properties:
+              code:
+                type: string
+                enum:
+                  - STATUS_VINCULO_INVALIDO
+                  - STATUS_CONSENTIMENTO_INVALIDO
+                  - RISCO
+                  - FALTAM_SINAIS_OBRIGATORIOS_DA_PLATAFORMA
+                  - CONTA_DEBITO_DIVERGENTE_CONSENTIMENTO_VINCULO
+                  - PARAMETRO_NAO_INFORMADO
+                  - PARAMETRO_INVALIDO
+                  - ERRO_IDEMPOTENCIA
+                example: STATUS_VINCULO_INVALIDO
+                description: |
+                  Códigos de erros previstos:
+
+                  - STATUS_VINCULO_INVALIDO: O vínculo de conta não possui status AUTHORISED.
+                  - STATUS_CONSENTIMENTO_INVALIDO: O consentimento de pagamentos não possui status AWAITING_AUTHORISATION.
+                  - RISCO: Validação síncrona dos sinais de risco impediram a ativação do consentimento.                  
                   - FALTAM_SINAIS_OBRIGATORIOS_DA_PLATAFORMA: Os sinais obrigatórios para a plataforma do usuário não foram enviados em sua totalidade.
                   - CONTA_DEBITO_DIVERGENTE_CONSENTIMENTO_VINCULO: A conta de débito informada pelo iniciador não condiz com a conta de débito vinculada ao dispositivo.
                   - PARAMETRO_NAO_INFORMADO: Parâmetro não informado.
@@ -1055,13 +1241,34 @@ components:
               maxLength: 14
               description: Número do documento de identificação oficial do titular pessoa jurídica.
               example: '11111111111111'
-              pattern: '^\d{14}$'
+              pattern: '^[0-9A-Z]{12}[0-9]{2}$'
             rel:
               type: string
               maxLength: 4
               description: Tipo do documento de identificação oficial do titular pessoa jurídica.
               example: CNPJ
               pattern: '^[A-Z]{4}$'
+    EnrollmentJourney:
+      type: object
+      required:
+        - isLinked
+        - linkId
+      description: | 
+        Informações adicionais sobre o contexto de Jornada Otimizada.  
+        [RESTRIÇÃO] Objeto de envio obrigatório quando o usuário manifestar consentimento para compartilhamento de saldo através da Jornada Otimizada, independente do status do consentimento de dados”
+      properties:
+        isLinked:
+          type: boolean
+          example: false
+          description: |
+            Campo para identificação de consentimento iniciado em Jornada Otimizada.
+        linkId:
+          type: string
+          pattern: ^urn:[a-zA-Z0-9][a-zA-Z0-9-]{0,31}:[a-zA-Z0-9()+,\-.:=@;$_!*'%\/?#]+$
+          maxLength: 256
+          example: urn:bancoex:C1DD331237
+          description: |
+            Identificador do consentimento de dados ao qual este consentimento está vinculado.
     CreateEnrollment:
       type: object
       required:
@@ -1085,6 +1292,8 @@ components:
               $ref: '#/components/schemas/BusinessEntity'
             debtorAccount:
               $ref: '#/components/schemas/DebtorAccount'
+            journey:
+              $ref: '#/components/schemas/EnrollmentJourney'
             enrollmentName:
               description: |
                 [Restrição] Deve ser preenchido sempre que o usuário pagador inserir alguma informação no nome do vínculo/dispositivo tanto no iniciador como no detentor de conta
@@ -1112,18 +1321,15 @@ components:
               type: string
               description: |
                 ID único do dispositivo gerado pela plataforma.
-
-                Utiliza-se a propriedade do sistema que identifica a combinação de usuário logado, chave de assinatura do aplicativo e dispositivo.
-
+                A geração deve utilizar-se da propriedade do sistema que identifica a combinação de usuário logado, chave de assinatura do aplicativo e dispositivo ou de algoritmos heurísticos capazes de criar um identificador único para o dispositivo.
                 [Android] Informação obtida através do [link](https://developer.android.com/reference/android/provider/Settings.Secure#ANDROID_ID).
-
                 [iOS] Informação obtida através do [link](https://developer.apple.com/documentation/uikit/uidevice/1620059-identifierforvendor/).
               example: 00aa11bb22cc33dd
             isRootedDevice:
               type: boolean
               description: |
                 Indica se o dispositivo atualmente está com permissão de “root”.
-
+ 
                 [Restrição] Campos de envio obrigatório quando o sistema operacional utilizado pelo usuário durante a vinculação de conta ou realização do pagamento for Android ou iOS.
               example: false
             screenBrightness:
@@ -1325,11 +1531,8 @@ components:
                   type: string
                   description: |
                     ID único do dispositivo gerado pela plataforma.
-
-                    Utiliza-se a propriedade do sistema que identifica a combinação de usuário logado, chave de assinatura do aplicativo e dispositivo.
-
+                    A geração deve utilizar-se da propriedade do sistema que identifica a combinação de usuário logado, chave de assinatura do aplicativo e dispositivo ou de algoritmos heurísticos capazes de criar um identificador único para o dispositivo.
                     [Android] Informação obtida através do [link](https://developer.android.com/reference/android/provider/Settings.Secure#ANDROID_ID).
-
                     [iOS] Informação obtida através do [link](https://developer.apple.com/documentation/uikit/uidevice/1620059-identifierforvendor/).
                 isRootedDevice:
                   type: boolean
@@ -1529,7 +1732,7 @@ components:
                       type: string
                       format: bytes
                       description: |
-                        Nome de usuário que foi enviado durante a criação da credencial. Deve ser enviado no formato base64url para a detentora de conta.
+                        Nome de usuário que foi enviado durante a criação da credencial. Deve ser enviado no formato base64url para a detentora de conta. 
                         Caso o autenticador FIDO2 não retorne este campo, a iniciadora deve enviar uma string vazia à detentora de conta.
                 clientExtensionResults:
                   type: object
@@ -1538,7 +1741,7 @@ components:
     DebtorAccount:
       type: object
       description: |
-        Objeto que contém a identificação da conta de origem do pagador.
+        Objeto que contém a identificação da conta de origem do pagador.  
         As informações quanto à conta de origem do pagador poderão ser trazidas no vínculo para a detentora, caso a iniciadora tenha coletado essas informações do cliente. Do contrário, será coletada na detentora e trazida para a iniciadora como resposta à criação do vínculo.
       required:
         - ispb
@@ -1549,7 +1752,7 @@ components:
           type: string
           minLength: 8
           maxLength: 8
-          pattern: '^[0-9]{8}$'
+          pattern: '^[0-9A-Z]{8}$'
           example: '12345678'
           description: |
             Deve ser preenchido com o ISPB (Identificador do Sistema de Pagamentos Brasileiros) do participante do SPI (Sistema de pagamentos instantâneos) somente com números.
@@ -1560,9 +1763,9 @@ components:
           pattern: '^[0-9]{1,4}$'
           example: '1774'
           description: |
-            Código da Agência emissora da conta sem dígito.
-            (Agência é a dependência destinada ao atendimento aos clientes, ao público em geral e aos associados de cooperativas de crédito,
-            no exercício de atividades da instituição, não podendo ser móvel ou transitória).
+            Código da Agência emissora da conta sem dígito.  
+            (Agência é a dependência destinada ao atendimento aos clientes, ao público em geral e aos associados de cooperativas de crédito,  
+            no exercício de atividades da instituição, não podendo ser móvel ou transitória).  
             [Restrição] Preenchimento obrigatório para os seguintes tipos de conta: CACC (CONTA_DEPOSITO_A_VISTA) e SVGS (CONTA_POUPANCA).
         number:
           type: string
@@ -1571,7 +1774,7 @@ components:
           pattern: '^[0-9]{1,20}$'
           example: '1234567890'
           description: |
-            Deve ser preenchido com o número da conta transacional do usuário pagador, com dígito verificador (se este existir),
+            Deve ser preenchido com o número da conta transacional do usuário pagador, com dígito verificador (se este existir),  
             se houver valor alfanumérico, este deve ser convertido para 0.
         accountType:
           $ref: '#/components/schemas/EnumAccountPaymentsType'
@@ -1590,23 +1793,38 @@ components:
         - o identificador associado ao namespace da instituição detentora de conta (bancoex)
         - o identificador específico dentro do namespace (C1DD33123).
         Informações mais detalhadas sobre a construção de namespaces devem ser consultadas na [RFC8141](https://tools.ietf.org/html/rfc8141).
+    recurringConsentIdSignOptions:
+      type: string
+      pattern: '^urn:[a-zA-Z0-9][a-zA-Z0-9\-]{0,31}:[a-zA-Z0-9()+,\-.:=@;$_!*''%\/?#]+$'
+      maxLength: 256
+      description: |
+        Identificador único do consentimento de longa duração criado para a iniciação de pagamento solicitada. Deverá ser um URN - Uniform Resource Name. 
+        Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource 
+        Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN 
+        seja um identificador de recurso persistente e independente da localização. 
+        Considerando a string urn:bancoex:C1DD33123 como exemplo para `recurringConsentId` temos:
+        - o namespace(urn)
+        - o identificador associado ao namespace da instituição transmissora (bancoex)
+        - o identificador específico dentro do namespace (C1DD33123).  
+        Informações mais detalhadas sobre a construção de namespaces devem ser consultadas na [RFC8141](https://tools.ietf.org/html/rfc8141).
     consentId:
       type: string
       maxLength: 256
       pattern: '^urn:[a-zA-Z0-9][a-zA-Z0-9\-]{0,31}:[a-zA-Z0-9()+,\-.:=@;$_!*''%\/?#]+$'
       description: |
-        O consentId é o identificador único do consentimento e deverá ser um URN - Uniform Resource Name.
-        Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource
-        Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN
-        seja um identificador de recurso persistente e independente da localização.
+        O consentId é o identificador único do consentimento e deverá ser um URN - Uniform Resource Name.  
+        Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource 
+        Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN 
+        seja um identificador de recurso persistente e independente da localização.  
         Considerando a string urn:bancoex:C1DD33123 como exemplo para consentId temos:
         - o namespace(urn)
-        - o identificador associado ao namespace da instituição detentora de conta (bancoex)
-        - o identificador específico dentro do namespace (C1DD33123).
+        - o identificador associado ao namespace da instituição detentora de conta (bancoex) 
+        - o identificador específico dentro do namespace (C1DD33123).  
         Informações mais detalhadas sobre a construção de namespaces devem ser consultadas na [RFC8141](https://tools.ietf.org/html/rfc8141).
     EnrollmentRejectionReason:
       type: string
       enum:
+      - REJEITADO_TITULARIDADE_DIVERGENTE
       - REJEITADO_TEMPO_EXPIRADO_RISK_SIGNALS
       - REJEITADO_TEMPO_EXPIRADO_ACCOUNT_HOLDER_VALIDATION
       - REJEITADO_TEMPO_EXPIRADO_ENROLLMENT
@@ -1621,26 +1839,28 @@ components:
       description: |
         Indica o motivo do cancelamento do vínculo de conta. Valores possíveis:
 
+        • REJEITADO_TITULARIDADE_DIVERGENTE: A titularidade do usuário logado na detentora é incompatível com a informada na criação do enrollment
+
         • REJEITADO_TEMPO_EXPIRADO_RISK_SIGNALS: Expiração automática devido a timeout no status "AWAITING_RISK_SIGNALS". O envio de sinais de risco não foi concluído.
-
+        
         • REJEITADO_TEMPO_EXPIRADO_ACCOUNT_HOLDER_VALIDATION: Expiração automática devido a timeout no status "AWAITING_ACCOUNT_HOLDER_VALIDATION". O processo de redirecionamento não foi concluído com sucesso.
-
+        
         • REJEITADO_TEMPO_EXPIRADO_ENROLLMENT: Expiração automática devido a timeout no status "AWAITING_ENROLLMENT". O processo de criação e envio de credenciais FIDO2 não foi concluído com sucesso.
-
+        
         • REJEITADO_MAXIMO_CHALLENGES_ATINGIDO: Vínculo de conta rejeitado devido várias tentativas vínculo frustradas.
-
+        
         • REJEITADO_MANUALMENTE: Cancelamento manual, explicitamente a pedido do usuário.
-
+        
         • REJEITADO_DISPOSITIVO_INCOMPATIVEL: Dispositivo não suporta o protocolo FIDO.
-
+        
         • REJEITADO_FALHA_INFRAESTRUTURA: Falha na infraestrutura na detentora.
-
+        
         • REJEITADO_SEGURANCA_INTERNA: Vínculo de conta rejeitado devido à política de segurança de instituição detentora ou iniciadora considerando a análise dos sinais de risco.
-
+        
         • REJEITADO_FALHA_HYBRID_FLOW: Vínculo de conta rejeitado por falha técnica no processo de redirecionamento (por exemplo: troca de authorization code por access token no FAPI Hybrid flow)
-
+        
         • REJEITADO_FALHA_FIDO: Vínculo de conta rejeitado por falha técnica no processo de validação ou associação da credencial pública FIDO.
-
+        
         • REJEITADO_OUTRO: Outros motivos não descritos pelas demais. Indicar, neste caso, o motivo em "additionalInformation".
     EnrollmentRevocationReason:
       type: string
@@ -1654,13 +1874,13 @@ components:
         Indica o motivo do cancelamento do vínculo de conta. Valores possíveis:
 
         • REVOGADO_MANUALMENTE: Cancelamento manual, explicitamente a mando do usuário.
-
+        
         • REVOGADO_VALIDADE_EXPIRADA: Expiração automática ao atingir o prazo limite do vínculo de conta.
-
+        
         • REVOGADO_FALHA_INFRAESTRUTURA: Falha na infraestrutura na detentora.
-
+        
         • REVOGADO_SEGURANCA_INTERNA: Vínculo de conta rejeitado devido à políticas de segurança tanto da iniciadora quanto da detentora.
-
+        
         • REVOGADO_OUTRO: Outros motivos não descritos pelas demais. Indicar, neste caso, o motivo em "additionalInformation".
     EnrollmentFidoRegistration:
       type: object
@@ -1728,7 +1948,7 @@ components:
             platform:
               type: string
               description: |
-                Indica a plataforma em que o usuário está utilizando a credencial FIDO2.
+                Indica a plataforma em que o usuário está utilizando a credencial FIDO2. 
                 Este campo permite que o servidor FIDO inclua extensões de acordo com a plataforma utilizada.
               enum:
                 - ANDROID
@@ -1767,9 +1987,12 @@ components:
                 $ref: '#/components/schemas/FidoPublicKeyCredentialCreationOptions'
             timeout:
               type: integer
-              description: Timeout, em milissegundos, para registro da credencial FIDO2.
+              description: |
+                Representa, em milissegundos, o tempo de validade do challenge para registro da credencial FIDO2. O valor desse campo deverá ser 300000, representando 5 minutos. Esse valor foi definido com base na máquina de estados do vínculo e na documentação do protocolo da webAuthn.
             excludeCredentials:
               type: array
+              description: |  
+                Lista de IDs de credenciais já existentes para este usuário e autenticador. É utilizado para evitar a criação de múltiplas credenciais para o mesmo usuário em mesmo autenticador. Caso seja enviado, a iniciadora pode rejeitar o registro de uma das credenciais já existentes no dispositivo, ou seguir com a criação, substituindo ou não o vínculo já existente.
               items:
                 $ref: '#/components/schemas/FidoPublicKeyCredentialDescriptor'
             authenticatorSelection:
@@ -1834,22 +2057,23 @@ components:
         - TRAN
       example: CACC
       description: |
-        Tipos de contas usadas para pagamento via Pix.
-        Modalidades tradicionais previstas pela Resolução 4.753, não contemplando contas vinculadas,
-        conta de domiciliados no exterior, contas em moedas estrangeiras e conta correspondente moeda eletrônica.
-        Segue descrição de cada valor do ENUM para o escopo do Pix.
-        CACC - Current - Conta Corrente.
-        SVGS - Savings - Conta de Poupança.
+        Tipos de contas usadas para pagamento via Pix.  
+        Modalidades tradicionais previstas pela Resolução 4.753, não contemplando contas vinculadas,  
+        conta de domiciliados no exterior, contas em moedas estrangeiras e conta correspondente moeda eletrônica.  
+        Segue descrição de cada valor do ENUM para o escopo do Pix.  
+        CACC - Current - Conta Corrente.    
+        SVGS - Savings - Conta de Poupança.  
         TRAN - TransactingAccount - Conta de Pagamento pré-paga.
     EnumEnrollmentPermission:
       type: string
       enum:
         - PAYMENTS_INITIATE
+        - RECURRING_PAYMENTS_INITIATE
       example: PAYMENTS_INITIATE
       description: |
-        Permissões atribuídas ao vínculo de conta:
-
-        • PAYMENTS_INITIATE: Iniciação de pagamentos sem redirecionamento à detentora.
+        Permissões atribuídas ao vínculo de conta:  
+        • PAYMENTS_INITIATE: Permite a utilização do vinculo para iniciação de pagamentos sem redirecionamento nas famílias de API “payments-consents” e “payments-pix”.  
+        • RECURRING_PAYMENTS_INITIATE: Permite a utilização do vinculo para iniciação de Pix Automático sem redirecionamento nas famílias de API "payments-recurring-consents-automatic" e "payments-pix-recurring-payments-automatic".
     EnumEnrollmentCancelledFrom:
       type: string
       enum:
@@ -1857,7 +2081,7 @@ components:
         - DETENTORA
       description: |
         Campo utilizado para informar o meio pelo qual foi realizado o cancelamento do vínculo de conta. Valores possíveis:
-
+        
           INICIADORA - Vínculo de conta nos canais da iniciadora.
 
           DETENTORA - Vínculo de conta nos canais da detentora.
@@ -1874,15 +2098,15 @@ components:
         Status do vínculo de conta:
 
         • AWAITING_RISK_SIGNALS: Vínculo de conta criado e aguardando envio dos sinais de risco para a dentora.
-
+        
         • AWAITING_ACCOUNT_HOLDER_VALIDATION: Vínculo de conta aguardando autorização no ambiente da detentora.
-
+        
         • AWAITING_ENROLLMENT: Vínculo de conta autorizado no ambiente da detentora e aguardando o vínculo de credenciais (FIDO2).
-
+        
         • AUTHORISED: Vínculo de conta pronto para uso.
-
+        
         • REVOKED: Vínculo de conta revogado.
-
+        
         • REJECTED: Vínculo de conta rejeitado.
     FidoAuthenticatorSelectionCriteria:
       type: object
@@ -1924,7 +2148,7 @@ components:
         id:
           type: string
           description: |
-            Identificador único do usuário sob registro em formato base64. A conversão deste valor para o formato original (BufferSource ou ArrayBuffer) não deve ultrapassar 64 bytes.
+            Identificador único do usuário sob registro em formato base64. A conversão deste valor para o formato original (BufferSource ou ArrayBuffer) não deve ultrapassar 64 bytes. 
             O identificador único deve ser opaco, ou seja, não deve carregar dados pessoais sobre o usuário, por exemplo (não exaustivo) um UUID RFC4122 cumpre com os requisitos desse campo
         name:
           type: string
@@ -2098,10 +2322,10 @@ components:
               pattern: '^(\d{4})-(1[0-2]|0?[1-9])-(3[01]|[12][0-9]|0?[1-9])T(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d)Z$'
               maxLength: 20
               description: |
-                Data e hora de expiração da permissão. Reflete a data limite de validade do vínculo.
+                Data e hora de expiração da permissão. Reflete a data limite de validade do vínculo. 
                 Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC (UTC time format).
-
-                [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada.
+                
+                [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada. 
                 Em casos de vínculo com prazo indeterminado, o campo não deve ser preenchido.
             loggedUser:
               $ref: '#/components/schemas/LoggedUser'
@@ -2109,6 +2333,8 @@ components:
               $ref: '#/components/schemas/BusinessEntity'
             debtorAccount:
               $ref: '#/components/schemas/DebtorAccount'
+            journey:
+              $ref: '#/components/schemas/EnrollmentJourney'
             enrollmentName:
               description: |
                 [Restrição] Deve ser preenchido sempre que o usuário pagador inserir alguma informação no nome do vínculo/dispositivo tanto no iniciador como no detentor de conta
@@ -2168,10 +2394,10 @@ components:
               pattern: '^(\d{4})-(1[0-2]|0?[1-9])-(3[01]|[12][0-9]|0?[1-9])T(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d)Z$'
               maxLength: 20
               description: |
-                Data e hora de expiração da permissão. Reflete a data limite de validade do vínculo.
+                Data e hora de expiração da permissão. Reflete a data limite de validade do vínculo. 
                 Uma string com data e hora conforme especificação RFC-3339, sempre com a utilização de timezone UTC (UTC time format).
-
-                [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada.
+                
+                [Restrição] De preenchimento obrigatório nos casos em que houver validade determinada. 
                 Em casos de vínculo com prazo indeterminado, o campo não deve ser preenchido.
             loggedUser:
               $ref: '#/components/schemas/LoggedUser'
@@ -2182,10 +2408,12 @@ components:
                 - $ref: '#/components/schemas/DebtorAccount'
                 - type: object
                   description: |
-                    Objeto que contém a identificação da conta de origem do pagador.
-                    As informações quanto à conta de origem do pagador poderão ser trazidas no vínculo para a detentora, caso a iniciadora tenha coletado essas informações do cliente. Do contrário, será coletada na detentora e trazida para a iniciadora como resposta à criação do vínculo.
-
+                    Objeto que contém a identificação da conta de origem do pagador.  
+                    As informações quanto à conta de origem do pagador poderão ser trazidas no vínculo para a detentora, caso a iniciadora tenha coletado essas informações do cliente. Do contrário, será coletada na detentora e trazida para a iniciadora como resposta à criação do vínculo. 
+                    
                     [ Restrição ] Deve obrigatoriamente ser preenchido nos status AWAITING_ENROLLMENT, AUTHORISED e REVOKED e não deve ser alterado.
+            journey:
+              $ref: '#/components/schemas/EnrollmentJourney'
             cancellation:
               type: object
               required:
@@ -2248,7 +2476,7 @@ components:
                   example: '2023-07-12T08:30:00Z'
                   pattern: '^(\d{4})-(1[0-2]|0?[1-9])-(3[01]|[12][0-9]|0?[1-9])T(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d)Z$'
                   maxLength: 20
-                  description: Instante de rejeição do vínculo de conta no ambiente da detentora.
+                  description: Instante de rejeição do vínculo de conta no ambiente da detentora.     
             transactionLimit:
               type: string
               minLength: 4
@@ -2293,14 +2521,32 @@ components:
       name: consentId
       in: path
       description: |
-        O consentId é o identificador único do consentimento e deverá ser um URN - Uniform Resource Name.
-        Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource
-        Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN
-        seja um identificador de recurso persistente e independente da localização.
+        O consentId é o identificador único do consentimento e deverá ser um URN - Uniform Resource Name.  
+        Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource 
+        Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN 
+        seja um identificador de recurso persistente e independente da localização.  
         Considerando a string urn:bancoex:C1DD33123 como exemplo para consentId temos:
         - o namespace(urn)
-        - o identificador associado ao namespace da instituição detentora de conta (bancoex)
-        - o identificador específico dentro do namespace (C1DD33123).
+        - o identificador associado ao namespace da instituição detentora de conta (bancoex) 
+        - o identificador específico dentro do namespace (C1DD33123).  
+        Informações mais detalhadas sobre a construção de namespaces devem ser consultadas na [RFC8141](https://tools.ietf.org/html/rfc8141).
+      required: true
+      schema:
+        type: string
+        pattern: '^urn:[a-zA-Z0-9][a-zA-Z0-9\-]{0,31}:[a-zA-Z0-9()+,\-.:=@;$_!*''%\/?#]+$'
+        maxLength: 256
+    recurringConsentId:
+      name: recurringConsentId
+      in: path
+      description: |
+        O `recurringConsentId` é o identificador único do consentimento de longa duração e deverá ser um URN - Uniform Resource Name.  
+        Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource 
+        Identifier - URI - que é atribuído sob o URI scheme "urn" e um namespace URN específico, com a intenção de que o URN 
+        seja um identificador de recurso persistente e independe da localização.  
+        Considerando a string urn:bancoex:C1DD33123 como exemplo para `recurringConsentId` temos:
+        - o namespace(urn)
+        - o identificador associado ao namespace da instituição detentora (bancoex).
+        - o identificador específico dentro do namespace (C1DD33123).  
         Informações mais detalhadas sobre a construção de namespaces devem ser consultadas na [RFC8141](https://tools.ietf.org/html/rfc8141).
       required: true
       schema:
@@ -2397,7 +2643,7 @@ components:
     OAuth2ClientCredentials:
       type: oauth2
       description: |
-        Fluxo OAuth necessário para que a iniciadora possa iniciar pagamentos. Requer o processo de redirecionamento e autenticação do usuário.
+        Fluxo OAuth necessário para que a iniciadora possa iniciar pagamentos. Requer o processo de redirecionamento e autenticação do usuário.  
         Apenas pagamentos iniciados pela mesma iniciadora podem ser consultados ou cancelados através de modelo client credentials.
       flows:
         clientCredentials:
@@ -2413,8 +2659,9 @@ components:
           tokenUrl: 'https://authserver.example/token'
           scopes:
             payments: Escopo necessário para acesso à API Payment Initiation.
+            recurring-payments: Escopo necessário para acesso à API Automatic Payments.
             openid: Indica que a autorização está sendo realizada utilizando o protocolo definido pela openid.
-            'enrollment:enrollmentId': Permite realizar atualização de um registro com a permissão do cliente.
+            'enrollment:enrollmentId': Permite realizar atualização de um registro com a permissão do cliente.      
             nrp-consents: Consentimento para pagamentos sem redirecionamento.
   responses:
     BadRequest:
@@ -2452,6 +2699,9 @@ components:
         application/json; charset=utf-8:
           schema:
             $ref: '#/components/schemas/ResponseError'
+      headers:
+        x-fapi-interaction-id:
+          $ref: '#/components/headers/xFapiInteractionServerError'
     MethodNotAllowed:
       description: O consumidor tentou acessar o recurso com um método não suportado
       content:
@@ -2485,12 +2735,24 @@ components:
         application/json; charset=utf-8:
           schema:
             $ref: '#/components/schemas/ResponseError'
+      headers:
+        x-fapi-interaction-id:
+          $ref: '#/components/headers/xFapiInteractionServerError'
     UnprocessableEntityConsentsAuthorization:
       description: 'A solicitação foi bem-formada, mas não pôde ser processada devido à lógica de negócios específica da solicitação.'
       content:
         application/jwt:
           schema:
             $ref: '#/components/schemas/422ResponseConsentsAuthorization'
+      headers:
+        x-fapi-interaction-id:
+          $ref: '#/components/headers/xFapiInteractionId'
+    UnprocessableEntityRecurringConsentsAuthorization:
+      description: 'A solicitação foi bem-formada, mas não pôde ser processada devido à lógica de negócios específica da solicitação.'
+      content:
+        application/jwt:
+          schema:
+            $ref: '#/components/schemas/422ResponseRecurringConsentsAuthorization'
       headers:
         x-fapi-interaction-id:
           $ref: '#/components/headers/xFapiInteractionId'

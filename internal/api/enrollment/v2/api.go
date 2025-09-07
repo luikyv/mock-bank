@@ -192,6 +192,7 @@ func (s Server) PostEnrollments(ctx context.Context, req PostEnrollmentsRequestO
 			EnrollmentID         EnrollmentID               "json:\"enrollmentId\""
 			EnrollmentName       *string                    "json:\"enrollmentName,omitempty\""
 			ExpirationDateTime   *timeutil.DateTime         "json:\"expirationDateTime,omitempty\""
+			Journey              *EnrollmentJourney         "json:\"journey,omitempty\""
 			LoggedUser           LoggedUser                 "json:\"loggedUser\""
 			Permissions          []EnumEnrollmentPermission "json:\"permissions\""
 			Status               EnumEnrollmentStatus       "json:\"status\""
@@ -280,6 +281,7 @@ func (s Server) GetEnrollment(ctx context.Context, req GetEnrollmentRequestObjec
 			EnrollmentID         EnrollmentID               "json:\"enrollmentId\""
 			EnrollmentName       *string                    "json:\"enrollmentName,omitempty\""
 			ExpirationDateTime   *timeutil.DateTime         "json:\"expirationDateTime,omitempty\""
+			Journey              *EnrollmentJourney         "json:\"journey,omitempty\""
 			LoggedUser           LoggedUser                 "json:\"loggedUser\""
 			Permissions          []EnumEnrollmentPermission "json:\"permissions\""
 			Status               EnumEnrollmentStatus       "json:\"status\""
@@ -475,13 +477,32 @@ func (s Server) AuthorizeConsent(ctx context.Context, req AuthorizeConsentReques
 			UserHandle:        req.Body.Data.FidoAssertion.Response.UserHandle,
 		},
 	}
-	if err := s.service.AuthorizeConsent(
-		ctx,
-		req.ParameterConsentID,
-		req.Body.Data.EnrollmentID,
-		orgID,
-		assertion,
-	); err != nil {
+	if err := s.service.AuthorizeConsent(ctx, req.ParameterConsentID, req.Body.Data.EnrollmentID, orgID, assertion); err != nil {
+		return nil, err
+	}
+
+	return AuthorizeConsent204Response{}, nil
+}
+
+func (s Server) AuthorizeRecurringConsent(ctx context.Context, req AuthorizeRecurringConsentRequestObject) (AuthorizeRecurringConsentResponseObject, error) {
+	orgID := ctx.Value(api.CtxKeyOrgID).(string)
+	assertion := enrollment.FIDOAssertion{
+		ID:    req.Body.Data.FidoAssertion.ID,
+		RawID: req.Body.Data.FidoAssertion.RawID,
+		Type:  req.Body.Data.FidoAssertion.Type,
+		Response: struct {
+			ClientDataJSON    string "json:\"clientDataJSON,omitempty\""
+			AuthenticatorData string "json:\"authenticatorData,omitempty\""
+			Signature         string "json:\"signature,omitempty\""
+			UserHandle        string "json:\"userHandle,omitempty\""
+		}{
+			ClientDataJSON:    req.Body.Data.FidoAssertion.Response.ClientDataJSON,
+			AuthenticatorData: req.Body.Data.FidoAssertion.Response.AuthenticatorData,
+			Signature:         req.Body.Data.FidoAssertion.Response.Signature,
+			UserHandle:        req.Body.Data.FidoAssertion.Response.UserHandle,
+		},
+	}
+	if err := s.service.AuthorizeConsent(ctx, req.RecurringConsentID, req.Body.Data.EnrollmentID, orgID, assertion); err != nil {
 		return nil, err
 	}
 
@@ -491,7 +512,7 @@ func (s Server) AuthorizeConsent(ctx context.Context, req AuthorizeConsentReques
 func (s Server) DeleteEnrollment(ctx context.Context, req DeleteEnrollmentRequestObject) (DeleteEnrollmentResponseObject, error) {
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
 	cancellation := enrollment.Cancellation{
-		From:           payment.CancelledFromInitiator,
+		From:           payment.TerminatedFromInitiator,
 		AdditionalInfo: req.Body.Data.Cancellation.AdditionalInformation,
 	}
 	if by := req.Body.Data.Cancellation.CancelledBy; by != nil {
@@ -539,8 +560,15 @@ func (s Server) EnrollmentRegisterFidoCredential(ctx context.Context, request En
 
 func (s Server) EnrollmentCreateFidoSigningOptions(ctx context.Context, req EnrollmentCreateFidoSigningOptionsRequestObject) (EnrollmentCreateFidoSigningOptionsResponseObject, error) {
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
+	var consentID string
+	if req.Body.Data.ConsentIDType != nil {
+		consentID = string(*req.Body.Data.ConsentIDType)
+	}
+	if req.Body.Data.RecurringConsentID != nil {
+		consentID = string(*req.Body.Data.RecurringConsentID)
+	}
 
-	challenge, err := s.service.InitAuthorization(ctx, req.Body.Data.ConsentIDType, req.EnrollmentID, orgID, enrollment.FIDOOptions{
+	challenge, err := s.service.InitAuthorization(ctx, consentID, req.EnrollmentID, orgID, enrollment.FIDOOptions{
 		RelyingParty: req.Body.Data.Rp,
 	})
 	if err != nil {
@@ -613,6 +641,16 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 
 	if errors.Is(err, autopayment.ErrInvalidConsentStatus) {
 		api.WriteError(w, r, api.NewError("STATUS_CONSENTIMENTO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, enrollment.ErrInvalidChallenge) {
+		api.WriteError(w, r, api.NewError("CHALLENGE_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
+	if errors.Is(err, enrollment.ErrFIDOOptionsAlreadyRegistered) {
+		api.WriteError(w, r, api.NewError("MAXIMO_CHALLENGES_ATINGIDO", http.StatusUnprocessableEntity, err.Error()))
 		return
 	}
 

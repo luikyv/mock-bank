@@ -7,7 +7,7 @@
     "keystore": "https://keystore.local/",
     "discoveryUrl": "https://directory.local/.well-known/openid-configuration",
     "apibase": "https://matls-directory.local",
-    "client_id": "random_client"
+    "client_id": "directory_client"
   },
   "resource": {
     "consentUrl": "https://matls-api.mockbank.local/open-banking/consents/v3/consents",

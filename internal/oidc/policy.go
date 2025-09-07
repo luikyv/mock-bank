@@ -437,8 +437,19 @@ func grantPaymentStep(
 			return goidc.StatusFailure, errors.New("consent not granted")
 		}
 
-		accountID := uuid.MustParse(r.PostFormValue(formParamAccountID))
-		c.DebtorAccountID = &accountID
+		accountID := r.PostFormValue(formParamAccountID)
+		acc, err := accountService.Account(r.Context(), account.Query{ID: accountID}, orgID)
+		if err != nil {
+			return goidc.StatusFailure, fmt.Errorf("could not fetch debtor account: %w", err)
+		}
+
+		if payment.ConvertAmount(c.PaymentAmount) > payment.ConvertAmount(acc.AvailableAmount) {
+			slog.InfoContext(r.Context(), "payment amount is too high")
+			paymentService.RejectConsent(r.Context(), c, payment.ConsentRejectionInsufficientFunds, "payment amount is too high")
+			return goidc.StatusFailure, errors.New("insufficient funds")
+		}
+
+		c.DebtorAccountID = &acc.ID
 		slog.InfoContext(r.Context(), "authorizing payment consent", "consent_id", c.ID)
 		if err := paymentService.AuthorizeConsent(r.Context(), c); err != nil {
 			return goidc.StatusFailure, err
@@ -533,7 +544,7 @@ func grantAutoPaymentStep(
 				slog.InfoContext(r.Context(), "consent was not created for the correct user")
 				_ = paymentService.RejectConsent(r.Context(), c, autopayment.ConsentRejection{
 					By:     autopayment.TerminatedByHolder,
-					From:   autopayment.TerminatedFromHolder,
+					From:   payment.TerminatedFromHolder,
 					Code:   autopayment.ConsentRejectionAuthenticationMismatch,
 					Detail: "payment consent not created for the correct user",
 				})
@@ -547,7 +558,7 @@ func grantAutoPaymentStep(
 					slog.InfoContext(r.Context(), "could not fetch the business", "error", err)
 					_ = paymentService.RejectConsent(r.Context(), c, autopayment.ConsentRejection{
 						By:     autopayment.TerminatedByHolder,
-						From:   autopayment.TerminatedFromHolder,
+						From:   payment.TerminatedFromHolder,
 						Code:   autopayment.ConsentRejectionAuthenticationMismatch,
 						Detail: "user has no access to the business",
 					})
@@ -562,7 +573,7 @@ func grantAutoPaymentStep(
 
 		if isConsented != "true" {
 			_ = paymentService.RejectConsent(r.Context(), c, autopayment.ConsentRejection{
-				From:   autopayment.TerminatedFromHolder,
+				From:   payment.TerminatedFromHolder,
 				By:     autopayment.TerminatedByUser,
 				Code:   autopayment.ConsentRejectionRejectedByUser,
 				Detail: "payment consent not granted",
@@ -668,7 +679,7 @@ func grantEnrollmentStep(
 				info := "enrollment not created for the correct user"
 				reason := enrollment.RejectionReasonHybridFlowFailure
 				_ = enrollmentService.Cancel(r.Context(), e, enrollment.Cancellation{
-					From:            payment.CancelledFromHolder,
+					From:            payment.TerminatedFromHolder,
 					RejectionReason: &reason,
 					AdditionalInfo:  &info,
 				})
@@ -683,7 +694,7 @@ func grantEnrollmentStep(
 					info := "user has no access to the business"
 					reason := enrollment.RejectionReasonHybridFlowFailure
 					_ = enrollmentService.Cancel(r.Context(), e, enrollment.Cancellation{
-						From:            payment.CancelledFromHolder,
+						From:            payment.TerminatedFromHolder,
 						RejectionReason: &reason,
 						AdditionalInfo:  &info,
 					})
@@ -700,7 +711,7 @@ func grantEnrollmentStep(
 			info := "enrollment not granted"
 			reason := enrollment.RejectionReasonManualRejection
 			_ = enrollmentService.Cancel(r.Context(), e, enrollment.Cancellation{
-				From:            payment.CancelledFromHolder,
+				From:            payment.TerminatedFromHolder,
 				By:              &e.UserIdentification,
 				RejectionReason: &reason,
 				AdditionalInfo:  &info,

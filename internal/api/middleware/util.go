@@ -80,7 +80,7 @@ func Swagger(getSwagger func() (*openapi3.T, error), errCodeFunc func(error) api
 		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts netmiddleware.ErrorHandlerOpts) {
 			api.WriteError(w, r, errCodeFunc(err))
 		},
-	}), spec.Info.Version
+	}), spec.Info.Version[:5]
 }
 
 func VersionHeader(v string) func(http.Handler) http.Handler {

@@ -1,7 +1,4 @@
 {
-  "server": {
-      "discoveryUrl": "https://auth.mockbank.local/.well-known/openid-configuration"
-  },
   "client": {
       "client_id": "client_one",
       "jwks": {
@@ -81,31 +78,35 @@
       "cert": "-----BEGIN CERTIFICATE-----\nMIIFSzCCAzOgAwIBAgIIGFD7Qw0FzuAwDQYJKoZIhvcNAQELBQAwDTELMAkGA1UE\nAxMCY2EwHhcNMjUwNzEwMTkzNzAwWhcNMjYwNzEwMTk0MjAwWjCBlDEtMCsGA1UE\nCxMkMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwMS0wKwYDVQQD\nEyQxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTExNDAyBgoJkiaJ\nk/IsZAEBEyQxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEwggIi\nMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDHtz7hduBO0vvUpApNbiGFKQAF\n/Vm/8l3UGke6sdJEzk9Sj183QjOHtjBOJhke/lJt/RVzTWXKK1rlE95ItpCpvujH\nNJuR8PMurapJYUs3tObk5Pp/huyh86L7Mf67Os/35nSICkqGvJSjwMeJFi1U/z3A\n98QeqgCJ4zIJoCcptg4BluNBRj0u5gHMiESqMWzVmp7+snfFI0IZ9mI+fsbReN6M\n4sfh4U2kiwtj/4GFYLDfOTC422s1s5//AqOaq/rj0/2t1Oz4zgh8AdtQNN+XvTSg\nbuLEmqIzrLVjzRcz1WOpGv7/ku8PtST4gVA85si9iqfLigJ+/lAug/tsR/Otbcgc\nUXunKYqQEaColQi061h2z1Vv2mrVVvA7o7AQrc8yXnCOAMv0CN+tq3uYeFjngFKs\nllunf7p+B+LQmYbkBiq2dttF3Vyez7d1ygah4S2YGTERpTgHjOsadZGYItazFhuw\nC0x2mPG2IWLzPUeRIE8UaBuw2fInwutH5hFWGvrP12jG3ek4dEfiKQ3DNPN6JHuf\nvQEEcr3EzX03XGjorE4T9etFcJ4GRVToDtljufPqk4pVH8NzMd7zz35CPlDLxH9i\nN8xzDLaJ7kLLHA7KTiGpommtYaS/davmSkKXaItNnOuu7d3HrAuVL9mHEbnZlifa\nPwerOx7RQXqxEGhKlwIDAQABoycwJTAOBgNVHQ8BAf8EBAMCBaAwEwYDVR0lBAww\nCgYIKwYBBQUHAwIwDQYJKoZIhvcNAQELBQADggIBAA3cSlAMmoE7ojTuqKjONH7y\njMjpiwNFH5HR4BSwKGBxknrk64tR1iaRsFbXOkIBP4Z0eSYveKSFAnIFYErB4cab\nBi7ijhTskhfbfQDM+HbTwR276nfzpOZ747xpl7WjVhJSEhR+WIBP+jL3v5rzYIvL\nkVE61IP6j4BYP9LeSdJRDdVIKuPre2eOXDmICgwkjXePk1aYjwq5dSEtOnHYJ+BB\nmo3tTMA7QSW8OtpLkZATGcOK/PYGXRs2YAhbXPCLAgWxkCDc/ManW5MQBDgmzJ/W\nDvNVj2rhTot13Lz90jEhyhGB7Tvf1qgEkzG6hZrgZJrIFHc/4O+rhgskqK4V4i8y\nUkO4e5SVSywRidx43FcgDlT5wNFBV8ouDqFVUfPiNGNPc+UKqZ91QoPYhxY8piaO\nexk14zf24MYr0PI2KKc0Xvu0x8L1ppeU7mv4mOJZPIg4v+L5p88qxCv+RZhjs2yK\n6BPlIRPVmLdRuPXHbTq/EVq+9BG9vroXFfqBIJilCfw/pXqbgDC0QtNdWqyuM/Kn\nbDY0eiQdA0aY3JuKETSGknRuxiHKlX2QQyLw05ZYFq62MzspIpyX716ytHOIuRDp\nOy6cwAXILdNfxBy3NOIvQYoTwacTw6gN4Snp/xHMNB+ZJNHuvxVmiVgfnadJRXF1\nfr7vPHjnINFxAa9miwd9\n-----END CERTIFICATE-----\n",
       "key": "-----BEGIN RSA PRIVATE KEY-----\n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\n-----END RSA PRIVATE KEY-----\n"
   },
-  "conditionalResources": {
-      "brazilCpfJointAccount": "87517400444"
-  },
-  "resource": {
-      "consentUrl": "https://matls-api.mockbank.local/open-banking/payments/v3/consents",
-      "enrollmentsUrl": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments",
-      "resourceUrl": "https://matls-api.mockbank.local/open-banking/payments/v3/pix/payments",
-      "loggedUserIdentification": "76109277673",
-      "debtorAccountIspb": "00000000",
-      "debtorAccountIssuer": "0000",
-      "debtorAccountNumber": "94088392",
-      "debtorAccountType": "CACC",
-      "paymentAmount": "100.00",
-      "brazilCpf": "76109277673",
-      "brazilOrganizationId": "00000000-0000-0000-0000-000000000000",
-      "webhookWaitTime": "5"
-  },
-  "consent": {
-      "productType": "personal"
+  "server": {
+      "discoveryUrl": "https://auth.mockbank.local/.well-known/openid-configuration"
   },
   "directory": {
       "keystore": "https://keystore.local/",
       "discoveryUrl": "https://directory.local/.well-known/openid-configuration",
       "apibase": "https://matls-directory.local",
       "client_id": "directory_client"
+  },
+  "conditionalResources": {
+      "brazilCpfJointAccount": "87517400444"
+  },
+  "resource": {
+      "loggedUserIdentification": "76109277673",
+      "debtorAccountIspb": "00000000",
+      "debtorAccountIssuer": "0000",
+      "debtorAccountNumber": "94088392",
+      "debtorAccountType": "CACC",
+      "creditorAccountIspb": "99999004",
+      "creditorAccountIssuer": "0001",
+      "creditorAccountNumber": "11188222",
+      "creditorAccountAccountType": "SVGS",
+      "creditorName": "Ralph Bragg",
+      "consentUrl": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/recurring-consents",
+      "brazilCpf": "76109277673",
+      "brazilOrganizationId": "00000000-0000-0000-0000-000000000000"
+  },
+  "consent": {
+      "productType": "personal"
   },
   "browser": [
       {
@@ -135,7 +136,7 @@
                   ]
               },
               {
-                  "task": "Enroll",
+                  "task": "Consent",
                   "match": "https://auth.mockbank.local/authorize/*/consent",
                   "commands": [
                       [
@@ -161,16 +162,40 @@
       }
   ],
   "override": {
-      "enrollments_api_multiple-consents-core_test-module_v2-2": {
+      "automatic-payments_api_invalid-scope_test-module_v2n2": {
+          "browser": [
+              {
+                  "match": "https://auth.mockbank.local/authorize*",
+                  "tasks": [
+                      {
+                          "task": "Verify Complete",
+                          "match": "*/test/*/callback*",
+                          "commands": [
+                              [
+                                  "wait",
+                                  "id",
+                                  "submission_complete",
+                                  10
+                              ]
+                          ]
+                      }
+                  ]
+              }
+          ]
+      },
+      "automatic-payments_api_multiple-consents-core_test-module_v2n2": {
           "resource": {
-              "enrollmentsUrl": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments",
               "loggedUserIdentification": "87517400444",
               "debtorAccountIspb": "00000000",
               "debtorAccountIssuer": "0000",
               "debtorAccountNumber": "94088393",
               "debtorAccountType": "CACC",
-              "paymentAmount": "100.00",
-              "consentUrl": "https://matls-api.mockbank.local/open-banking/payments/v3/consents",
+              "creditorAccountIspb": "99999004",
+              "creditorAccountIssuer": "0001",
+              "creditorAccountNumber": "94088393",
+              "creditorAccountAccountType": "CACC",
+              "creditorName": "Ralph Bragg",
+              "consentUrl": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/recurring-consents",
               "brazilCpf": "87517400444",
               "brazilOrganizationId": "00000000-0000-0000-0000-000000000000"
           },
@@ -202,7 +227,7 @@
                           ]
                       },
                       {
-                          "task": "Enroll",
+                          "task": "Consent",
                           "match": "https://auth.mockbank.local/authorize/*/consent",
                           "commands": [
                               [
@@ -227,56 +252,6 @@
                   ]
               }
           ]
-      },
-      "enrollments_api_rejected-holder-mismatch_test-module_v2-2": {
-          "browser": [
-              {
-                  "match": "https://auth.mockbank.local/authorize*",
-                  "tasks": [
-                      {
-                          "task": "Login",
-                          "match": "https://auth.mockbank.local/authorize/*/login",
-                          "commands": [
-                              [
-                                  "text",
-                                  "name",
-                                  "username",
-                                  "bob@email.com"
-                              ],
-                              [
-                                  "text",
-                                  "name",
-                                  "password",
-                                  "P@ssword01"
-                              ],
-                              [
-                                  "click",
-                                  "id",
-                                  "login-button"
-                              ]
-                          ]
-                      },
-                      {
-                          "task": "Verify Complete",
-                          "match": "*/test/*/callback*",
-                          "commands": [
-                              [
-                                  "wait",
-                                  "id",
-                                  "submission_complete",
-                                  10
-                              ]
-                          ]
-                      }
-                  ]
-              }
-          ]
-      },
-      "enrollments_api_webhook-rejected_test-module_v2-2": {
-          "alias": "mockbank"
-      },
-      "enrollments_api_webhook-revoked_test-module_v2-2": {
-          "alias": "mockbank"
       }
   }
 }

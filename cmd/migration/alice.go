@@ -13,23 +13,50 @@ import (
 	"github.com/luikyv/mock-bank/internal/timeutil"
 	"github.com/luikyv/mock-bank/internal/user"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
+// nolint:cyclop
 func seedAlice(ctx context.Context, db *gorm.DB) error {
-	cnpj := "50685362006773"
 	testUser := &user.User{
 		ID:        uuid.MustParse("ff8cd4db-a1c8-4966-a9ca-26ab0b19c6d1"),
 		Username:  "alice@email.com",
 		Name:      "Ms Alice",
 		CPF:       "76109277673",
-		CNPJ:      &cnpj,
+		CNPJ:      pointerOf("50685362006773"),
 		CrossOrg:  true,
 		UpdatedAt: timeutil.DateTimeNow(),
 		OrgID:     OrgID,
 	}
-
 	if err := db.WithContext(ctx).Omit("CreatedAt").Save(testUser).Error; err != nil {
 		return fmt.Errorf("failed to create test user: %w", err)
+	}
+
+	testUserCNPJ := &user.User{
+		ID:        uuid.MustParse("93545348-e501-4764-a0c5-f5854cab782a"),
+		Username:  "98380199000125@email.com",
+		Name:      "98380199000125",
+		CPF:       "98380199000",
+		CNPJ:      pointerOf("98380199000125"),
+		CrossOrg:  false,
+		UpdatedAt: timeutil.DateTimeNow(),
+		OrgID:     OrgID,
+	}
+	if err := db.WithContext(ctx).Omit("CreatedAt").Save(testUserCNPJ).Error; err != nil {
+		return fmt.Errorf("failed to create test user: %w", err)
+	}
+
+	if err := db.WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "user_id"}, {Name: "business_user_id"}},
+			DoNothing: true,
+		}).
+		Create(&user.UserBusiness{
+			UserID:         testUser.ID,
+			BusinessUserID: testUserCNPJ.ID,
+			OrgID:          OrgID,
+		}).Error; err != nil {
+		return err
 	}
 
 	testAccount := &account.Account{
@@ -166,6 +193,26 @@ func seedAlice(ctx context.Context, db *gorm.DB) error {
 		if err := db.WithContext(ctx).Omit("CreatedAt").Save(testTransaction).Error; err != nil {
 			return fmt.Errorf("failed to create test transaction: %w", err)
 		}
+	}
+
+	testAccount2 := &account.Account{
+		ID:                          uuid.MustParse("9e207cd7-a881-48e0-9755-0e6bda6cb181"),
+		OwnerID:                     testUser.ID,
+		Number:                      "11188222",
+		Type:                        account.TypeSavingsAccount,
+		SubType:                     account.SubTypeIndividual,
+		AvailableAmount:             "100000000.04",
+		BlockedAmount:               "12345.01",
+		AutomaticallyInvestedAmount: "15000.00",
+		OverdraftLimitContracted:    "99.99",
+		OverdraftLimitUsed:          "10000.99",
+		OverdraftLimitUnarranged:    "99.99",
+		CrossOrg:                    true,
+		OrgID:                       OrgID,
+		UpdatedAt:                   timeutil.DateTimeNow(),
+	}
+	if err := db.WithContext(ctx).Omit("CreatedAt").Save(testAccount2).Error; err != nil {
+		return fmt.Errorf("failed to create second test account: %w", err)
 	}
 
 	testLoan := &creditop.Contract{

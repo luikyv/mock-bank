@@ -103,7 +103,7 @@ const (
 
 type Cancellation struct {
 	Reason CancellationReason `json:"cancellation_reason"`
-	From   CancelledFrom      `json:"cancellation_from"`
+	From   TerminatedFrom     `json:"cancellation_from"`
 	At     timeutil.DateTime  `json:"cancelled_at"`
 	By     string             `json:"cancelled_by"`
 }
@@ -115,11 +115,11 @@ const (
 	CancellationReasonScheduled CancellationReason = "CANCELADO_AGENDAMENTO"
 )
 
-type CancelledFrom string
+type TerminatedFrom string
 
 const (
-	CancelledFromInitiator CancelledFrom = "INICIADORA"
-	CancelledFromHolder    CancelledFrom = "DETENTORA"
+	TerminatedFromInitiator TerminatedFrom = "INICIADORA"
+	TerminatedFromHolder    TerminatedFrom = "DETENTORA"
 )
 
 type Consent struct {
@@ -190,8 +190,13 @@ func (c Consent) PaymentDates() []timeutil.BrazilDate {
 		return dates
 
 	case schedule.Weekly != nil:
-		// TODO: Use DayOfWeek to find the first occurrence of the target weekday on or after the start date.
 		start := schedule.Weekly.StartDate
+		// If start date weekday is after target weekday, move to next week.
+		if start.Weekday() > schedule.Weekly.DayOfWeek.Weekday() {
+			start = start.AddDate(0, 0, 7)
+		}
+		// Adjust to the exact target weekday.
+		start = start.AddDate(0, 0, int(schedule.Weekly.DayOfWeek.Weekday()-start.Weekday()))
 		var dates []timeutil.BrazilDate
 		for i := range schedule.Weekly.Quantity {
 			dates = append(dates, start.AddDate(0, 0, i*7))
@@ -199,11 +204,14 @@ func (c Consent) PaymentDates() []timeutil.BrazilDate {
 		return dates
 
 	case schedule.Monthly != nil:
-		// TODO: Use DayOfMonth to find the first occurrence of the target day of month on or after the start date.
 		start := schedule.Monthly.StartDate
+		// If start date day is after target day, move to next month.
+		if start.Day() > schedule.Monthly.DayOfMonth {
+			start = start.AddDate(0, 1, 0)
+		}
 		var dates []timeutil.BrazilDate
 		for i := range schedule.Monthly.Quantity {
-			dates = append(dates, start.AddDate(0, i, 0))
+			dates = append(dates, start.AddDate(0, i, 0).WithDay(schedule.Monthly.DayOfMonth))
 		}
 		return dates
 
@@ -249,9 +257,31 @@ const (
 	DayOfWeekSunday    DayOfWeek = "DOMINGO"
 )
 
+func (d DayOfWeek) Weekday() time.Weekday {
+	switch d {
+	case DayOfWeekMonday:
+		return time.Monday
+	case DayOfWeekTuesday:
+		return time.Tuesday
+	case DayOfWeekWednesday:
+		return time.Wednesday
+	case DayOfWeekThursday:
+		return time.Thursday
+	case DayOfWeekFriday:
+		return time.Friday
+	case DayOfWeekSaturday:
+		return time.Saturday
+	case DayOfWeekSunday:
+		return time.Sunday
+	default:
+		return 0
+	}
+}
+
 type LocalInstrument string
 
 const (
+	LocalInstrumentAUTO LocalInstrument = "AUTO" // Automatic.
 	LocalInstrumentMANU LocalInstrument = "MANU" // Manual.
 	LocalInstrumentDICT LocalInstrument = "DICT" // PIX key.
 	LocalInstrumentQRDN LocalInstrument = "QRDN" // Dynamic QR code.
@@ -348,27 +378,6 @@ type EnrollmentOptions struct {
 	Challenge              string
 	TransactionLimit       string
 	DailyLimit             string
-}
-
-func parseWeekday(weekDay DayOfWeek) time.Weekday {
-	switch weekDay {
-	case "DOMINGO":
-		return time.Sunday
-	case "SEGUNDA_FEIRA":
-		return time.Monday
-	case "TERCA_FEIRA":
-		return time.Tuesday
-	case "QUARTA_FEIRA":
-		return time.Wednesday
-	case "QUINTA_FEIRA":
-		return time.Thursday
-	case "SEXTA_FEIRA":
-		return time.Friday
-	case "SABADO":
-		return time.Saturday
-	default:
-		return time.Sunday
-	}
 }
 
 type Filter struct {

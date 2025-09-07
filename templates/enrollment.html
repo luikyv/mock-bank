@@ -80,6 +80,9 @@
       background: #d1d5db;
     }
   </style>
+  <script nonce="{{ .Nonce }}">
+    window.history.pushState({}, "", "{{ .BaseURL }}/authorize/{{ .CallbackID }}/consent");
+  </script>
 </head>
 <body>
   <div class="container">
@@ -91,7 +94,7 @@
       <div class="info-value">{{ .UserCPF }}</div>
     </div>
 
-    <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
+    <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}/consent" method="POST">
       <input type="hidden" name="consent" value="true" />
 
       {{ if .Account }}
@@ -115,12 +118,12 @@
       </div>
       {{ end }}
 
-      <button type="submit" class="consent-button">Confirm Enrollment</button>
+      <button type="submit" id="consent-button" class="consent-button">Confirm Enrollment</button>
     </form>
 
-    <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}" method="POST">
+    <form action="{{ .BaseURL }}/authorize/{{ .CallbackID }}/consent" method="POST">
       <input type="hidden" name="consent" value="false" />
-      <button type="submit" class="cancel-button">Cancel</button>
+      <button type="submit" id="cancel-button" class="cancel-button">Cancel</button>
     </form>
   </div>
 </body>

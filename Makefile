@@ -2,7 +2,7 @@
 
 ORG_ID="00000000-0000-0000-0000-000000000000"
 SOFTWARE_ID="11111111-1111-1111-1111-111111111111"
-CS_VERSION="3de7a6d5bccbea655519cd4f3e632bf01f9247d9"
+CS_VERSION="6111a8e835350b9270a7443a42329628e62f368f"
 
 setup:
 	@chmod +x testdata/setup-localstack.sh
@@ -54,14 +54,8 @@ models:
 migration:
 	@docker compose run migration
 
-build-mockbank:
-	@docker compose build mockbank
-
-build-mockgw:
-	@docker compose build mockgw
-
-build-migration:
-	@docker compose build migration
+build:
+	@docker compose build
 
 # Build the Conformance Suite JAR file.
 build-cs:
@@ -80,6 +74,18 @@ test-coverage:
 
 cs-tests:
 	@conformance-suite/venv/bin/python conformance-suite/scripts/run-test-plan.py \
-		consents_test-plan_v3-2 ./testdata/conformance/phase2-config.json \
-		accounts_test-plan_v2-4 ./testdata/conformance/phase2-config.json \
-		--export-dir ./conformance-suite/results
+		no-redirect-payments_test-plan_v2-2 ./testdata/conformance/phase3_no_redirect_payments_v2-config.json \
+		no-redirect-payments-webhook_test-plan_v2-2 ./testdata/conformance/phase3_no_redirect_payments_v2-config.json \
+		automatic-pix-payments_test-plan_v2-2 ./testdata/conformance/phase3_automatic_pix_payments_v2-config.json \
+		automatic-payments_test-plan_v2-2 ./testdata/conformance/phase3_automatic_payments_v2-config.json \
+		payments_test-plan_v4 ./testdata/conformance/phase3_payments_v4-config.json \
+		--expected-skips-file ./testdata/conformance/expected_skips.json \
+		--expected-failures-file ./testdata/conformance/expected_failures.json \
+		--export-dir ./conformance-suite/results \
+		--verbose
+
+cs-tests-wip:
+	@conformance-suite/venv/bin/python conformance-suite/scripts/run-test-plan.py \
+		no-redirect-payments_test-plan_v2-2 ./testdata/conformance/phase3_no_redirect_payments_v2-config.json \
+		--export-dir ./conformance-suite/results \
+		--verbose

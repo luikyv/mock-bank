@@ -12,7 +12,7 @@ COPY . /app
 
 RUN go mod download
 
-RUN go build -o main ./cmd/mockgw
+RUN go build -o main ./cmd/gateway
 
 # Step 2: Run Stage.
 FROM alpine:latest

@@ -116,7 +116,7 @@ func requestMiddlewareHandler(next http.Handler, baseURL, keystoreHost string, s
 		}
 
 		if !jtiIsValid {
-			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusBadRequest, "jti is invalid"))
+			api.WriteError(w, r, api.NewError("INVALID_REQUEST", http.StatusForbidden, "jti is invalid"))
 			return
 		}
 

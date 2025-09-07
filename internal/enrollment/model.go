@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	CredentialRegistrationTimeout = 300 * time.Second
+	CredentialRegistrationTimeout = 300000 * time.Second
 	URNPrefix                     = "urn:mockbank:enrollment:"
 	defaultDailyLimit             = "500.00"
 	defaultTransactionLimit       = "100.00"
@@ -89,16 +89,17 @@ const (
 type Permission string
 
 const (
-	PermissionPaymentsInitiate Permission = "PAYMENTS_INITIATE"
+	PermissionPaymentsInitiate          Permission = "PAYMENTS_INITIATE"
+	PermissionRecurringPaymentsInitiate Permission = "RECURRING_PAYMENTS_INITIATE"
 )
 
 type Cancellation struct {
-	RejectionReason  *RejectionReason      `json:"rejection_reason,omitempty"`
-	RevocationReason *RevocationReason     `json:"revocation_reason,omitempty"`
-	From             payment.CancelledFrom `json:"cancellation_from"`
-	At               *timeutil.DateTime    `json:"cancelled_at,omitempty"`
-	By               *string               `json:"cancelled_by,omitempty"`
-	AdditionalInfo   *string               `json:"additional_info,omitempty"`
+	RejectionReason  *RejectionReason       `json:"rejection_reason,omitempty"`
+	RevocationReason *RevocationReason      `json:"revocation_reason,omitempty"`
+	From             payment.TerminatedFrom `json:"cancellation_from"`
+	At               *timeutil.DateTime     `json:"cancelled_at,omitempty"`
+	By               *string                `json:"cancelled_by,omitempty"`
+	AdditionalInfo   *string                `json:"additional_info,omitempty"`
 }
 
 type RejectionReason string

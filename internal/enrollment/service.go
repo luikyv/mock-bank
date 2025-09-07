@@ -51,15 +51,37 @@ func NewService(
 }
 
 func (s Service) Create(ctx context.Context, e *Enrollment, debtorAcc *payment.Account) error {
+
+	if slices.ContainsFunc(e.Permissions, func(p Permission) bool {
+		return p != PermissionPaymentsInitiate && p != PermissionRecurringPaymentsInitiate
+	}) {
+		return errorutil.Format("%w: permission not allowed", ErrInvalidPermissions)
+	}
+
+	if e.RelyingParty == "" {
+		return errorutil.Format("%w: relying party is required", ErrMissingValue)
+	}
+
+	if e.UserRel != consent.RelationCPF {
+		return errorutil.Format("%w: only CPF is allowed for logged user document relation", ErrInvalidData)
+	}
+
+	if e.BusinessRel != nil && *e.BusinessRel != consent.RelationCNPJ {
+		return errorutil.Format("%w: only CNPJ is allowed for business document relation", ErrInvalidData)
+	}
+
+	if debtorAcc != nil && slices.Contains([]payment.AccountType{
+		payment.AccountTypeCACC,
+		payment.AccountTypeSVGS,
+	}, debtorAcc.Type) && debtorAcc.Issuer == nil {
+		return errorutil.Format("%w: debtor account issuer is required for account types CACC or SVGS", ErrMissingValue)
+	}
+
 	e.Status = StatusAwaitingRiskSignals
 	now := timeutil.DateTimeNow()
 	e.StatusUpdatedAt = now
 	e.CreatedAt = now
 	e.UpdatedAt = now
-
-	if err := s.validate(ctx, e, debtorAcc); err != nil {
-		return err
-	}
 
 	u, err := s.userService.User(ctx, user.Query{CPF: e.UserIdentification}, e.OrgID)
 	if err != nil {
@@ -136,8 +158,12 @@ func (s Service) InitRegistration(ctx context.Context, id, orgID string, opts FI
 
 	if opts.RelyingParty != e.RelyingParty {
 		reason := RejectionReasonFidoFailure
-		_ = s.Cancel(ctx, e, Cancellation{From: payment.CancelledFromHolder, RejectionReason: &reason})
+		_ = s.Cancel(ctx, e, Cancellation{From: payment.TerminatedFromHolder, RejectionReason: &reason})
 		return nil, errorutil.Format("%w: relying party mismatch", ErrInvalidRelyingParty)
+	}
+
+	if e.Challenge != nil {
+		return nil, errorutil.Format("%w: challenge already exists", ErrFIDOOptionsAlreadyRegistered)
 	}
 
 	challenge := generateChallenge()
@@ -163,13 +189,13 @@ func (s Service) RegisterCredential(ctx context.Context, id, orgID string, crede
 	parsed, err := protocol.ParseCredentialCreationResponseBody(bytes.NewReader(data))
 	if err != nil {
 		reason := RejectionReasonFidoFailure
-		_ = s.Cancel(ctx, e, Cancellation{From: payment.CancelledFromHolder, RejectionReason: &reason})
+		_ = s.Cancel(ctx, e, Cancellation{From: payment.TerminatedFromHolder, RejectionReason: &reason})
 		return errorutil.Format("%w: invalid credential: %w", ErrInvalidPublicKey, err)
 	}
 
 	if !slices.Contains(e.Client.OriginURIs, parsed.Response.CollectedClientData.Origin) {
 		reason := RejectionReasonFidoFailure
-		_ = s.Cancel(ctx, e, Cancellation{From: payment.CancelledFromHolder, RejectionReason: &reason})
+		_ = s.Cancel(ctx, e, Cancellation{From: payment.TerminatedFromHolder, RejectionReason: &reason})
 		return errorutil.Format("%w: invalid credential: %w", ErrInvalidOrigin, err)
 	}
 
@@ -177,8 +203,8 @@ func (s Service) RegisterCredential(ctx context.Context, id, orgID string, crede
 		protocol.TopOriginIgnoreVerificationMode, nil, PublicKeyCredentialParameters)
 	if err != nil {
 		reason := RejectionReasonFidoFailure
-		_ = s.Cancel(ctx, e, Cancellation{From: payment.CancelledFromHolder, RejectionReason: &reason})
-		return errorutil.Format("%w: invalid credential: %w", ErrInvalidPublicKey, err)
+		_ = s.Cancel(ctx, e, Cancellation{From: payment.TerminatedFromHolder, RejectionReason: &reason})
+		return errorutil.Format("%w: invalid credential: %w", ErrInvalidChallenge, err)
 	}
 
 	publicKey := base64.RawStdEncoding.EncodeToString(parsed.Response.AttestationObject.AuthData.AttData.CredentialPublicKey)
@@ -203,8 +229,14 @@ func (s Service) InitAuthorization(ctx context.Context, consentID, enrollmentID,
 
 	var enrollConsent func(ctx context.Context, consentID, orgID string, opts payment.EnrollmentOptions) error
 	if strings.HasPrefix(consentID, payment.ConsentURNPrefix) {
+		if !slices.Contains(e.Permissions, PermissionRecurringPaymentsInitiate) {
+			return "", errorutil.Format("%w: permission not allowed", ErrInvalidPermissions)
+		}
 		enrollConsent = s.paymentService.EnrollConsent
 	} else if strings.HasPrefix(consentID, autopayment.ConsentURNPrefix) {
+		if !slices.Contains(e.Permissions, PermissionPaymentsInitiate) {
+			return "", errorutil.Format("%w: permission not allowed", ErrInvalidPermissions)
+		}
 		enrollConsent = s.autopaymentService.EnrollConsent
 	} else {
 		return "", errorutil.New("invalid consent id")
@@ -235,74 +267,53 @@ func (s Service) AuthorizeConsent(ctx context.Context, consentID, id, orgID stri
 	}
 
 	if e.Status != StatusAuthorized {
-		_ = s.rejectConsent(ctx, consentID, orgID, "enrollment is not in authorized status")
+		_, _ = s.paymentService.RejectConsentByID(ctx, consentID, orgID, payment.ConsentRejectionNotProvided, "enrollment is not in authorized status")
 		return errorutil.Format("%w: enrollment is not in authorized status", ErrInvalidStatus)
 	}
 
-	data, err := json.Marshal(assertion)
+	c, err := s.paymentService.Consent(ctx, consentID, orgID)
 	if err != nil {
-		return errorutil.New("invalid assertion")
-	}
-
-	parsed, err := protocol.ParseCredentialRequestResponseBody(bytes.NewReader(data))
-	if err != nil {
-		return errorutil.New("invalid assertion")
-	}
-
-	publicKey, _ := base64.RawStdEncoding.DecodeString(*e.PublicKey)
-	var verify = func(challenge *string) error {
-		if challenge == nil {
-			return errorutil.New("challenge was not initialized")
-		}
-
-		if err := parsed.Verify(*challenge, e.RelyingParty, e.Client.OriginURIs, nil,
-			protocol.TopOriginIgnoreVerificationMode, "", true, publicKey); err != nil {
-			return errorutil.Format("%w: %w", ErrInvalidAssertion, err)
-		}
-		return nil
-	}
-
-	if strings.HasPrefix(consentID, payment.ConsentURNPrefix) {
-		c, err := s.paymentService.Consent(ctx, consentID, orgID)
-		if err != nil {
-			return err
-		}
-		if err := verify(c.EnrollmentChallenge); err != nil {
-			_ = s.rejectConsent(ctx, consentID, orgID, "error verifying enrollment challenge")
-			return err
-		}
-		return s.paymentService.AuthorizeConsent(ctx, c)
-	}
-	if strings.HasPrefix(consentID, autopayment.ConsentURNPrefix) {
-		c, err := s.autopaymentService.Consent(ctx, consentID, orgID)
-		if err != nil {
-			return err
-		}
-		if err := verify(c.EnrollmentChallenge); err != nil {
-			_ = s.rejectConsent(ctx, consentID, orgID, "error verifying enrollment challenge")
-			return err
-		}
-		return s.autopaymentService.AuthorizeConsent(ctx, c)
-	}
-
-	return errorutil.New("invalid consent ID")
-}
-
-func (s Service) rejectConsent(ctx context.Context, id, orgID, detail string) error {
-	if strings.HasPrefix(id, payment.ConsentURNPrefix) {
-		_, err := s.paymentService.RejectConsentByID(ctx, id, orgID, payment.ConsentRejectionNotProvided, detail)
 		return err
 	}
-	if strings.HasPrefix(id, autopayment.ConsentURNPrefix) {
-		_, err := s.autopaymentService.RejectConsentByID(ctx, id, orgID, autopayment.ConsentRejection{
+
+	if err := verifyChallenge(ctx, c.EnrollmentChallenge, e, assertion); err != nil {
+		_, _ = s.paymentService.RejectConsentByID(ctx, consentID, orgID, payment.ConsentRejectionNotProvided, "error verifying enrollment challenge")
+		return err
+	}
+	return s.paymentService.AuthorizeConsent(ctx, c)
+}
+
+func (s Service) AuthorizeRecurringConsent(ctx context.Context, consentID, id, orgID string, assertion FIDOAssertion) error {
+	e, err := s.Enrollment(ctx, Query{ID: id, LoadClient: true}, orgID)
+	if err != nil {
+		return err
+	}
+
+	if e.Status != StatusAuthorized {
+		_, _ = s.autopaymentService.RejectConsentByID(ctx, consentID, orgID, autopayment.ConsentRejection{
 			By:     autopayment.TerminatedByHolder,
-			From:   autopayment.TerminatedFromHolder,
+			From:   payment.TerminatedFromHolder,
 			Code:   autopayment.ConsentRejectionNotProvided,
-			Detail: detail,
+			Detail: "enrollment is not in authorized status",
+		})
+		return errorutil.Format("%w: enrollment is not in authorized status", ErrInvalidStatus)
+	}
+
+	c, err := s.autopaymentService.Consent(ctx, consentID, orgID)
+	if err != nil {
+		return err
+	}
+
+	if err := verifyChallenge(ctx, c.EnrollmentChallenge, e, assertion); err != nil {
+		_, _ = s.autopaymentService.RejectConsentByID(ctx, consentID, orgID, autopayment.ConsentRejection{
+			By:     autopayment.TerminatedByHolder,
+			From:   payment.TerminatedFromHolder,
+			Code:   autopayment.ConsentRejectionNotProvided,
+			Detail: "error verifying enrollment challenge",
 		})
 		return err
 	}
-	return errorutil.New("invalid consent ID")
+	return s.autopaymentService.AuthorizeConsent(ctx, c)
 }
 
 func (s Service) Enrollment(ctx context.Context, query Query, orgID string) (*Enrollment, error) {
@@ -333,17 +344,17 @@ func (s Service) Enrollment(ctx context.Context, query Query, orgID string) (*En
 	case StatusAwaitingRiskSignals:
 		if timeutil.DateTimeNow().After(e.CreatedAt.Add(5 * time.Minute)) {
 			reason := RejectionReasonAwaitingRiskSignals
-			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.CancelledFromHolder})
+			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.TerminatedFromHolder})
 		}
 	case StatusAwaitingAccountHolderValidation:
 		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(15 * time.Minute)) {
 			reason := RejectionReasonAwaitingAccountHolderValidation
-			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.CancelledFromHolder})
+			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.TerminatedFromHolder})
 		}
 	case StatusAwaitingEnrollment:
 		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(CredentialRegistrationTimeout)) {
 			reason := RejectionReasonAwaitingEnrollment
-			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.CancelledFromHolder})
+			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.TerminatedFromHolder})
 		}
 	}
 
@@ -368,42 +379,13 @@ func (s Service) Cancel(ctx context.Context, e *Enrollment, cancellation Cancell
 		status = StatusRevoked
 	}
 
-	if cancellation.From == payment.CancelledFromHolder {
+	if cancellation.From == payment.TerminatedFromHolder {
 		now := timeutil.DateTimeNow()
 		cancellation.At = &now
 	}
 
 	e.Cancellation = &cancellation
 	return s.updateStatus(ctx, e, status)
-}
-
-func (s Service) validate(_ context.Context, e *Enrollment, debtorAccount *payment.Account) error {
-	for _, p := range e.Permissions {
-		if p != PermissionPaymentsInitiate {
-			return errorutil.Format("%w: permission %s is not allowed", ErrInvalidPermissions, p)
-		}
-	}
-
-	if e.RelyingParty == "" {
-		return errorutil.Format("%w: relying party is required", ErrMissingValue)
-	}
-
-	if e.UserRel != consent.RelationCPF {
-		return errorutil.Format("%w: only CPF is allowed for logged user document relation", ErrInvalidData)
-	}
-
-	if e.BusinessRel != nil && *e.BusinessRel != consent.RelationCNPJ {
-		return errorutil.Format("%w: only CNPJ is allowed for business document relation", ErrInvalidData)
-	}
-
-	if debtorAccount != nil && slices.Contains([]payment.AccountType{
-		payment.AccountTypeCACC,
-		payment.AccountTypeSVGS,
-	}, debtorAccount.Type) && debtorAccount.Issuer == nil {
-		return errorutil.Format("%w: debtor account issuer is required for account types CACC or SVGS", ErrMissingValue)
-	}
-
-	return nil
 }
 
 func (s Service) updateStatus(ctx context.Context, e *Enrollment, status Status) error {
@@ -428,6 +410,30 @@ func (s Service) update(ctx context.Context, e *Enrollment) error {
 		Where("id = ? AND org_id = ?", e.ID, e.OrgID).
 		Updates(e).Error; err != nil {
 		return fmt.Errorf("could not update enrollment: %w", err)
+	}
+	return nil
+}
+
+func verifyChallenge(_ context.Context, challenge *string, e *Enrollment, assertion FIDOAssertion) error {
+	if challenge == nil {
+		return errorutil.New("challenge was not initialized")
+	}
+
+	data, err := json.Marshal(assertion)
+	if err != nil {
+		return errorutil.New("invalid assertion")
+	}
+
+	parsed, err := protocol.ParseCredentialRequestResponseBody(bytes.NewReader(data))
+	if err != nil {
+		return errorutil.New("invalid assertion")
+	}
+
+	publicKey, _ := base64.RawStdEncoding.DecodeString(*e.PublicKey)
+
+	if err := parsed.Verify(*challenge, e.RelyingParty, e.Client.OriginURIs, nil,
+		protocol.TopOriginIgnoreVerificationMode, "", true, publicKey); err != nil {
+		return errorutil.Format("%w: %w", ErrInvalidAssertion, err)
 	}
 	return nil
 }

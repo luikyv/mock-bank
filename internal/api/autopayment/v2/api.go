@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/google/uuid"
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
@@ -75,6 +76,18 @@ func (s Server) Handler() (http.Handler, string) {
 	clientCredentialsAuthMiddleware := middleware.Auth(s.op, goidc.GrantClientCredentials, autopayment.Scope)
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID)
 	swaggerMiddleware, swaggerVersion := middleware.Swagger(GetSwagger, func(err error) api.Error {
+		var schemaErr *openapi3.SchemaError
+		if errors.As(err, &schemaErr) {
+			path := schemaErr.JSONPointer()
+			value := schemaErr.Value.(map[string]any)
+			if path[len(path)-1] == "recurringConfiguration" && len(value) == 0 {
+				return api.NewError("PARAMETRO_NAO_INFORMADO", http.StatusUnprocessableEntity, err.Error())
+			}
+
+			if schemaErr.SchemaField == "oneOf" {
+				return api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error())
+			}
+		}
 		if strings.Contains(err.Error(), "is missing") {
 			return api.NewError("PARAMETRO_NAO_INFORMADO", http.StatusUnprocessableEntity, err.Error())
 		}
@@ -158,7 +171,8 @@ func (s Server) AutomaticPaymentsPostRecurringConsents(ctx context.Context, req 
 	}
 	if business := req.Body.Data.BusinessEntity; business != nil {
 		c.BusinessIdentification = &business.Document.Identification
-		c.BusinessIdentification = &business.Document.Rel
+		rel := consent.Relation(business.Document.Rel)
+		c.BusinessRel = &rel
 	}
 
 	for _, creditor := range req.Body.Data.Creditors {
@@ -433,14 +447,14 @@ func (s Server) AutomaticPaymentsPatchRecurringConsentsConsentID(ctx context.Con
 	if action, _ := req.Body.Data.AsConsentRejection(); action.Status != nil && *action.Status == ConsentRejectionStatusREJECTED {
 		c, err = s.service.RejectConsentByID(ctx, req.RecurringConsentID, orgID, autopayment.ConsentRejection{
 			By:     autopayment.TerminatedBy(action.Rejection.RejectedBy),
-			From:   autopayment.TerminatedFrom(action.Rejection.RejectedFrom),
+			From:   payment.TerminatedFrom(action.Rejection.RejectedFrom),
 			Code:   autopayment.ConsentRejectionCode(action.Rejection.Reason.Code),
 			Detail: action.Rejection.Reason.Detail,
 		})
 	} else if action, _ := req.Body.Data.AsConsentRevocation(); action.Status != nil && *action.Status == REVOKED {
 		c, err = s.service.RevokeConsent(ctx, req.RecurringConsentID, orgID, autopayment.ConsentRevocation{
 			By:     autopayment.TerminatedBy(action.Revocation.RevokedBy),
-			From:   autopayment.TerminatedFrom(action.Revocation.RevokedFrom),
+			From:   payment.TerminatedFrom(action.Revocation.RevokedFrom),
 			Code:   autopayment.ConsentRevocationCode(action.Revocation.Reason.Code),
 			Detail: action.Revocation.Reason.Detail,
 		})
@@ -1014,6 +1028,10 @@ func (s Server) AutomaticPaymentsPatchPixRecurringPaymentsPaymentID(ctx context.
 	}
 
 	return AutomaticPaymentsPatchPixRecurringPaymentsPaymentID200JSONResponse{N200RecurringPaymentsIDPatchJSONResponse(resp)}, nil
+}
+
+func (s Server) AutomaticPaymentsPostPixRecurringPaymentsRetry(ctx context.Context, req AutomaticPaymentsPostPixRecurringPaymentsRetryRequestObject) (AutomaticPaymentsPostPixRecurringPaymentsRetryResponseObject, error) {
+	return nil, nil
 }
 
 func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {

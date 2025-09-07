@@ -34,7 +34,7 @@ func AWSConfig(ctx context.Context, env Environment) (*aws.Config, error) {
 	}
 
 	if env == LocalEnvironment {
-		cfg.BaseEndpoint = aws.String("http://localstack.local:4566")
+		cfg.BaseEndpoint = aws.String("http://aws.local:4566")
 		cfg.Credentials = credentials.NewStaticCredentialsProvider("test", "test", "")
 	}
 	return &cfg, nil

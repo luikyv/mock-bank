@@ -72,14 +72,19 @@ actions:
 - target: $.components.schemas.ConsentRevocation
   update:
     required: [revocation]
+
 - target: $.components.schemas.ConsentRejection
   update:
     required: [rejection]
+
 - target: $.components.schemas.ConsentEdition
   update:
     x-go-type: autopayment.ConsentEdition
     x-go-type-import:
       path: github.com/luikyv/mock-bank/internal/autopayment
+
+- target: $.components.schemas.ConsentEdition.properties.loggedUser.properties.document.required
+  remove: true
 
 - target: $.components.parameters.originalRecurringPaymentId
   update:
@@ -177,3 +182,18 @@ actions:
     application/json:
       schema:
         $ref: '#/components/schemas/ResponseRecurringPaymentsIdPatch'
+
+- target: $.paths./pix/recurring-payments/{originalRecurringPaymentId}/retry.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./pix/recurring-payments/{originalRecurringPaymentId}/retry.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/CreateRecurringRetryPixPayment'
+- target: $.components.responses.201RecurringRetryPaymentsIdPost.content.application/jwt
+  remove: true
+- target: $.components.responses.201RecurringRetryPaymentsIdPost.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ResponseRecurringRetryPaymentsIdPost'

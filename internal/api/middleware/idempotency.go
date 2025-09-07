@@ -66,7 +66,7 @@ func Idempotency(service idempotency.Service) func(http.Handler) http.Handler {
 			err = service.Create(r.Context(), &idempotency.Record{
 				ID:         idempotencyID,
 				Request:    base64.RawStdEncoding.EncodeToString(bodyBytes),
-				Response:   recorder.Body.String(),
+				Response:   base64.RawStdEncoding.EncodeToString(recorder.Body.Bytes()),
 				StatusCode: recorder.StatusCode,
 			})
 			if err != nil {
@@ -87,7 +87,11 @@ func writeIdempotencyResp(w http.ResponseWriter, r *http.Request, rec *idempoten
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(rec.StatusCode)
 
-	resp, _ := base64.RawStdEncoding.DecodeString(rec.Response)
+	resp, err := base64.RawStdEncoding.DecodeString(rec.Response)
+	if err != nil {
+		slog.ErrorContext(r.Context(), "failed to decode cached idempotent response body", "error", err)
+		return
+	}
 	if _, err := w.Write(resp); err != nil {
 		slog.ErrorContext(r.Context(), "failed to write cached idempotent response body", "error", err)
 	}

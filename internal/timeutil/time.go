@@ -49,7 +49,6 @@ func (d *DateTime) UnmarshalJSON(data []byte) error {
 
 func (d *DateTime) Scan(value any) error {
 	if value == nil {
-		d.Time = time.Time{}
 		return nil
 	}
 
@@ -63,11 +62,11 @@ func (d *DateTime) Scan(value any) error {
 }
 
 func (d DateTime) Value() (driver.Value, error) {
-	return d.Time.UTC(), nil
+	return d.UTC(), nil
 }
 
 func (d DateTime) String() string {
-	return d.Time.Format(dateTimeFormat)
+	return d.Format(dateTimeFormat)
 }
 
 func (d DateTime) BrazilDate() BrazilDate {
@@ -154,7 +153,7 @@ func (d *BrazilDate) UnmarshalJSON(data []byte) error {
 }
 
 func (d BrazilDate) String() string {
-	return d.Time.Format(dateFormat)
+	return d.Format(dateFormat)
 }
 
 func (d *BrazilDate) Scan(value any) error {
@@ -222,6 +221,10 @@ func (d BrazilDate) StartOfYear() BrazilDate {
 
 func (d BrazilDate) EndOfYear() BrazilDate {
 	return NewBrazilDate(time.Date(d.Year(), 12, 31, 12, 0, 0, 0, d.Location()))
+}
+
+func (d BrazilDate) WithDay(day int) BrazilDate {
+	return NewBrazilDate(time.Date(d.Year(), d.Month(), day, 12, 0, 0, 0, d.Location()))
 }
 
 func BrazilDateNow() BrazilDate {

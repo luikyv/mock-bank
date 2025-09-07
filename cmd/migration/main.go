@@ -175,3 +175,7 @@ func createOAuthClients(ctx context.Context, db *gorm.DB) error {
 
 	return nil
 }
+
+func pointerOf[T any](v T) *T {
+	return &v
+}

@@ -1,5 +1,4 @@
 services:
-
   mockbank:
     build:
       context: .
@@ -7,15 +6,13 @@ services:
     environment:
       - ENV=LOCAL
       - AWS_REGION=us-east-1
-    ports:
-      - "80:80"
     depends_on:
-      localstack:
+      aws:
         condition: service_healthy
       psql:
         condition: service_started
 
-  localstack:
+  aws:
     image: localstack/localstack
     ports:
       - "4566:4566"
@@ -37,7 +34,7 @@ services:
     networks:
       default:
         aliases:
-          - localstack.local
+          - aws.local
 
   psql:
     image: postgres
@@ -69,10 +66,10 @@ services:
         aliases:
           - database.local
 
-  mockgw:
+  gateway:
     build:
       context: .
-      dockerfile: cmd/mockgw/Dockerfile
+      dockerfile: cmd/gateway/Dockerfile
     volumes:
       - ./testdata/keys/server.crt:/mocks/server.crt:ro
       - ./testdata/keys/server.key:/mocks/server.key:ro
@@ -120,7 +117,7 @@ services:
     volumes:
       - ./db/migrations:/app/db/migrations:ro
     depends_on:
-      localstack:
+      aws:
         condition: service_healthy
       psql:
         condition: service_started

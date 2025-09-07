@@ -159,7 +159,6 @@ actions:
             required:
               - rp
               - platform
-              - consentId
             properties:
               rp:
                 type: string
@@ -172,6 +171,8 @@ actions:
                   - IOS
               consentId:
                 $ref: '#/components/schemas/consentId'
+              recurringConsentId:
+                $ref: '#/components/schemas/recurringConsentIdSignOptions'
 
 - target: $.paths./enrollments/{enrollmentId}/risk-signals.post.requestBody.content.application/jwt
   remove: true
@@ -184,6 +185,14 @@ actions:
 - target: $.paths./consents/{consentId}/authorise.post.requestBody.content.application/jwt
   remove: true
 - target: $.paths./consents/{consentId}/authorise.post.requestBody.content
+  update:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ConsentAuthorization'
+
+- target: $.paths./recurring-consents/{recurringConsentId}/authorise.post.requestBody.content.application/jwt
+  remove: true
+- target: $.paths./recurring-consents/{recurringConsentId}/authorise.post.requestBody.content
   update:
     application/json:
       schema:

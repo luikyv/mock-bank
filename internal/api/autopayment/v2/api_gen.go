@@ -65,6 +65,20 @@ const (
 	N422ResponseErrorCreateRecurringPaymentsPaymentIDErrorsCodePARAMETRONAOINFORMADO            N422ResponseErrorCreateRecurringPaymentsPaymentIDErrorsCode = "PARAMETRO_NAO_INFORMADO"
 )
 
+// Defines values for N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode.
+const (
+	N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCodeCONSENTIMENTOINVALIDO        N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode = "CONSENTIMENTO_INVALIDO"
+	N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCodeDETALHETENTATIVAINVALIDO     N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode = "DETALHE_TENTATIVA_INVALIDO"
+	N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCodeERROIDEMPOTENCIA             N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode = "ERRO_IDEMPOTENCIA"
+	N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCodeFALHAINFRAESTRUTURADETENTORA N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode = "FALHA_INFRAESTRUTURA_DETENTORA"
+	N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCodeFORAPRAZOPERMITIDO           N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode = "FORA_PRAZO_PERMITIDO"
+	N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCodeLIMITETENTATIVASEXCEDIDO     N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode = "LIMITE_TENTATIVAS_EXCEDIDO"
+	N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCodeNAOPERMITIDO                 N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode = "NAO_PERMITIDO"
+	N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCodePAGAMENTORECUSADODETENTORA   N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode = "PAGAMENTO_RECUSADO_DETENTORA"
+	N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCodePARAMETROINVALIDO            N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode = "PARAMETRO_INVALIDO"
+	N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCodePARAMETRONAOINFORMADO        N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode = "PARAMETRO_NAO_INFORMADO"
+)
+
 // Defines values for N422ResponseErrorRecurringConsentsErrorsCode.
 const (
 	N422ResponseErrorRecurringConsentsErrorsCodeCAMPONAOPERMITIDO                   N422ResponseErrorRecurringConsentsErrorsCode = "CAMPO_NAO_PERMITIDO"
@@ -120,9 +134,7 @@ const (
 	ConsentRejectionReasonCodeFALHAINFRAESTRUTURA       ConsentRejectionReasonCode = "FALHA_INFRAESTRUTURA"
 	ConsentRejectionReasonCodeNAOINFORMADO              ConsentRejectionReasonCode = "NAO_INFORMADO"
 	ConsentRejectionReasonCodeREJEITADOUSUARIO          ConsentRejectionReasonCode = "REJEITADO_USUARIO"
-	ConsentRejectionReasonCodeSALDOINSUFICIENTE         ConsentRejectionReasonCode = "SALDO_INSUFICIENTE"
 	ConsentRejectionReasonCodeTEMPOEXPIRADOAUTORIZACAO  ConsentRejectionReasonCode = "TEMPO_EXPIRADO_AUTORIZACAO"
-	ConsentRejectionReasonCodeVALORACIMALIMITE          ConsentRejectionReasonCode = "VALOR_ACIMA_LIMITE"
 )
 
 // Defines values for ConsentRevocationRevocationRevokedBy.
@@ -171,6 +183,7 @@ const (
 
 // Defines values for CreateRecurringPixPaymentDataLocalInstrument.
 const (
+	CreateRecurringPixPaymentDataLocalInstrumentAUTO CreateRecurringPixPaymentDataLocalInstrument = "AUTO"
 	CreateRecurringPixPaymentDataLocalInstrumentDICT CreateRecurringPixPaymentDataLocalInstrument = "DICT"
 	CreateRecurringPixPaymentDataLocalInstrumentINIC CreateRecurringPixPaymentDataLocalInstrument = "INIC"
 	CreateRecurringPixPaymentDataLocalInstrumentMANU CreateRecurringPixPaymentDataLocalInstrument = "MANU"
@@ -383,9 +396,9 @@ const (
 
 // Defines values for ResponseRecurringConsentPatchDataRevocationReasonCode.
 const (
-	NAOINFORMADO      ResponseRecurringConsentPatchDataRevocationReasonCode = "NAO_INFORMADO"
-	REVOGADORECEBEDOR ResponseRecurringConsentPatchDataRevocationReasonCode = "REVOGADO_RECEBEDOR"
-	REVOGADOUSUARIO   ResponseRecurringConsentPatchDataRevocationReasonCode = "REVOGADO_USUARIO"
+	ResponseRecurringConsentPatchDataRevocationReasonCodeNAOINFORMADO      ResponseRecurringConsentPatchDataRevocationReasonCode = "NAO_INFORMADO"
+	ResponseRecurringConsentPatchDataRevocationReasonCodeREVOGADORECEBEDOR ResponseRecurringConsentPatchDataRevocationReasonCode = "REVOGADO_RECEBEDOR"
+	ResponseRecurringConsentPatchDataRevocationReasonCodeREVOGADOUSUARIO   ResponseRecurringConsentPatchDataRevocationReasonCode = "REVOGADO_USUARIO"
 )
 
 // Defines values for ResponseRecurringConsentPatchDataRevocationRevokedBy.
@@ -416,6 +429,7 @@ const (
 
 // Defines values for ResponseRecurringPaymentsDataPatchLocalInstrument.
 const (
+	ResponseRecurringPaymentsDataPatchLocalInstrumentAUTO ResponseRecurringPaymentsDataPatchLocalInstrument = "AUTO"
 	ResponseRecurringPaymentsDataPatchLocalInstrumentDICT ResponseRecurringPaymentsDataPatchLocalInstrument = "DICT"
 	ResponseRecurringPaymentsDataPatchLocalInstrumentINIC ResponseRecurringPaymentsDataPatchLocalInstrument = "INIC"
 	ResponseRecurringPaymentsDataPatchLocalInstrumentMANU ResponseRecurringPaymentsDataPatchLocalInstrument = "MANU"
@@ -436,6 +450,7 @@ const (
 
 // Defines values for ResponseRecurringPaymentsDataReadLocalInstrument.
 const (
+	ResponseRecurringPaymentsDataReadLocalInstrumentAUTO ResponseRecurringPaymentsDataReadLocalInstrument = "AUTO"
 	ResponseRecurringPaymentsDataReadLocalInstrumentDICT ResponseRecurringPaymentsDataReadLocalInstrument = "DICT"
 	ResponseRecurringPaymentsDataReadLocalInstrumentINIC ResponseRecurringPaymentsDataReadLocalInstrument = "INIC"
 	ResponseRecurringPaymentsDataReadLocalInstrumentMANU ResponseRecurringPaymentsDataReadLocalInstrument = "MANU"
@@ -456,6 +471,7 @@ const (
 
 // Defines values for ResponseRecurringPaymentsPostDataLocalInstrument.
 const (
+	ResponseRecurringPaymentsPostDataLocalInstrumentAUTO ResponseRecurringPaymentsPostDataLocalInstrument = "AUTO"
 	ResponseRecurringPaymentsPostDataLocalInstrumentDICT ResponseRecurringPaymentsPostDataLocalInstrument = "DICT"
 	ResponseRecurringPaymentsPostDataLocalInstrumentINIC ResponseRecurringPaymentsPostDataLocalInstrument = "INIC"
 	ResponseRecurringPaymentsPostDataLocalInstrumentMANU ResponseRecurringPaymentsPostDataLocalInstrument = "MANU"
@@ -595,6 +611,64 @@ type N422ResponseErrorCreateRecurringPaymentsPaymentID struct {
 // - PARAMETRO_NAO_INFORMADO: Algum ou todos os campos obrigatórios não foram informados.
 type N422ResponseErrorCreateRecurringPaymentsPaymentIDErrorsCode string
 
+// N422ResponseErrorCreateRetryPixRecurringPayment defines model for 422ResponseErrorCreateRetryPixRecurringPayment.
+type N422ResponseErrorCreateRetryPixRecurringPayment struct {
+	Errors []struct {
+		// Code Códigos de erros previstos na criação da iniciação de pagamento:
+		// - ERRO_IDEMPOTENCIA: Erro idempotência.
+		// - CONSENTIMENTO_INVALIDO: Consentimento inválido (em status final).
+		// - PARAMETRO_NAO_INFORMADO: Parâmetro não informado.
+		// - PARAMETRO_INVALIDO: Parâmetro inválido.
+		// - PAGAMENTO_RECUSADO_DETENTORA: Pagamento recusado pela detentora de conta.
+		// - FALHA_INFRAESTRUTURA_DETENTORA - Ocorreu uma falha de infraestrutura interna na detentora durante o processamento do pagamento.
+		// - LIMITE_TENTATIVAS_EXCEDIDO: O limite de tentativas para liquidação do pagamento permitidas pelo arranjo foi excedido.
+		// - FORA_PRAZO_PERMITIDO: O horário ou período da requisição não permite o agendamento pelo detentor.
+		// - DETALHE_TENTATIVA_INVALIDO: O parâmetro [nome_do(s)_campo(s)] inseridos para a nova tentativa de pagamento não condizem com o pagamento original que falhou e não são permitidos na nova tentativa de pagamento.
+		// - NAO_PERMITIDO: Valida se o valor do originalRecurringPaymentId aponta para um pagamento de Pix Automático
+		Code N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode `json:"code"`
+
+		// Detail Descrição específica do erro de acordo com o código reportado:
+		// - ERRO_IDEMPOTENCIA: Erro idempotência.
+		// - CONSENTIMENTO_INVALIDO: Consentimento inválido (em status final).
+		// - PARAMETRO_NAO_INFORMADO: Parâmetro não informado.
+		// - PARAMETRO_INVALIDO: Parâmetro inválido.
+		// - PAGAMENTO_RECUSADO_DETENTORA: Pagamento recusado pela detentora de conta.
+		// - FALHA_INFRAESTRUTURA_DETENTORA - Ocorreu uma falha de infraestrutura interna na detentora durante o processamento do pagamento.
+		// - LIMITE_TENTATIVAS_EXCEDIDO: O limite de tentativas para liquidação do pagamento permitidas pelo arranjo foi excedido.
+		// - FORA_PRAZO_PERMITIDO: O horário ou período da requisição não permite o agendamento pelo detentor.
+		// - DETALHE_TENTATIVA_INVALIDO: O parâmetro [nome_do(s)_campo(s)] inseridos para a nova tentativa de pagamento não condizem com o pagamento original que falhou e não são permitidos na nova tentativa de pagamento.
+		// - NAO_PERMITIDO: Valida se o valor do originalRecurringPaymentId aponta para um pagamento de Pix Automático
+		Detail string `json:"detail"`
+
+		// Title Título específico do erro reportado, de acordo com o código enviado:
+		// - ERRO_IDEMPOTENCIA: Erro idempotência.
+		// - CONSENTIMENTO_INVALIDO: Consentimento inválido (em status final).
+		// - PARAMETRO_NAO_INFORMADO: Parâmetro não informado.
+		// - PARAMETRO_INVALIDO: Parâmetro inválido.
+		// - PAGAMENTO_RECUSADO_DETENTORA: Pagamento recusado pela detentora de conta.
+		// - FALHA_INFRAESTRUTURA_DETENTORA - Ocorreu uma falha de infraestrutura interna na detentora durante o processamento do pagamento.
+		// - LIMITE_TENTATIVAS_EXCEDIDO: Limite de tentativas excedido.
+		// - FORA_PRAZO_PERMITIDO: Tentativa fora do prazo.
+		// - DETALHE_TENTATIVA_INVALIDO: Nova tentativa inválida
+		// - NAO_PERMITIDO: Valida se o valor do originalRecurringPaymentId aponta para um pagamento de Pix Automático
+		Title string `json:"title"`
+	} `json:"errors"`
+	Meta *api.Meta `json:"meta,omitempty"`
+}
+
+// N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode Códigos de erros previstos na criação da iniciação de pagamento:
+// - ERRO_IDEMPOTENCIA: Erro idempotência.
+// - CONSENTIMENTO_INVALIDO: Consentimento inválido (em status final).
+// - PARAMETRO_NAO_INFORMADO: Parâmetro não informado.
+// - PARAMETRO_INVALIDO: Parâmetro inválido.
+// - PAGAMENTO_RECUSADO_DETENTORA: Pagamento recusado pela detentora de conta.
+// - FALHA_INFRAESTRUTURA_DETENTORA - Ocorreu uma falha de infraestrutura interna na detentora durante o processamento do pagamento.
+// - LIMITE_TENTATIVAS_EXCEDIDO: O limite de tentativas para liquidação do pagamento permitidas pelo arranjo foi excedido.
+// - FORA_PRAZO_PERMITIDO: O horário ou período da requisição não permite o agendamento pelo detentor.
+// - DETALHE_TENTATIVA_INVALIDO: O parâmetro [nome_do(s)_campo(s)] inseridos para a nova tentativa de pagamento não condizem com o pagamento original que falhou e não são permitidos na nova tentativa de pagamento.
+// - NAO_PERMITIDO: Valida se o valor do originalRecurringPaymentId aponta para um pagamento de Pix Automático
+type N422ResponseErrorCreateRetryPixRecurringPaymentErrorsCode string
+
 // N422ResponseErrorRecurringConsents defines model for 422ResponseErrorRecurringConsents.
 type N422ResponseErrorRecurringConsents struct {
 	Errors []struct {
@@ -630,7 +704,7 @@ type N422ResponseErrorRecurringConsentsErrorsCode string
 type Automatic struct {
 	// Automatic Definição da configuração de recorrência para pagamentos automáticos
 	Automatic struct {
-		// ContractDebtor Informações sobre o cliente devedor do contrato.
+		// ContractDebtor Informações sobre o cliente devedor do contrato. Pode possuir titularidade diferente do usuário pagador descrito nos objetos "/data/loggedUser" e "/data/businessEntity".
 		ContractDebtor ContractDebtor `json:"contractDebtor"`
 
 		// ContractID Identificador do contrato de transação
@@ -668,8 +742,7 @@ type Automatic struct {
 		// Não representa um valor mínimo de cobrança para o pagamento.
 		MinimumVariableAmount *string `json:"minimumVariableAmount,omitempty"`
 
-		// ReferenceStartDate Representa a data prevista para a primeira ocorrência de um pagamento associado a recorrência.
-		// Uma string com data e hora conforme especificação [RFC-3339](https://datatracker.ietf.org/doc/html/rfc3339), sempre com a utilização de timezone UTC(UTC time format).
+		// ReferenceStartDate Representa a data prevista para o início do ciclo de cobrança dos pagamentos associados à recorrência. Trata-se de uma string com data conforme especificação RFC-3339, seguindo o horário de Brasília (UTC-3). O pagamento inicial avulso, declarado no objeto firstPayment do consentimento, não está sujeito a essa data.
 		ReferenceStartDate timeutil.BrazilDate `json:"referenceStartDate"`
 
 		// UseOverdraftLimit Indica se o usuário pagador autorizou a utilização de limite pré-aprovado (cheque especial) na sua conta para realização de pagamentos, caso o cliente possua o produto.
@@ -689,7 +762,7 @@ type AutomaticAutomaticInterval string
 type AutomaticRequest struct {
 	// Automatic Definição da configuração de recorrência para pagamentos automáticos
 	Automatic struct {
-		// ContractDebtor Informações sobre o cliente devedor do contrato.
+		// ContractDebtor Informações sobre o cliente devedor do contrato. Pode possuir titularidade diferente do usuário pagador descrito nos objetos "/data/loggedUser" e "/data/businessEntity".
 		ContractDebtor ContractDebtor `json:"contractDebtor"`
 
 		// ContractID Identificador do contrato de transação
@@ -727,8 +800,7 @@ type AutomaticRequest struct {
 		// Não representa um valor mínimo de cobrança para o pagamento.
 		MinimumVariableAmount *string `json:"minimumVariableAmount,omitempty"`
 
-		// ReferenceStartDate Representa a data prevista para a primeira ocorrência de um pagamento associado a recorrência.
-		// Uma string com data e hora conforme especificação [RFC-3339](https://datatracker.ietf.org/doc/html/rfc3339), sempre com a utilização de timezone UTC(UTC time format).
+		// ReferenceStartDate Representa a data prevista para o início do ciclo de cobrança dos pagamentos associados à recorrência. Trata-se de uma string com data conforme especificação RFC-3339, seguindo o horário de Brasília (UTC-3). O pagamento inicial avulso, declarado no objeto firstPayment do consentimento, não está sujeito a essa data.
 		ReferenceStartDate timeutil.BrazilDate `json:"referenceStartDate"`
 	} `json:"automatic"`
 }
@@ -797,8 +869,6 @@ type ConsentRejectionReason struct {
 	// - REJEITADO_USUARIO
 	// - CONTAS_ORIGEM_DESTINO_IGUAIS
 	// - CONTA_NAO_PERMITE_PAGAMENTO
-	// - SALDO_INSUFICIENTE
-	// - VALOR_ACIMA_LIMITE
 	// - AUTENTICACAO_DIVERGENTE
 	Code ConsentRejectionReasonCode `json:"code"`
 
@@ -809,8 +879,6 @@ type ConsentRejectionReason struct {
 	// - REJEITADO_USUARIO: O usuário rejeitou a autorização do consentimento;
 	// - CONTAS_ORIGEM_DESTINO_IGUAIS: A conta selecionada é igual à conta destino e não permite realizar esse pagamento;
 	// - CONTA_NAO_PERMITE_PAGAMENTO: A conta selecionada é do tipo [salario/investimento/liquidação/outros] e não permite realizar esse pagamento;
-	// - SALDO_INSUFICIENTE: A conta selecionada não possui saldo suficiente para realizar o pagamento;
-	// - VALOR_ACIMA_LIMITE: O valor ultrapassa o limite estabelecido para permitir a realização de transações pelo cliente;
 	// - AUTENTICACAO_DIVERGENTE : Usuário autenticado no detentor diverge do usuário autenticado no iniciador;
 	Detail string `json:"detail"`
 }
@@ -822,8 +890,6 @@ type ConsentRejectionReason struct {
 // - REJEITADO_USUARIO
 // - CONTAS_ORIGEM_DESTINO_IGUAIS
 // - CONTA_NAO_PERMITE_PAGAMENTO
-// - SALDO_INSUFICIENTE
-// - VALOR_ACIMA_LIMITE
 // - AUTENTICACAO_DIVERGENTE
 type ConsentRejectionReasonCode string
 
@@ -885,7 +951,7 @@ type ConsentRevokedReason struct {
 // - NAO_INFORMADO
 type ConsentRevokedReasonCode string
 
-// ContractDebtor Informações sobre o cliente devedor do contrato.
+// ContractDebtor Informações sobre o cliente devedor do contrato. Pode possuir titularidade diferente do usuário pagador descrito nos objetos "/data/loggedUser" e "/data/businessEntity".
 type ContractDebtor struct {
 	Document struct {
 		// Identification Número do documento de identificação oficial do cliente devedor do contrato.
@@ -1038,8 +1104,11 @@ type CreateRecurringPixPaymentData struct {
 	// - MANU - Inserção manual de dados da conta transacional
 	// - DICT - Inserção manual de chave Pix
 	// - INIC - Indica que o recebedor (creditor) contratou o Iniciador de Pagamentos especificamente para realizar iniciações de pagamento em que o beneficiário é previamente conhecido
+	// - AUTO - Indica o pagamento de uma recorrência de Pix automático, onde o consentimento foi previamente autorizado pelo pagador e o pagamento é realizado automaticamente pelo Iniciador de Pagamentos sob comando do recebedor.
 	//
-	// [Restrição] Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration"), apenas o método MANU é permitido.
+	// [Restrição]
+	// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar uma recorrência (valor do campo "/data/paymentReferente" diferente de "zero"), apenas o método AUTO é permitido, ou;
+	// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar o pagamento inicial avulso (valor do campo "/data/paymentReferente" igual a "zero"), apenas o método MANU é permitido.
 	LocalInstrument CreateRecurringPixPaymentDataLocalInstrument `json:"localInstrument"`
 
 	// OriginalRecurringPaymentID Campo que contém o código ou o identificador da tentativa original de pagamento que falhou.
@@ -1054,29 +1123,26 @@ type CreateRecurringPixPaymentData struct {
 	// Payment Objeto contendo as informações do pagamento.
 	Payment PaymentPix `json:"payment"`
 
-	// PaymentReference [Restrição]
-	// Campo de preenchimento obrigatório caso seja um pagamento de Pix automático, caso não respeitado, a instituição detentora deve retornar erro HTTP 422 com o código DETALHE_PAGAMENTO_INVALIDO.
-	//
-	// - Primeiro pagamento: Se for o pagamento inicial especificado em “/data/firstPayment”, preencha o campo com a string fixa “zero”.
-	// - Semanal: Preencha com W$numSemana-$ano, onde $numSemana representa o número da semana no ano. Exemplo: "W50-2024".
-	// - Mensal: Use M$mês-$ano, onde $mês representa o mês com dois dígitos. Exemplo: "M09-2024".
-	// - Trimestral: Utilize Q$trimestre-$ano, onde $trimestre indica o trimestre do ano (1 a 4).
-	//   - Janeiro a Março: Q1-$ano (ex.: "Q1-2024").
-	//   - Abril a Junho: Q2-$ano (ex.: "Q2-2024").
-	//   - Julho a Setembro: Q3-$ano (ex.: "Q3-2024").
-	//   - Outubro a Dezembro: Q4-$ano (ex.: "Q4-2024").
-	// - Semestral: Utilize $semestre-$ano, onde $semestre indica o semestre do ano (1 para janeiro a junho e 2 para julho a dezembro).
-	//   - Janeiro a Junho: S1-$ano (ex.: "S1-2024").
-	//   - Julho a Dezembro: S2-$ano (ex.: "S2-2024").
-	// - Anual: Use Y$ano, apenas com o ano. Exemplo: "Y2024".
-	//   - Exemplo de Formatos:
-	//     - Primeiro pagamento: "zero"
-	//     - Semanal: "W50-2024"
-	//     - Mensal: "M09-2024"
-	//     - Trimestral: "Q3-2024"
-	//     - Semestral: "S2-2024"
-	//     - Anual: "Y2024"
-	PaymentReference *string `json:"paymentReference,omitempty"`
+	// PaymentReference [Restrição]Campo de preenchimento obrigatório caso seja um pagamento de Pix automático e deve ser enviado para critérios de coleta de métricas do ecossistema. Caso essa regra não seja respeitada, a instituição detentora da conta deve retornar um erro HTTP 422 com o código DETALHE_PAGAMENTO_INVALIDO.
+	// - O preenchimento deve seguir a seguinte lógica:
+	//   - Primeiro Pagamento: Caso se trate do pagamento inicial avulso, especificado no campo “/data/firstPayment”, o valor deste campo deve ser preenchido com a string fixa "zero".
+	//   - Pagamentos Recorrentes (Subsequentes): Para todos os pagamentos recorrentes realizados após o pagamento inicial, o campo paymentReference deve ser preenchido com uma string de Intervalo ISO 8601 no formato ```<start>/<duration>```, que representa o ciclo exato ao qual o pagamento se refere.
+	//     - O componente ```<start>``` deve indicar a data de início do ciclo específico ao qual o pagamento enviado se refere.
+	//     - O componente ```<duration>``` deve corresponder ao código da periodicidade do consentimento (P1W para semanal, P1M para mensal, P3M para trimestral, P6M para semestral e P1Y para anual)
+	//     - Exemplos:
+	//       - 1: Data de início do ciclo definido no consentimento: 23/07/25
+	//         - Periodicidade definida no consentimento: Semanal
+	//         - Preenchimento do paymentReference:
+	//         - Primeiro ciclo: 23-07-2025/P1W
+	//         - Segundo ciclo: 30-07-2025/P1W
+	//         - Terceiro ciclo: 06-07-2025/P1W
+	//       - 2: Data de início do ciclo definido no consentimento: 23/07/25
+	//         - Periodicidade definida no consentimento: Mensal
+	//         - Preenchimento do paymentReference:
+	//         - Primeiro ciclo: 23-07-2025/P1M
+	//         - Segundo ciclo: 23-08-2025/P1M
+	//         - Terceiro ciclo: 23-09-2025/P1M
+	PaymentReference *PaymentReference `json:"paymentReference,omitempty"`
 
 	// Proxy Chave cadastrada no DICT pertencente ao recebedor. Os tipos de chaves podem ser: telefone, e-mail, cpf/cnpj ou chave aleatória.
 	// No caso de telefone celular deve ser informado no padrão E.1641. Para e-mail deve ter o formato xxxxxxxx@xxxxxxx.xxx(.xx) e no máximo 77 caracteres.
@@ -1118,8 +1184,9 @@ type CreateRecurringPixPaymentData struct {
 	// [Restrição] Preenchimento condicional de acordo com o conteúdo do campo localInstument:
 	// - MANU - O campo transactionIdentification não deve ser preenchido;
 	// - DICT - O campo transactionIdentification não deve ser preenchido;
-	// - INIC - O campo transactionIdentification deve ser preenchido obrigatoriamente e deve conter até 25 caracteres alfanuméricos ([a-z|A-Z|0-9]).
-	TransactionIdentification *string `json:"transactionIdentification,omitempty"`
+	// - INIC - O campo transactionIdentification deve ser preenchido obrigatoriamente e deve conter até 25 caracteres alfanuméricos ([a-z|A-Z|0-9]);
+	// - AUTO – O campo transactionIdentification não deve ser preenchido.
+	TransactionIdentification *TransactionIdentification `json:"transactionIdentification,omitempty"`
 }
 
 // CreateRecurringPixPaymentDataAuthorisationFlow Campo condicional utilizado para identificar o fluxo de autorização em que o pagamento foi solicitado.
@@ -1134,9 +1201,36 @@ type CreateRecurringPixPaymentDataDocumentRel string
 // - MANU - Inserção manual de dados da conta transacional
 // - DICT - Inserção manual de chave Pix
 // - INIC - Indica que o recebedor (creditor) contratou o Iniciador de Pagamentos especificamente para realizar iniciações de pagamento em que o beneficiário é previamente conhecido
+// - AUTO - Indica o pagamento de uma recorrência de Pix automático, onde o consentimento foi previamente autorizado pelo pagador e o pagamento é realizado automaticamente pelo Iniciador de Pagamentos sob comando do recebedor.
 //
-// [Restrição] Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration"), apenas o método MANU é permitido.
+// [Restrição]
+// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar uma recorrência (valor do campo "/data/paymentReferente" diferente de "zero"), apenas o método AUTO é permitido, ou;
+// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar o pagamento inicial avulso (valor do campo "/data/paymentReferente" igual a "zero"), apenas o método MANU é permitido.
 type CreateRecurringPixPaymentDataLocalInstrument string
+
+// CreateRecurringRetryPixPayment defines model for CreateRecurringRetryPixPayment.
+type CreateRecurringRetryPixPayment struct {
+	// Data Objeto contendo dados da nova tentativa de pagamento.
+	Data CreateRecurringRetryPixPaymentData `json:"data"`
+}
+
+// CreateRecurringRetryPixPaymentData Objeto contendo dados da nova tentativa de pagamento.
+type CreateRecurringRetryPixPaymentData struct {
+	// Date Data em que o pagamento será realizado. Uma string com a utilização de timezone UTC-3 (UTC time format).
+	Date timeutil.BrazilDate `json:"date"`
+
+	// EndToEndID Deve ser preenchido no formato padrão ExxxxxxxxyyyyMMddHHmmkkkkkkkkkkk (32 caracteres; "case sensitive", isso é, diferencia letras maiúsculas e minúsculas), sendo:
+	//
+	// - "E" - fixo (1 caractere);
+	// - xxxxxxxx - identificação do agente que gerou o EndToEndId, podendo ser: o ISPB do participante direto ou o ISPB do participante indireto (8 caracteres numéricos [0-9]);
+	// - yyyyMMddHHmm – data, hora e minuto (12 caracteres), seguindo o horário UTC, da submissão da ordem de pagamento, caso a liquidação seja prioritária, ou prevista para o envio da ordem ao sistema de liquidação, caso seja realizado um agendamento. Para ordens prioritárias e não prioritárias, aceita-se o preenchimento, pelo agente que gerou o EndToEndId, com uma tolerância máxima de 12 horas, para o futuro e para o passado, em relação ao horário efetivo de processamento da ordem pelo SPI;
+	// - kkkkkkkkkkk – sequência criada pelo agente que gerou o EndToEndId (11 caracteres alfanuméricos [a-z/A-Z/0-9]). Deve ser único dentro de cada “yyyyMMddHHmm”;
+	//
+	// Admite-se que o EndToEndId seja gerado pelo participante direto, pelo participante indireto ou pelo iniciador de pagamento.
+	//
+	// Ele deve ser único, não podendo ser repetido em qualquer outra operação enviada ao SPI.
+	EndToEndID EndToEndIDPost `json:"endToEndId"`
+}
 
 // CreditorAccount Objeto que contém a identificação da conta de destino do beneficiário/recebedor.
 // [Restrição]
@@ -1517,6 +1611,27 @@ type PaymentPix struct {
 	// Currency Código da moeda nacional segundo modelo ISO-4217, ou seja, 'BRL'. Todos os valores monetários informados estão representados com a moeda vigente do Brasil.
 	Currency string `json:"currency"`
 }
+
+// PaymentReference [Restrição]Campo de preenchimento obrigatório caso seja um pagamento de Pix automático e deve ser enviado para critérios de coleta de métricas do ecossistema. Caso essa regra não seja respeitada, a instituição detentora da conta deve retornar um erro HTTP 422 com o código DETALHE_PAGAMENTO_INVALIDO.
+// - O preenchimento deve seguir a seguinte lógica:
+//   - Primeiro Pagamento: Caso se trate do pagamento inicial avulso, especificado no campo “/data/firstPayment”, o valor deste campo deve ser preenchido com a string fixa "zero".
+//   - Pagamentos Recorrentes (Subsequentes): Para todos os pagamentos recorrentes realizados após o pagamento inicial, o campo paymentReference deve ser preenchido com uma string de Intervalo ISO 8601 no formato ```<start>/<duration>```, que representa o ciclo exato ao qual o pagamento se refere.
+//   - O componente ```<start>``` deve indicar a data de início do ciclo específico ao qual o pagamento enviado se refere.
+//   - O componente ```<duration>``` deve corresponder ao código da periodicidade do consentimento (P1W para semanal, P1M para mensal, P3M para trimestral, P6M para semestral e P1Y para anual)
+//   - Exemplos:
+//   - 1: Data de início do ciclo definido no consentimento: 23/07/25
+//   - Periodicidade definida no consentimento: Semanal
+//   - Preenchimento do paymentReference:
+//   - Primeiro ciclo: 23-07-2025/P1W
+//   - Segundo ciclo: 30-07-2025/P1W
+//   - Terceiro ciclo: 06-07-2025/P1W
+//   - 2: Data de início do ciclo definido no consentimento: 23/07/25
+//   - Periodicidade definida no consentimento: Mensal
+//   - Preenchimento do paymentReference:
+//   - Primeiro ciclo: 23-07-2025/P1M
+//   - Segundo ciclo: 23-08-2025/P1M
+//   - Terceiro ciclo: 23-09-2025/P1M
+type PaymentReference = string
 
 // PeriodicLimits Limites transacionais por período determinado pelo usuário pagador.
 type PeriodicLimits struct {
@@ -2335,8 +2450,11 @@ type ResponseRecurringPaymentsDataPatch struct {
 	// - MANU - Inserção manual de dados da conta transacional
 	// - DICT - Inserção manual de chave Pix
 	// - INIC - Indica que o recebedor (creditor) contratou o Iniciador de Pagamentos especificamente para realizar iniciações de pagamento em que o beneficiário é previamente conhecido
+	// - AUTO - Indica o pagamento de uma recorrência de Pix automático, onde o consentimento foi previamente autorizado pelo pagador e o pagamento é realizado automaticamente pelo Iniciador de Pagamentos sob comando do recebedor.
 	//
-	// [Restrição] Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration"), apenas o método MANU é permitido.
+	// [Restrição]
+	// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar uma recorrência (valor do campo "/data/paymentReferente" diferente de "zero"), apenas o método AUTO é permitido, ou;
+	// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar o pagamento inicial avulso (valor do campo "/data/paymentReferente" igual a "zero"), apenas o método MANU é permitido.
 	LocalInstrument ResponseRecurringPaymentsDataPatchLocalInstrument `json:"localInstrument"`
 
 	// OriginalRecurringPaymentID Campo que contém o código ou o identificador da tentativa original de pagamento que falhou.
@@ -2351,29 +2469,26 @@ type ResponseRecurringPaymentsDataPatch struct {
 	// Payment Objeto contendo as informações do pagamento.
 	Payment PaymentPix `json:"payment"`
 
-	// PaymentReference [Restrição]
-	// Campo de preenchimento obrigatório caso seja um pagamento de Pix automático, caso não respeitado, a instituição detentora deve retornar erro HTTP 422 com o código DETALHE_PAGAMENTO_INVALIDO.
-	//
-	// - Primeiro pagamento: Se for o pagamento inicial especificado em “/data/firstPayment”, preencha o campo com a string fixa “zero”.
-	// - Semanal: Preencha com W$numSemana-$ano, onde $numSemana representa o número da semana no ano. Exemplo: "W50-2024".
-	// - Mensal: Use M$mês-$ano, onde $mês representa o mês com dois dígitos. Exemplo: "M09-2024".
-	// - Trimestral: Utilize Q$trimestre-$ano, onde $trimestre indica o trimestre do ano (1 a 4).
-	//   - Janeiro a Março: Q1-$ano (ex.: "Q1-2024").
-	//   - Abril a Junho: Q2-$ano (ex.: "Q2-2024").
-	//   - Julho a Setembro: Q3-$ano (ex.: "Q3-2024").
-	//   - Outubro a Dezembro: Q4-$ano (ex.: "Q4-2024").
-	// - Semestral: Utilize $semestre-$ano, onde $semestre indica o semestre do ano (1 para janeiro a junho e 2 para julho a dezembro).
-	//   - Janeiro a Junho: S1-$ano (ex.: "S1-2024").
-	//   - Julho a Dezembro: S2-$ano (ex.: "S2-2024").
-	// - Anual: Use Y$ano, apenas com o ano. Exemplo: "Y2024".
-	//   - Exemplo de Formatos:
-	//     - Primeiro pagamento: "zero"
-	//     - Semanal: "W50-2024"
-	//     - Mensal: "M09-2024"
-	//     - Trimestral: "Q3-2024"
-	//     - Semestral: "S2-2024"
-	//     - Anual: "Y2024"
-	PaymentReference *string `json:"paymentReference,omitempty"`
+	// PaymentReference [Restrição]Campo de preenchimento obrigatório caso seja um pagamento de Pix automático e deve ser enviado para critérios de coleta de métricas do ecossistema. Caso essa regra não seja respeitada, a instituição detentora da conta deve retornar um erro HTTP 422 com o código DETALHE_PAGAMENTO_INVALIDO.
+	// - O preenchimento deve seguir a seguinte lógica:
+	//   - Primeiro Pagamento: Caso se trate do pagamento inicial avulso, especificado no campo “/data/firstPayment”, o valor deste campo deve ser preenchido com a string fixa "zero".
+	//   - Pagamentos Recorrentes (Subsequentes): Para todos os pagamentos recorrentes realizados após o pagamento inicial, o campo paymentReference deve ser preenchido com uma string de Intervalo ISO 8601 no formato ```<start>/<duration>```, que representa o ciclo exato ao qual o pagamento se refere.
+	//     - O componente ```<start>``` deve indicar a data de início do ciclo específico ao qual o pagamento enviado se refere.
+	//     - O componente ```<duration>``` deve corresponder ao código da periodicidade do consentimento (P1W para semanal, P1M para mensal, P3M para trimestral, P6M para semestral e P1Y para anual)
+	//     - Exemplos:
+	//       - 1: Data de início do ciclo definido no consentimento: 23/07/25
+	//         - Periodicidade definida no consentimento: Semanal
+	//         - Preenchimento do paymentReference:
+	//         - Primeiro ciclo: 23-07-2025/P1W
+	//         - Segundo ciclo: 30-07-2025/P1W
+	//         - Terceiro ciclo: 06-07-2025/P1W
+	//       - 2: Data de início do ciclo definido no consentimento: 23/07/25
+	//         - Periodicidade definida no consentimento: Mensal
+	//         - Preenchimento do paymentReference:
+	//         - Primeiro ciclo: 23-07-2025/P1M
+	//         - Segundo ciclo: 23-08-2025/P1M
+	//         - Terceiro ciclo: 23-09-2025/P1M
+	PaymentReference *PaymentReference `json:"paymentReference,omitempty"`
 
 	// Proxy Chave cadastrada no DICT pertencente ao recebedor. Os tipos de chaves podem ser: telefone, e-mail, cpf/cnpj ou chave aleatória.
 	// No caso de telefone celular deve ser informado no padrão E.1641. Para e-mail deve ter o formato xxxxxxxx@xxxxxxx.xxx(.xx) e no máximo 77 caracteres.
@@ -2432,12 +2547,12 @@ type ResponseRecurringPaymentsDataPatch struct {
 	// Essa informação permitirá ao recebedor identificar e correlacionar a transferência, quando recebida, com a apresentação das instruções ao pagador.
 	// Os caracteres permitidos no contexto do Pix para o campo txid (EMV 62-05) são:Letras minúsculas, de 'a' a 'z' Letras maiúsculas, de 'A' a 'z' Dígitos decimais, de '0' a '9'.
 	//
-	// [Restrição] Preenchimento condicional de acordo com o conteúdo do campo “localInstrument”:
-	//
-	// MANU - O campo transactionIdentification não deve ser preenchido;
-	// DICT - O campo transactionIdentification não deve ser preenchido;
-	// INIC - O campo transactionIdentification deve ser preenchido obrigatoriamente e deve conter até 25 caracteres alfanuméricos ([a-z|A-Z|0-9]).
-	TransactionIdentification *string `json:"transactionIdentification,omitempty"`
+	// [Restrição] Preenchimento condicional de acordo com o conteúdo do campo localInstument:
+	// - MANU - O campo transactionIdentification não deve ser preenchido;
+	// - DICT - O campo transactionIdentification não deve ser preenchido;
+	// - INIC - O campo transactionIdentification deve ser preenchido obrigatoriamente e deve conter até 25 caracteres alfanuméricos ([a-z|A-Z|0-9]);
+	// - AUTO – O campo transactionIdentification não deve ser preenchido.
+	TransactionIdentification *TransactionIdentification `json:"transactionIdentification,omitempty"`
 }
 
 // ResponseRecurringPaymentsDataPatchAuthorisationFlow Campo condicional utilizado para identificar o fluxo de autorização em que o pagamento foi solicitado.
@@ -2452,8 +2567,11 @@ type ResponseRecurringPaymentsDataPatchDocumentRel string
 // - MANU - Inserção manual de dados da conta transacional
 // - DICT - Inserção manual de chave Pix
 // - INIC - Indica que o recebedor (creditor) contratou o Iniciador de Pagamentos especificamente para realizar iniciações de pagamento em que o beneficiário é previamente conhecido
+// - AUTO - Indica o pagamento de uma recorrência de Pix automático, onde o consentimento foi previamente autorizado pelo pagador e o pagamento é realizado automaticamente pelo Iniciador de Pagamentos sob comando do recebedor.
 //
-// [Restrição] Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration"), apenas o método MANU é permitido.
+// [Restrição]
+// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar uma recorrência (valor do campo "/data/paymentReferente" diferente de "zero"), apenas o método AUTO é permitido, ou;
+// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar o pagamento inicial avulso (valor do campo "/data/paymentReferente" igual a "zero"), apenas o método MANU é permitido.
 type ResponseRecurringPaymentsDataPatchLocalInstrument string
 
 // ResponseRecurringPaymentsDataRead defines model for ResponseRecurringPaymentsDataRead.
@@ -2510,8 +2628,11 @@ type ResponseRecurringPaymentsDataRead struct {
 	// - MANU - Inserção manual de dados da conta transacional
 	// - DICT - Inserção manual de chave Pix
 	// - INIC - Indica que o recebedor (creditor) contratou o Iniciador de Pagamentos especificamente para realizar iniciações de pagamento em que o beneficiário é previamente conhecido
+	// - AUTO - Indica o pagamento de uma recorrência de Pix automático, onde o consentimento foi previamente autorizado pelo pagador e o pagamento é realizado automaticamente pelo Iniciador de Pagamentos sob comando do recebedor.
 	//
-	// [Restrição] Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration"), apenas o método MANU é permitido.
+	// [Restrição]
+	// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar uma recorrência (valor do campo "/data/paymentReferente" diferente de "zero"), apenas o método AUTO é permitido, ou;
+	// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar o pagamento inicial avulso (valor do campo "/data/paymentReferente" igual a "zero"), apenas o método MANU é permitido.
 	LocalInstrument ResponseRecurringPaymentsDataReadLocalInstrument `json:"localInstrument"`
 
 	// OriginalRecurringPaymentID Campo que contém o código ou o identificador da tentativa original de pagamento que falhou.
@@ -2526,29 +2647,26 @@ type ResponseRecurringPaymentsDataRead struct {
 	// Payment Objeto contendo as informações do pagamento.
 	Payment PaymentPix `json:"payment"`
 
-	// PaymentReference [Restrição]
-	// Campo de preenchimento obrigatório caso seja um pagamento de Pix automático, caso não respeitado, a instituição detentora deve retornar erro HTTP 422 com o código DETALHE_PAGAMENTO_INVALIDO.
-	//
-	// - Primeiro pagamento: Se for o pagamento inicial especificado em “/data/firstPayment”, preencha o campo com a string fixa “zero”.
-	// - Semanal: Preencha com W$numSemana-$ano, onde $numSemana representa o número da semana no ano. Exemplo: "W50-2024".
-	// - Mensal: Use M$mês-$ano, onde $mês representa o mês com dois dígitos. Exemplo: "M09-2024".
-	// - Trimestral: Utilize Q$trimestre-$ano, onde $trimestre indica o trimestre do ano (1 a 4).
-	//   - Janeiro a Março: Q1-$ano (ex.: "Q1-2024").
-	//   - Abril a Junho: Q2-$ano (ex.: "Q2-2024").
-	//   - Julho a Setembro: Q3-$ano (ex.: "Q3-2024").
-	//   - Outubro a Dezembro: Q4-$ano (ex.: "Q4-2024").
-	// - Semestral: Utilize $semestre-$ano, onde $semestre indica o semestre do ano (1 para janeiro a junho e 2 para julho a dezembro).
-	//   - Janeiro a Junho: S1-$ano (ex.: "S1-2024").
-	//   - Julho a Dezembro: S2-$ano (ex.: "S2-2024").
-	// - Anual: Use Y$ano, apenas com o ano. Exemplo: "Y2024".
-	//   - Exemplo de Formatos:
-	//     - Primeiro pagamento: "zero"
-	//     - Semanal: "W50-2024"
-	//     - Mensal: "M09-2024"
-	//     - Trimestral: "Q3-2024"
-	//     - Semestral: "S2-2024"
-	//     - Anual: "Y2024"
-	PaymentReference *string `json:"paymentReference,omitempty"`
+	// PaymentReference [Restrição]Campo de preenchimento obrigatório caso seja um pagamento de Pix automático e deve ser enviado para critérios de coleta de métricas do ecossistema. Caso essa regra não seja respeitada, a instituição detentora da conta deve retornar um erro HTTP 422 com o código DETALHE_PAGAMENTO_INVALIDO.
+	// - O preenchimento deve seguir a seguinte lógica:
+	//   - Primeiro Pagamento: Caso se trate do pagamento inicial avulso, especificado no campo “/data/firstPayment”, o valor deste campo deve ser preenchido com a string fixa "zero".
+	//   - Pagamentos Recorrentes (Subsequentes): Para todos os pagamentos recorrentes realizados após o pagamento inicial, o campo paymentReference deve ser preenchido com uma string de Intervalo ISO 8601 no formato ```<start>/<duration>```, que representa o ciclo exato ao qual o pagamento se refere.
+	//     - O componente ```<start>``` deve indicar a data de início do ciclo específico ao qual o pagamento enviado se refere.
+	//     - O componente ```<duration>``` deve corresponder ao código da periodicidade do consentimento (P1W para semanal, P1M para mensal, P3M para trimestral, P6M para semestral e P1Y para anual)
+	//     - Exemplos:
+	//       - 1: Data de início do ciclo definido no consentimento: 23/07/25
+	//         - Periodicidade definida no consentimento: Semanal
+	//         - Preenchimento do paymentReference:
+	//         - Primeiro ciclo: 23-07-2025/P1W
+	//         - Segundo ciclo: 30-07-2025/P1W
+	//         - Terceiro ciclo: 06-07-2025/P1W
+	//       - 2: Data de início do ciclo definido no consentimento: 23/07/25
+	//         - Periodicidade definida no consentimento: Mensal
+	//         - Preenchimento do paymentReference:
+	//         - Primeiro ciclo: 23-07-2025/P1M
+	//         - Segundo ciclo: 23-08-2025/P1M
+	//         - Terceiro ciclo: 23-09-2025/P1M
+	PaymentReference *PaymentReference `json:"paymentReference,omitempty"`
 
 	// Proxy Chave cadastrada no DICT pertencente ao recebedor. Os tipos de chaves podem ser: telefone, e-mail, cpf/cnpj ou chave aleatória.
 	// No caso de telefone celular deve ser informado no padrão E.1641. Para e-mail deve ter o formato xxxxxxxx@xxxxxxx.xxx(.xx) e no máximo 77 caracteres.
@@ -2607,12 +2725,12 @@ type ResponseRecurringPaymentsDataRead struct {
 	// Essa informação permitirá ao recebedor identificar e correlacionar a transferência, quando recebida, com a apresentação das instruções ao pagador.
 	// Os caracteres permitidos no contexto do Pix para o campo txid (EMV 62-05) são:Letras minúsculas, de 'a' a 'z' Letras maiúsculas, de 'A' a 'z' Dígitos decimais, de '0' a '9'.
 	//
-	// [Restrição] Preenchimento condicional de acordo com o conteúdo do campo “localInstrument”:
-	//
-	// MANU - O campo transactionIdentification não deve ser preenchido;
-	// DICT - O campo transactionIdentification não deve ser preenchido;
-	// INIC - O campo transactionIdentification deve ser preenchido obrigatoriamente e deve conter até 25 caracteres alfanuméricos ([a-z|A-Z|0-9]).
-	TransactionIdentification *string `json:"transactionIdentification,omitempty"`
+	// [Restrição] Preenchimento condicional de acordo com o conteúdo do campo localInstument:
+	// - MANU - O campo transactionIdentification não deve ser preenchido;
+	// - DICT - O campo transactionIdentification não deve ser preenchido;
+	// - INIC - O campo transactionIdentification deve ser preenchido obrigatoriamente e deve conter até 25 caracteres alfanuméricos ([a-z|A-Z|0-9]);
+	// - AUTO – O campo transactionIdentification não deve ser preenchido.
+	TransactionIdentification *TransactionIdentification `json:"transactionIdentification,omitempty"`
 }
 
 // ResponseRecurringPaymentsDataReadAuthorisationFlow Campo condicional utilizado para identificar o fluxo de autorização em que o pagamento foi solicitado.
@@ -2627,8 +2745,11 @@ type ResponseRecurringPaymentsDataReadDocumentRel string
 // - MANU - Inserção manual de dados da conta transacional
 // - DICT - Inserção manual de chave Pix
 // - INIC - Indica que o recebedor (creditor) contratou o Iniciador de Pagamentos especificamente para realizar iniciações de pagamento em que o beneficiário é previamente conhecido
+// - AUTO - Indica o pagamento de uma recorrência de Pix automático, onde o consentimento foi previamente autorizado pelo pagador e o pagamento é realizado automaticamente pelo Iniciador de Pagamentos sob comando do recebedor.
 //
-// [Restrição] Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration"), apenas o método MANU é permitido.
+// [Restrição]
+// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar uma recorrência (valor do campo "/data/paymentReferente" diferente de "zero"), apenas o método AUTO é permitido, ou;
+// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar o pagamento inicial avulso (valor do campo "/data/paymentReferente" igual a "zero"), apenas o método MANU é permitido.
 type ResponseRecurringPaymentsDataReadLocalInstrument string
 
 // ResponseRecurringPaymentsIDPatch defines model for ResponseRecurringPaymentsIdPatch.
@@ -2704,8 +2825,11 @@ type ResponseRecurringPaymentsPostData struct {
 	// - MANU - Inserção manual de dados da conta transacional
 	// - DICT - Inserção manual de chave Pix
 	// - INIC - Indica que o recebedor (creditor) contratou o Iniciador de Pagamentos especificamente para realizar iniciações de pagamento em que o beneficiário é previamente conhecido
+	// - AUTO - Indica o pagamento de uma recorrência de Pix automático, onde o consentimento foi previamente autorizado pelo pagador e o pagamento é realizado automaticamente pelo Iniciador de Pagamentos sob comando do recebedor.
 	//
-	// [Restrição] Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration"), apenas o método MANU é permitido.
+	// [Restrição]
+	// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar uma recorrência (valor do campo "/data/paymentReferente" diferente de "zero"), apenas o método AUTO é permitido, ou;
+	// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar o pagamento inicial avulso (valor do campo "/data/paymentReferente" igual a "zero"), apenas o método MANU é permitido.
 	LocalInstrument ResponseRecurringPaymentsPostDataLocalInstrument `json:"localInstrument"`
 
 	// OriginalRecurringPaymentID Campo que contém o código ou o identificador da tentativa original de pagamento que falhou.
@@ -2720,29 +2844,26 @@ type ResponseRecurringPaymentsPostData struct {
 	// Payment Objeto contendo as informações do pagamento.
 	Payment PaymentPix `json:"payment"`
 
-	// PaymentReference [Restrição]
-	// Campo de preenchimento obrigatório caso seja um pagamento de Pix automático, caso não respeitado, a instituição detentora deve retornar erro HTTP 422 com o código DETALHE_PAGAMENTO_INVALIDO.
-	//
-	// - Primeiro pagamento: Se for o pagamento inicial especificado em “/data/firstPayment”, preencha o campo com a string fixa “zero”.
-	// - Semanal: Preencha com W$numSemana-$ano, onde $numSemana representa o número da semana no ano. Exemplo: "W50-2024".
-	// - Mensal: Use M$mês-$ano, onde $mês representa o mês com dois dígitos. Exemplo: "M09-2024".
-	// - Trimestral: Utilize Q$trimestre-$ano, onde $trimestre indica o trimestre do ano (1 a 4).
-	//   - Janeiro a Março: Q1-$ano (ex.: "Q1-2024").
-	//   - Abril a Junho: Q2-$ano (ex.: "Q2-2024").
-	//   - Julho a Setembro: Q3-$ano (ex.: "Q3-2024").
-	//   - Outubro a Dezembro: Q4-$ano (ex.: "Q4-2024").
-	// - Semestral: Utilize $semestre-$ano, onde $semestre indica o semestre do ano (1 para janeiro a junho e 2 para julho a dezembro).
-	//   - Janeiro a Junho: S1-$ano (ex.: "S1-2024").
-	//   - Julho a Dezembro: S2-$ano (ex.: "S2-2024").
-	// - Anual: Use Y$ano, apenas com o ano. Exemplo: "Y2024".
-	//   - Exemplo de Formatos:
-	//     - Primeiro pagamento: "zero"
-	//     - Semanal: "W50-2024"
-	//     - Mensal: "M09-2024"
-	//     - Trimestral: "Q3-2024"
-	//     - Semestral: "S2-2024"
-	//     - Anual: "Y2024"
-	PaymentReference *string `json:"paymentReference,omitempty"`
+	// PaymentReference [Restrição]Campo de preenchimento obrigatório caso seja um pagamento de Pix automático e deve ser enviado para critérios de coleta de métricas do ecossistema. Caso essa regra não seja respeitada, a instituição detentora da conta deve retornar um erro HTTP 422 com o código DETALHE_PAGAMENTO_INVALIDO.
+	// - O preenchimento deve seguir a seguinte lógica:
+	//   - Primeiro Pagamento: Caso se trate do pagamento inicial avulso, especificado no campo “/data/firstPayment”, o valor deste campo deve ser preenchido com a string fixa "zero".
+	//   - Pagamentos Recorrentes (Subsequentes): Para todos os pagamentos recorrentes realizados após o pagamento inicial, o campo paymentReference deve ser preenchido com uma string de Intervalo ISO 8601 no formato ```<start>/<duration>```, que representa o ciclo exato ao qual o pagamento se refere.
+	//     - O componente ```<start>``` deve indicar a data de início do ciclo específico ao qual o pagamento enviado se refere.
+	//     - O componente ```<duration>``` deve corresponder ao código da periodicidade do consentimento (P1W para semanal, P1M para mensal, P3M para trimestral, P6M para semestral e P1Y para anual)
+	//     - Exemplos:
+	//       - 1: Data de início do ciclo definido no consentimento: 23/07/25
+	//         - Periodicidade definida no consentimento: Semanal
+	//         - Preenchimento do paymentReference:
+	//         - Primeiro ciclo: 23-07-2025/P1W
+	//         - Segundo ciclo: 30-07-2025/P1W
+	//         - Terceiro ciclo: 06-07-2025/P1W
+	//       - 2: Data de início do ciclo definido no consentimento: 23/07/25
+	//         - Periodicidade definida no consentimento: Mensal
+	//         - Preenchimento do paymentReference:
+	//         - Primeiro ciclo: 23-07-2025/P1M
+	//         - Segundo ciclo: 23-08-2025/P1M
+	//         - Terceiro ciclo: 23-09-2025/P1M
+	PaymentReference *PaymentReference `json:"paymentReference,omitempty"`
 
 	// Proxy Chave cadastrada no DICT pertencente ao recebedor. Os tipos de chaves podem ser: telefone, e-mail, cpf/cnpj ou chave aleatória.
 	// No caso de telefone celular deve ser informado no padrão E.1641. Para e-mail deve ter o formato xxxxxxxx@xxxxxxx.xxx(.xx) e no máximo 77 caracteres.
@@ -2801,12 +2922,12 @@ type ResponseRecurringPaymentsPostData struct {
 	// Essa informação permitirá ao recebedor identificar e correlacionar a transferência, quando recebida, com a apresentação das instruções ao pagador.
 	// Os caracteres permitidos no contexto do Pix para o campo txid (EMV 62-05) são:Letras minúsculas, de 'a' a 'z' Letras maiúsculas, de 'A' a 'z' Dígitos decimais, de '0' a '9'.
 	//
-	// [Restrição] Preenchimento condicional de acordo com o conteúdo do campo “localInstrument”:
-	//
-	// MANU - O campo transactionIdentification não deve ser preenchido;
-	// DICT - O campo transactionIdentification não deve ser preenchido;
-	// INIC - O campo transactionIdentification deve ser preenchido obrigatoriamente e deve conter até 25 caracteres alfanuméricos ([a-z|A-Z|0-9]).
-	TransactionIdentification *string `json:"transactionIdentification,omitempty"`
+	// [Restrição] Preenchimento condicional de acordo com o conteúdo do campo localInstument:
+	// - MANU - O campo transactionIdentification não deve ser preenchido;
+	// - DICT - O campo transactionIdentification não deve ser preenchido;
+	// - INIC - O campo transactionIdentification deve ser preenchido obrigatoriamente e deve conter até 25 caracteres alfanuméricos ([a-z|A-Z|0-9]);
+	// - AUTO – O campo transactionIdentification não deve ser preenchido.
+	TransactionIdentification *TransactionIdentification `json:"transactionIdentification,omitempty"`
 }
 
 // ResponseRecurringPaymentsPostDataAuthorisationFlow Campo condicional utilizado para identificar o fluxo de autorização em que o pagamento foi solicitado.
@@ -2821,8 +2942,11 @@ type ResponseRecurringPaymentsPostDataDocumentRel string
 // - MANU - Inserção manual de dados da conta transacional
 // - DICT - Inserção manual de chave Pix
 // - INIC - Indica que o recebedor (creditor) contratou o Iniciador de Pagamentos especificamente para realizar iniciações de pagamento em que o beneficiário é previamente conhecido
+// - AUTO - Indica o pagamento de uma recorrência de Pix automático, onde o consentimento foi previamente autorizado pelo pagador e o pagamento é realizado automaticamente pelo Iniciador de Pagamentos sob comando do recebedor.
 //
-// [Restrição] Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration"), apenas o método MANU é permitido.
+// [Restrição]
+// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar uma recorrência (valor do campo "/data/paymentReferente" diferente de "zero"), apenas o método AUTO é permitido, ou;
+// Caso consentimento associado a tentativa de pagamento seja para Pix automático (objeto “automatic” selecionado no oneOf do campo "/data/recurringConfiguration") e a referência do pagamento indicar o pagamento inicial avulso (valor do campo "/data/paymentReferente" igual a "zero"), apenas o método MANU é permitido.
 type ResponseRecurringPaymentsPostDataLocalInstrument string
 
 // ResponseRecurringPixData defines model for ResponseRecurringPixData.
@@ -2863,29 +2987,26 @@ type ResponseRecurringPixData = []struct {
 	// Payment Objeto contendo as informações do pagamento.
 	Payment PaymentPix `json:"payment"`
 
-	// PaymentReference [Restrição]
-	// Campo de preenchimento obrigatório caso seja um pagamento de Pix automático, caso não respeitado, a instituição detentora deve retornar erro HTTP 422 com o código DETALHE_PAGAMENTO_INVALIDO.
-	//
-	// - Primeiro pagamento: Se for o pagamento inicial especificado em “/data/firstPayment”, preencha o campo com a string fixa “zero”.
-	// - Semanal: Preencha com W$numSemana-$ano, onde $numSemana representa o número da semana no ano. Exemplo: "W50-2024".
-	// - Mensal: Use M$mês-$ano, onde $mês representa o mês com dois dígitos. Exemplo: "M09-2024".
-	// - Trimestral: Utilize Q$trimestre-$ano, onde $trimestre indica o trimestre do ano (1 a 4).
-	//   - Janeiro a Março: Q1-$ano (ex.: "Q1-2024").
-	//   - Abril a Junho: Q2-$ano (ex.: "Q2-2024").
-	//   - Julho a Setembro: Q3-$ano (ex.: "Q3-2024").
-	//   - Outubro a Dezembro: Q4-$ano (ex.: "Q4-2024").
-	// - Semestral: Utilize $semestre-$ano, onde $semestre indica o semestre do ano (1 para janeiro a junho e 2 para julho a dezembro).
-	//   - Janeiro a Junho: S1-$ano (ex.: "S1-2024").
-	//   - Julho a Dezembro: S2-$ano (ex.: "S2-2024").
-	// - Anual: Use Y$ano, apenas com o ano. Exemplo: "Y2024".
-	//   - Exemplo de Formatos:
-	//     - Primeiro pagamento: "zero"
-	//     - Semanal: "W50-2024"
-	//     - Mensal: "M09-2024"
-	//     - Trimestral: "Q3-2024"
-	//     - Semestral: "S2-2024"
-	//     - Anual: "Y2024"
-	PaymentReference *string `json:"paymentReference,omitempty"`
+	// PaymentReference [Restrição]Campo de preenchimento obrigatório caso seja um pagamento de Pix automático e deve ser enviado para critérios de coleta de métricas do ecossistema. Caso essa regra não seja respeitada, a instituição detentora da conta deve retornar um erro HTTP 422 com o código DETALHE_PAGAMENTO_INVALIDO.
+	// - O preenchimento deve seguir a seguinte lógica:
+	//   - Primeiro Pagamento: Caso se trate do pagamento inicial avulso, especificado no campo “/data/firstPayment”, o valor deste campo deve ser preenchido com a string fixa "zero".
+	//   - Pagamentos Recorrentes (Subsequentes): Para todos os pagamentos recorrentes realizados após o pagamento inicial, o campo paymentReference deve ser preenchido com uma string de Intervalo ISO 8601 no formato ```<start>/<duration>```, que representa o ciclo exato ao qual o pagamento se refere.
+	//     - O componente ```<start>``` deve indicar a data de início do ciclo específico ao qual o pagamento enviado se refere.
+	//     - O componente ```<duration>``` deve corresponder ao código da periodicidade do consentimento (P1W para semanal, P1M para mensal, P3M para trimestral, P6M para semestral e P1Y para anual)
+	//     - Exemplos:
+	//       - 1: Data de início do ciclo definido no consentimento: 23/07/25
+	//         - Periodicidade definida no consentimento: Semanal
+	//         - Preenchimento do paymentReference:
+	//         - Primeiro ciclo: 23-07-2025/P1W
+	//         - Segundo ciclo: 30-07-2025/P1W
+	//         - Terceiro ciclo: 06-07-2025/P1W
+	//       - 2: Data de início do ciclo definido no consentimento: 23/07/25
+	//         - Periodicidade definida no consentimento: Mensal
+	//         - Preenchimento do paymentReference:
+	//         - Primeiro ciclo: 23-07-2025/P1M
+	//         - Segundo ciclo: 23-08-2025/P1M
+	//         - Terceiro ciclo: 23-09-2025/P1M
+	PaymentReference *PaymentReference `json:"paymentReference,omitempty"`
 
 	// RecurringConsentID Identificador único do consentimento criado para a iniciação de pagamento solicitada. Deverá ser um URN - Uniform Resource Name.
 	// Um URN, conforme definido na [RFC8141](https://tools.ietf.org/html/rfc8141) é um Uniform Resource
@@ -2932,12 +3053,12 @@ type ResponseRecurringPixData = []struct {
 	// Essa informação permitirá ao recebedor identificar e correlacionar a transferência, quando recebida, com a apresentação das instruções ao pagador.
 	// Os caracteres permitidos no contexto do Pix para o campo txid (EMV 62-05) são:Letras minúsculas, de 'a' a 'z' Letras maiúsculas, de 'A' a 'z' Dígitos decimais, de '0' a '9'.
 	//
-	// [Restrição] Preenchimento condicional de acordo com o conteúdo do campo “localInstrument”:
-	//
-	// MANU - O campo transactionIdentification não deve ser preenchido;
-	// DICT - O campo transactionIdentification não deve ser preenchido;
-	// INIC - O campo transactionIdentification deve ser preenchido obrigatoriamente e deve conter até 25 caracteres alfanuméricos ([a-z|A-Z|0-9]).
-	TransactionIdentification *string `json:"transactionIdentification,omitempty"`
+	// [Restrição] Preenchimento condicional de acordo com o conteúdo do campo localInstument:
+	// - MANU - O campo transactionIdentification não deve ser preenchido;
+	// - DICT - O campo transactionIdentification não deve ser preenchido;
+	// - INIC - O campo transactionIdentification deve ser preenchido obrigatoriamente e deve conter até 25 caracteres alfanuméricos ([a-z|A-Z|0-9]);
+	// - AUTO – O campo transactionIdentification não deve ser preenchido.
+	TransactionIdentification *TransactionIdentification `json:"transactionIdentification,omitempty"`
 }
 
 // ResponseRecurringPixDataDocumentRel Tipo do documento de identificação oficial do titular pessoa natural ou jurídica.
@@ -2948,6 +3069,52 @@ type ResponseRecurringPixPayment struct {
 	Data  ResponseRecurringPixData `json:"data"`
 	Links api.Links                `json:"links"`
 	Meta  api.Meta                 `json:"meta"`
+}
+
+// ResponseRecurringRetryPaymentsIDPost defines model for ResponseRecurringRetryPaymentsIdPost.
+type ResponseRecurringRetryPaymentsIDPost struct {
+	Data  ResponseRecurringRetryPaymentsPostData `json:"data"`
+	Links api.Links                              `json:"links"`
+	Meta  api.Meta                               `json:"meta"`
+}
+
+// ResponseRecurringRetryPaymentsPostData defines model for ResponseRecurringRetryPaymentsPostData.
+type ResponseRecurringRetryPaymentsPostData struct {
+	// Date Data em que o pagamento será realizado. Uma string com a utilização de timezone UTC-3 (UTC time format).
+	Date string `json:"date"`
+
+	// EndToEndID Trata-se de um identificador único, gerado na instituição iniciadora de pagamento e recebido na instituição detentora de conta, permeando toda a jornada do pagamento Pix.
+	//
+	// [Restrição] A detentora deve obrigatoriamente retornar o campo com o mesmo valor recebido da iniciadora.
+	//
+	// No caso de Pix Automático, a iniciadora deverá, no que tange á composição do endToEndId, utilizar a data para a qual o Pix está sendo agendado e horário fixo 15:00 UTC, que dará para a detentora a janela de efetivação de 00:00 e 23:59 do horário de Brasília, mesmo a janela sendo, para o detentor, até as 21h.
+	EndToEndID EndToEndID `json:"endToEndId"`
+
+	// OriginalRecurringPaymentID Campo que contém o código ou o identificador da tentativa original de pagamento que falhou.
+	// A tentativa de pagamento original é a primeira tentativa (Intradia – Primeira Tentativa, vide documentação) realizada para o pagamento de uma determinada recorrência.
+	// Código ou identificador único informado pela instituição detentora da conta para representar a iniciação de pagamento.
+	// O recurringPaymentId deve ser diferente do endToEndId.
+	// Este é o identificador que deverá ser utilizado na consulta ao status da iniciação de pagamento efetuada.
+	//
+	// [Restrição] Este campo é de envio obrigatório pela Iniciadora quando for uma nova tentativa de liquidação de pagamento que falhou anteriormente.
+	OriginalRecurringPaymentID OriginalRecurringPaymentID `json:"originalRecurringPaymentId"`
+
+	// RecurringPaymentID Código ou identificador único informado pela instituição detentora da conta para representar a iniciação de pagamento. O `recurringPaymentId` deve ser diferente do `endToEndId`.
+	// Este é o identificador que deverá ser utilizado na consulta ao status da iniciação de pagamento efetuada.
+	RecurringPaymentID string `json:"recurringPaymentId"`
+
+	// Status Estado atual do pagamento. O estado evolui na seguinte ordem:
+	// - RCVD (Received) - Indica que a requisição de pagamento foi recebida com sucesso pela detentora, mas ainda há validações a serem feitas antes de ser submetida para liquidação.
+	// - CANC (Cancelled) - Indica que a transação Pix pendente foi cancelada com sucesso pelo usuário antes que fosse confirmada (ACCP) ou rejeitada (RJCT) pela detentora.
+	// - ACCP( Accepted Customer Profile) - Indica que todas as verificações necessárias já foram realizadas pela detentora e que a transação está pronta para ser enviada para liquidação (no SPI se for Pix para outra instituição ou internamente se for para outra conta na mesma instituição).
+	// - ACPD (Accepted Clearing Processed) - Indica que a detentora já submeteu a transação para liquidação, mas ainda não tem a confirmação se foi liquidada ou rejeitada.
+	// - RJCT (Rejected) Indica que a transação foi rejeitada pela detentora ou pelo SPI.
+	// - ACSC (Accepted Settlement Completed Debitor Account) - Indica que a transação foi efetivada pela detentora ou pelo SPI.
+	// - PDNG (Pending) - Indica que a detentora reteve temporariamente a transação Pix para análise. Não se aplica para Transferências inteligentes.
+	// - SCHD (Scheduled) - Indica que a transação Pix foi agendada com sucesso na detentora.
+	// Em caso insucesso:
+	// - RJCT (REJECTED) - Instrução de pagamento rejeitada.
+	Status EnumPaymentStatusType `json:"status"`
 }
 
 // RiskSignalsConsentEdition Sinais de risco para iniciação de pagamentos automáticos
@@ -3011,6 +3178,17 @@ type SweepingRequest struct {
 		TransactionLimit *string `json:"transactionLimit,omitempty"`
 	} `json:"sweeping"`
 }
+
+// TransactionIdentification Trata-se de um identificador de transação que deve ser retransmitido intacto pelo PSP do pagador ao gerar a ordem de pagamento.
+// Essa informação permitirá ao recebedor identificar e correlacionar a transferência, quando recebida, com a apresentação das instruções ao pagador.
+// Os caracteres permitidos no contexto do Pix para o campo txid (EMV 62-05) são:Letras minúsculas, de 'a' a 'z' Letras maiúsculas, de 'A' a 'z' Dígitos decimais, de '0' a '9'.
+//
+// [Restrição] Preenchimento condicional de acordo com o conteúdo do campo localInstument:
+// - MANU - O campo transactionIdentification não deve ser preenchido;
+// - DICT - O campo transactionIdentification não deve ser preenchido;
+// - INIC - O campo transactionIdentification deve ser preenchido obrigatoriamente e deve conter até 25 caracteres alfanuméricos ([a-z|A-Z|0-9]);
+// - AUTO – O campo transactionIdentification não deve ser preenchido.
+type TransactionIdentification = string
 
 // Vrp defines model for Vrp.
 type Vrp struct {
@@ -3096,6 +3274,9 @@ type EndDate = string
 // ParameterOriginalRecurringPaymentId defines model for originalRecurringPaymentId.
 type ParameterOriginalRecurringPaymentId = string
 
+// PathOriginalRecurringPaymentID defines model for pathOriginalRecurringPaymentId.
+type PathOriginalRecurringPaymentID = string
+
 // PathRecurringConsentID defines model for pathRecurringConsentId.
 type PathRecurringConsentID = string
 
@@ -3131,6 +3312,9 @@ type N200RecurringPixPaymentRead = ResponseRecurringPixPayment
 
 // N201RecurringPaymentsIDPost defines model for 201RecurringPaymentsIdPost.
 type N201RecurringPaymentsIDPost = ResponseRecurringPaymentsIDPost
+
+// N201RecurringRetryPaymentsIDPost defines model for 201RecurringRetryPaymentsIdPost.
+type N201RecurringRetryPaymentsIDPost = ResponseRecurringRetryPaymentsIDPost
 
 // BadRequest defines model for BadRequest.
 type BadRequest = ResponseError
@@ -3213,6 +3397,27 @@ type AutomaticPaymentsGetPixRecurringPaymentsParams struct {
 
 // AutomaticPaymentsPostPixRecurringPaymentsParams defines parameters for AutomaticPaymentsPostPixRecurringPayments.
 type AutomaticPaymentsPostPixRecurringPaymentsParams struct {
+	// Authorization Cabeçalho HTTP padrão. Permite que as credenciais sejam fornecidas dependendo do tipo de recurso solicitado
+	Authorization Authorization `json:"Authorization"`
+
+	// XCustomerUserAgent Indica o user-agent que o usuário utiliza.
+	XCustomerUserAgent *XCustomerUserAgent `json:"x-customer-user-agent,omitempty"`
+
+	// XFapiAuthDate Data em que o usuário logou pela última vez com o iniciador. Representada de acordo com a [RFC7231](https://tools.ietf.org/html/rfc7231).Exemplo: Sun, 10 Sep 2017 19:43:31 UTC
+	XFapiAuthDate *XFapiAuthDate `json:"x-fapi-auth-date,omitempty"`
+
+	// XFapiCustomerIPAddress O endereço IP do usuário se estiver atualmente logado com o iniciador.
+	XFapiCustomerIPAddress *XFapiCustomerIPAddress `json:"x-fapi-customer-ip-address,omitempty"`
+
+	// XFapiInteractionID Um UUID [RFC4122](https://tools.ietf.org/html/rfc4122) usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela iniciadora (client) e o seu valor deve ser “espelhado” pela detentora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a detentora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP status code 400. A iniciadora deve acatar o valor recebido da detentora..
+	XFapiInteractionID XFapiInteractionID `json:"x-fapi-interaction-id"`
+
+	// XIdempotencyKey Cabeçalho HTTP personalizado. Identificador de solicitação exclusivo para suportar a idempotência.
+	XIdempotencyKey XIdempotencyKey `json:"x-idempotency-key"`
+}
+
+// AutomaticPaymentsPostPixRecurringPaymentsRetryParams defines parameters for AutomaticPaymentsPostPixRecurringPaymentsRetry.
+type AutomaticPaymentsPostPixRecurringPaymentsRetryParams struct {
 	// Authorization Cabeçalho HTTP padrão. Permite que as credenciais sejam fornecidas dependendo do tipo de recurso solicitado
 	Authorization Authorization `json:"Authorization"`
 
@@ -3334,6 +3539,9 @@ type AutomaticPaymentsPatchRecurringConsentsConsentIDParams struct {
 // AutomaticPaymentsPostPixRecurringPaymentsJSONRequestBody defines body for AutomaticPaymentsPostPixRecurringPayments for application/json ContentType.
 type AutomaticPaymentsPostPixRecurringPaymentsJSONRequestBody = CreateRecurringPixPayment
 
+// AutomaticPaymentsPostPixRecurringPaymentsRetryJSONRequestBody defines body for AutomaticPaymentsPostPixRecurringPaymentsRetry for application/json ContentType.
+type AutomaticPaymentsPostPixRecurringPaymentsRetryJSONRequestBody = CreateRecurringRetryPixPayment
+
 // AutomaticPaymentsPatchPixRecurringPaymentsPaymentIDJSONRequestBody defines body for AutomaticPaymentsPatchPixRecurringPaymentsPaymentID for application/json ContentType.
 type AutomaticPaymentsPatchPixRecurringPaymentsPaymentIDJSONRequestBody = PatchPixPayment
 
@@ -3439,6 +3647,9 @@ type ServerInterface interface {
 	// Cria uma transação de pagamento.
 	// (POST /pix/recurring-payments)
 	AutomaticPaymentsPostPixRecurringPayments(w http.ResponseWriter, r *http.Request, params AutomaticPaymentsPostPixRecurringPaymentsParams)
+	// Cria nova tentativa de pagamento para o Pix Automático.
+	// (POST /pix/recurring-payments/{originalRecurringPaymentId}/retry)
+	AutomaticPaymentsPostPixRecurringPaymentsRetry(w http.ResponseWriter, r *http.Request, originalRecurringPaymentID PathOriginalRecurringPaymentID, params AutomaticPaymentsPostPixRecurringPaymentsRetryParams)
 	// Busca informações de uma transação de pagamento.
 	// (GET /pix/recurring-payments/{recurringPaymentId})
 	AutomaticPaymentsGetPixRecurringPaymentsPaymentID(w http.ResponseWriter, r *http.Request, recurringPaymentID PathRecurringPaymentID, params AutomaticPaymentsGetPixRecurringPaymentsPaymentIDParams)
@@ -3780,6 +3991,168 @@ func (siw *ServerInterfaceWrapper) AutomaticPaymentsPostPixRecurringPayments(w h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.AutomaticPaymentsPostPixRecurringPayments(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AutomaticPaymentsPostPixRecurringPaymentsRetry operation middleware
+func (siw *ServerInterfaceWrapper) AutomaticPaymentsPostPixRecurringPaymentsRetry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "originalRecurringPaymentId" -------------
+	var originalRecurringPaymentID PathOriginalRecurringPaymentID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "originalRecurringPaymentId", r.PathValue("originalRecurringPaymentId"), &originalRecurringPaymentID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "originalRecurringPaymentId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, OAuth2ClientCredentialsScopes, []string{"recurring-payments"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AutomaticPaymentsPostPixRecurringPaymentsRetryParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Authorization" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Authorization")]; found {
+		var Authorization Authorization
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Authorization", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Authorization", valueList[0], &Authorization, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Authorization", Err: err})
+			return
+		}
+
+		params.Authorization = Authorization
+
+	} else {
+		err := fmt.Errorf("Header parameter Authorization is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Authorization", Err: err})
+		return
+	}
+
+	// ------------- Optional header parameter "x-customer-user-agent" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-customer-user-agent")]; found {
+		var XCustomerUserAgent XCustomerUserAgent
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-customer-user-agent", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-customer-user-agent", valueList[0], &XCustomerUserAgent, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-customer-user-agent", Err: err})
+			return
+		}
+
+		params.XCustomerUserAgent = &XCustomerUserAgent
+
+	}
+
+	// ------------- Optional header parameter "x-fapi-auth-date" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-fapi-auth-date")]; found {
+		var XFapiAuthDate XFapiAuthDate
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-fapi-auth-date", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-fapi-auth-date", valueList[0], &XFapiAuthDate, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-fapi-auth-date", Err: err})
+			return
+		}
+
+		params.XFapiAuthDate = &XFapiAuthDate
+
+	}
+
+	// ------------- Optional header parameter "x-fapi-customer-ip-address" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-fapi-customer-ip-address")]; found {
+		var XFapiCustomerIPAddress XFapiCustomerIPAddress
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-fapi-customer-ip-address", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-fapi-customer-ip-address", valueList[0], &XFapiCustomerIPAddress, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-fapi-customer-ip-address", Err: err})
+			return
+		}
+
+		params.XFapiCustomerIPAddress = &XFapiCustomerIPAddress
+
+	}
+
+	// ------------- Required header parameter "x-fapi-interaction-id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-fapi-interaction-id")]; found {
+		var XFapiInteractionID XFapiInteractionID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-fapi-interaction-id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-fapi-interaction-id", valueList[0], &XFapiInteractionID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-fapi-interaction-id", Err: err})
+			return
+		}
+
+		params.XFapiInteractionID = XFapiInteractionID
+
+	} else {
+		err := fmt.Errorf("Header parameter x-fapi-interaction-id is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-fapi-interaction-id", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "x-idempotency-key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-idempotency-key")]; found {
+		var XIdempotencyKey XIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-idempotency-key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-idempotency-key", valueList[0], &XIdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-idempotency-key", Err: err})
+			return
+		}
+
+		params.XIdempotencyKey = XIdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter x-idempotency-key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-idempotency-key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AutomaticPaymentsPostPixRecurringPaymentsRetry(w, r, originalRecurringPaymentID, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4666,6 +5039,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc("GET "+options.BaseURL+"/pix/recurring-payments", wrapper.AutomaticPaymentsGetPixRecurringPayments)
 	m.HandleFunc("POST "+options.BaseURL+"/pix/recurring-payments", wrapper.AutomaticPaymentsPostPixRecurringPayments)
+	m.HandleFunc("POST "+options.BaseURL+"/pix/recurring-payments/{originalRecurringPaymentId}/retry", wrapper.AutomaticPaymentsPostPixRecurringPaymentsRetry)
 	m.HandleFunc("GET "+options.BaseURL+"/pix/recurring-payments/{recurringPaymentId}", wrapper.AutomaticPaymentsGetPixRecurringPaymentsPaymentID)
 	m.HandleFunc("PATCH "+options.BaseURL+"/pix/recurring-payments/{recurringPaymentId}", wrapper.AutomaticPaymentsPatchPixRecurringPaymentsPaymentID)
 	m.HandleFunc("POST "+options.BaseURL+"/recurring-consents", wrapper.AutomaticPaymentsPostRecurringConsents)
@@ -4682,6 +5056,8 @@ type N200RecurringPaymentsIDReadJSONResponse ResponseRecurringPaymentsIDRead
 type N200RecurringPixPaymentReadJSONResponse ResponseRecurringPixPayment
 
 type N201RecurringPaymentsIDPostJSONResponse ResponseRecurringPaymentsIDPost
+
+type N201RecurringRetryPaymentsIDPostJSONResponse ResponseRecurringRetryPaymentsIDPost
 
 type BadRequestApplicationJSONCharsetUTF8Response ResponseError
 
@@ -4728,6 +5104,12 @@ type UnprocessableEntityPixPatchApplicationJwtResponse struct {
 }
 
 type UnprocessableEntityPixRecurringPaymentApplicationJwtResponse struct {
+	Body io.Reader
+
+	ContentLength int64
+}
+
+type UnprocessableEntityPixRetryRecurringPaymentApplicationJwtResponse struct {
 	Body io.Reader
 
 	ContentLength int64
@@ -5006,6 +5388,156 @@ type AutomaticPaymentsPostPixRecurringPaymentsdefaultJSONResponse struct {
 }
 
 func (response AutomaticPaymentsPostPixRecurringPaymentsdefaultJSONResponse) VisitAutomaticPaymentsPostPixRecurringPaymentsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetryRequestObject struct {
+	OriginalRecurringPaymentID PathOriginalRecurringPaymentID `json:"originalRecurringPaymentId"`
+	Params                     AutomaticPaymentsPostPixRecurringPaymentsRetryParams
+	Body                       *AutomaticPaymentsPostPixRecurringPaymentsRetryJSONRequestBody
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetryResponseObject interface {
+	VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetry201JSONResponse struct {
+	N201RecurringRetryPaymentsIDPostJSONResponse
+}
+
+func (response AutomaticPaymentsPostPixRecurringPaymentsRetry201JSONResponse) VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetry400ApplicationJSONCharsetUTF8Response struct {
+	BadRequestApplicationJSONCharsetUTF8Response
+}
+
+func (response AutomaticPaymentsPostPixRecurringPaymentsRetry400ApplicationJSONCharsetUTF8Response) VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetry401ApplicationJSONCharsetUTF8Response struct {
+	UnauthorizedApplicationJSONCharsetUTF8Response
+}
+
+func (response AutomaticPaymentsPostPixRecurringPaymentsRetry401ApplicationJSONCharsetUTF8Response) VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetry403ApplicationJSONCharsetUTF8Response struct {
+	ForbiddenApplicationJSONCharsetUTF8Response
+}
+
+func (response AutomaticPaymentsPostPixRecurringPaymentsRetry403ApplicationJSONCharsetUTF8Response) VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetry404ApplicationJSONCharsetUTF8Response struct {
+	NotFoundApplicationJSONCharsetUTF8Response
+}
+
+func (response AutomaticPaymentsPostPixRecurringPaymentsRetry404ApplicationJSONCharsetUTF8Response) VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetry405ApplicationJSONCharsetUTF8Response struct {
+	MethodNotAllowedApplicationJSONCharsetUTF8Response
+}
+
+func (response AutomaticPaymentsPostPixRecurringPaymentsRetry405ApplicationJSONCharsetUTF8Response) VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(405)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetry406ApplicationJSONCharsetUTF8Response struct {
+	NotAcceptableApplicationJSONCharsetUTF8Response
+}
+
+func (response AutomaticPaymentsPostPixRecurringPaymentsRetry406ApplicationJSONCharsetUTF8Response) VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(406)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetry422ApplicationJwtResponse struct {
+	UnprocessableEntityPixRetryRecurringPaymentApplicationJwtResponse
+}
+
+func (response AutomaticPaymentsPostPixRecurringPaymentsRetry422ApplicationJwtResponse) VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/jwt")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(422)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetry500ApplicationJSONCharsetUTF8Response struct {
+	InternalServerErrorApplicationJSONCharsetUTF8Response
+}
+
+func (response AutomaticPaymentsPostPixRecurringPaymentsRetry500ApplicationJSONCharsetUTF8Response) VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetry504ApplicationJSONCharsetUTF8Response struct {
+	GatewayTimeoutWithAdditionalPropertiesApplicationJSONCharsetUTF8Response
+}
+
+func (response AutomaticPaymentsPostPixRecurringPaymentsRetry504ApplicationJSONCharsetUTF8Response) VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(504)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetry529ApplicationJSONCharsetUTF8Response struct {
+	SiteIsOverloadedApplicationJSONCharsetUTF8Response
+}
+
+func (response AutomaticPaymentsPostPixRecurringPaymentsRetry529ApplicationJSONCharsetUTF8Response) VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(529)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AutomaticPaymentsPostPixRecurringPaymentsRetrydefaultJSONResponse struct {
+	Body       ResponseError
+	StatusCode int
+}
+
+func (response AutomaticPaymentsPostPixRecurringPaymentsRetrydefaultJSONResponse) VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -5731,6 +6263,9 @@ type StrictServerInterface interface {
 	// Cria uma transação de pagamento.
 	// (POST /pix/recurring-payments)
 	AutomaticPaymentsPostPixRecurringPayments(ctx context.Context, request AutomaticPaymentsPostPixRecurringPaymentsRequestObject) (AutomaticPaymentsPostPixRecurringPaymentsResponseObject, error)
+	// Cria nova tentativa de pagamento para o Pix Automático.
+	// (POST /pix/recurring-payments/{originalRecurringPaymentId}/retry)
+	AutomaticPaymentsPostPixRecurringPaymentsRetry(ctx context.Context, request AutomaticPaymentsPostPixRecurringPaymentsRetryRequestObject) (AutomaticPaymentsPostPixRecurringPaymentsRetryResponseObject, error)
 	// Busca informações de uma transação de pagamento.
 	// (GET /pix/recurring-payments/{recurringPaymentId})
 	AutomaticPaymentsGetPixRecurringPaymentsPaymentID(ctx context.Context, request AutomaticPaymentsGetPixRecurringPaymentsPaymentIDRequestObject) (AutomaticPaymentsGetPixRecurringPaymentsPaymentIDResponseObject, error)
@@ -5829,6 +6364,40 @@ func (sh *strictHandler) AutomaticPaymentsPostPixRecurringPayments(w http.Respon
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(AutomaticPaymentsPostPixRecurringPaymentsResponseObject); ok {
 		if err := validResponse.VisitAutomaticPaymentsPostPixRecurringPaymentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AutomaticPaymentsPostPixRecurringPaymentsRetry operation middleware
+func (sh *strictHandler) AutomaticPaymentsPostPixRecurringPaymentsRetry(w http.ResponseWriter, r *http.Request, originalRecurringPaymentID PathOriginalRecurringPaymentID, params AutomaticPaymentsPostPixRecurringPaymentsRetryParams) {
+	var request AutomaticPaymentsPostPixRecurringPaymentsRetryRequestObject
+
+	request.OriginalRecurringPaymentID = originalRecurringPaymentID
+	request.Params = params
+
+	var body AutomaticPaymentsPostPixRecurringPaymentsRetryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AutomaticPaymentsPostPixRecurringPaymentsRetry(ctx, request.(AutomaticPaymentsPostPixRecurringPaymentsRetryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AutomaticPaymentsPostPixRecurringPaymentsRetry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AutomaticPaymentsPostPixRecurringPaymentsRetryResponseObject); ok {
+		if err := validResponse.VisitAutomaticPaymentsPostPixRecurringPaymentsRetryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -5994,579 +6563,607 @@ func (sh *strictHandler) AutomaticPaymentsPatchRecurringConsentsConsentID(w http
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/+y9W28bR7Y/+lVqczIIlSEpkpJ8kRHM0CSdMH9LYkjKmcT0Xyl1l6hyuruYqm5Fdmwg",
-	"r+f5AAfnYQaY7HkIvAE/HMx/Hxzk5QCH3ySf5KBWVXVXX3iRLdnJpIONPTK7u66rVq3Lb631fcVh/pwF",
-	"JAhFZf/7yhxz7JOQcPhXJwrPGafPcUhZIH9wiXA4nat/Vrr4lCx+wt45Q59OJkM0xy5f/JM10JBwn4YE",
-	"fRsRhAVyOHFJ4FBMBRLkKfbRGeMBcaiLBXLJnAQuCVyGXIZCOmfIJYgTJ+KCIcE86tAQu6xSq1DZ6TnB",
-	"LuGVWiXAPqnsZ8ZYq3DybUQ5cSv7IY9IrSKcc+JjOXgfXz4kwSw8r+y3m7t3ahWfBuaHVq0yx2FIuOzi",
-	"8XT63XT6xXQqnnxUqVXCZ3PZkQg5DWaVly9rlb8OXOLPWUgC59n/IM82WBnCBQuwR59jlzXQwCVBSM+o",
-	"g13G5XTNNBc/Lf7JELl0vEjQC4bkdiARzRkPMUcYUdXv4r/kajaWLcllnSbjq39Dnm26LLvN7KLk504C",
-	"t4dDkp9zD4cYndEAe3JGDuMhUeOXezknXE/OxYg5jHM1B7nnczzDPglChjw6wy5GmCGHBUKukfrdJchj",
-	"wQwjN9LNxHP/NiL8WTJ1M7olE2xlJti0t/1/VqdT9/vdl1v1autxs95+8qL558et+t0nW/XqzuNm68mL",
-	"x632k8fN+t3kyQeF9ME4ncmFGEkqlr8O8TM5k4FbRCr+nMFJcVgQLl75iCFn8S+XzhhiEWJyz21iwSgk",
-	"QYhDeoGR6UcuULKKsq0zSXtRYxp0k6bSDS1+DqjDkMMplntAPIxoIEIaRlRvFJEdMY5ln3Js2GznnBO5",
-	"OYoiA+pQs7XWKGTXWDBEgzPGfeyyGnLJBfGRIBxxEjIeYJcJFDL5/5lIvhQIC8EcCo9xdv5WewKYBvGI",
-	"QDYRxYtSdVkATCXVwhYCnhSwCyySpRSwaiS4oJIB5lY9kKdQTv3biAq1PjVEA5c6WI5Bfpssiw+NJ203",
-	"psESal1BJzYBk0vszz35weSv89HB8d3jzyejo4Mvzr961L4cH7ceHOPnn40Pel6llib25nIe9z8f4/rz",
-	"Tv0rSc3Jn9Np/cn3zdrduy8LCLtWuazPWF2PfWhuiqPlk3gJPZ7HT7rqVBcdgyP0Nc+99jVavMrthSZc",
-	"dz2TQARoji9+BKqLfHQ8OkR1dBxQSURoRASLuEPQIfZJYxocwws12a58Lr8+owF1mdz/x6MH3Tut3daT",
-	"6nkYzsX+9nbImCcalIRnDcZn2+eh723zM0e+tCUHLvvL9DQNDOsnXA5kNEB1oJ7FK4RDTk+jxWtX3nqn",
-	"iMFTIAKCppWIB9MKIrJRuQFijh0C0yFiTpzF6zPqMDlyH85kSIL4SMrmZWOH00BevrIFmr1/zHUr7ykq",
-	"JOUSRCSBq8tZcgCPOXB/KfY7DeQmUZdwOAAYKSJBEQ/2T3HgMHK53231ejs7rfaOHJa81Yg/9/SdVrjZ",
-	"IfGZ2J8GdcSSSVYjHmyp39LDjrmEZBLJmrjL+VhVj2yrUdSetZBIPuBAY0nD1Xg+8vuB4kOLnxb/TQTy",
-	"pWjjkhB751gKNYKdcoKAbYqQR/FexK0JixvKlyIvhA+vTGgWc5FHLeEt+QXeWDjau7WCb8gdXsU7dlov",
-	"refVrT/VptN6Y//jv9z74OQ/Pvrwj9Pp9p//8ORPxRdnilusuDQH2TuRWQKGfQutWRub3260NtfNU1/W",
-	"ijaq5I4ldyy54/Vyx4zo9ZtkjyLEPFyhfSlh3NK/blbZSobzftWty24kQuYTfiwI78xIEBbcGCCsI4Yi",
-	"QXgdy5f02Y9EtPiRU4aikMojvEKtdnQ/9aSRyptcFGsNDJcP8Jx2ovB8xWYTPzsBj81YpFS5xc9eSH2M",
-	"LshzYHtM04bLeAONYlXFxXK7scM4XBiSPcoDdru9s/6AyZe2Gn3Ft/bROApqqNVEYzJH7WbrNmrd3d/d",
-	"2d9poeNJd/mSnuE5reMoPK+7KwipfTe1mPKfNiEdsODFJCIvviDui8l59OIBpy/GOHwxjoKtGpJk1n6J",
-	"qp/h4MUDcvriAPMXnTl/cYCfvfgsCl58FnkvOtHsxZjMXxw54YtDdvGiR5wtpOhTf7+f+h9U/eRg8uJ4",
-	"0l1GknIDDVkO5h3X5USIootd3iCcLH5iaDCUBzTeTUEQESG9IBzhMMKeD/eOx2ZY75W9p2sWOCZcOq9j",
-	"PZabI9xBEBKOHTnFImFGChLHgx5Q2m6r3V5LafKlLRQJPXEmL+lBT3M5TjwjzwQhJ6CjExEi+ZeYS87W",
-	"QMrG4hI0I4nwI5V9htgppzMcLv4ll1xbQfSiYlR1PEqCcAvJYyZIhC6wByLBBYG76Zcf/ibvRXmtsV9+",
-	"+Lv63rpRBeEXhG+hgCEnsQi6emgixHJogqFAjgjED04cciplKhZJAjhjPPkp8nX/NLhY/OhRl9WQ3R0M",
-	"S84QhDm98zTZizp1YVVCxoPFj3UPBDczEk1RYK0UIQ4jgRzmErTbbDZQx14U6AY7OMQcMT2ieIyuNaDG",
-	"OqpMj23l/ZuYQNzbd86cXbJX37nt4Pqui3fq2D1r1++eNu+0T8/uttt3mpVaBeSPsLJfiSJo2qLwnVX3",
-	"t7xvcP2sU3/w5Ps7L+v2P3ev8s9Wu1DcB3lfkSVwg3azmdV3xMAd4tA5l48dJoVVuM7wfO5RB6zc20+F",
-	"Mscn6/MBJ2eV/cofthNz/rZ6KrZHusOlHcGwsjeMy6QUttS+h4b0ErHTkMr3JO2IyCFCsEblZW3JrEYE",
-	"u+9iUtDPzc6JXurubnhOcT83MZ9WEUEwEb4TwpP9XPuc7mN3pNj/mjncQ8455oKEH0fhWf3O1afU55zx",
-	"ogl0UkZidMYo8rGnbNa4hphPQwo6IeizIROpG0jU1DUQSEH9mcewKy8CHHJ8sXgF65J8F2B0PHqYmbdZ",
-	"Ya3ViN/NOshleMD4KXVdEry3WR+hkH1DAqmrIyIcNpcyGggpIVzpkY/RnHmL16FURlwpRcwijoPFTxiW",
-	"6IIyD7tYTuYTHJLv8LMJ9QmLwi9oeN5xXSr7wd6QsznhISW/mv0NzCbjkAQuBTHAGAlCIqUvj4JLmIgQ",
-	"nxKPONRlcpogKwbYG4OopLp7b7sHOyV3CRHOmaS+mdoFKdd0hgO5hQFDPnU4E1K4o4ufYBYHJDxn7iEL",
-	"O57HviPueyRAsJf41GUcPFDy2EgGCcKaMWRJvhn5yF+8CplrxE/lZVa7ImfiOGQe4lOPvEcaS/vF5SBo",
-	"cA5GOkueViNFLj0jHHQk8CvSubpI/MVrl2I0B0gC3BpwDmVjTyNt73CwFEMJJ8JuhaDjyYP6Hb0eD1gU",
-	"vM99zSMi1L6RSypCApRpziCVorIP+j3sZtb/JlKW5pu56nUXhXM5fSrZoepXXgHCeHW1vRAUO9skBUbR",
-	"pRIBjkLmL34MqaOkgOXTvWG5WvezVKh+5xO/EWlONvpr2OYxDclAHF0QLuWD98pzhb7ZFj8q27aDOSdg",
-	"pyEo5ZuSp1MeZAFC0JxRoS9NGsxA6zfXpL/48ZL6sAKT4RjNPHaKvRoKiDzrPtPOrZe1ynGANQDqPa5A",
-	"N2XcwJEcAXX0nHEkt5hsx1YLyauUmBT/pGYy5wyuqlOPbCK/fhe+4RS6nOCQrCDdMZlFlEuKZZxKPqop",
-	"VptNCQid6pMY1NQZDmqISsGv1diRYs+JsnqcGNlBCnuRQCI6pSEJRG7K/SCk4bO1LOoqs95tt1MTzzGI",
-	"65k8ECUJ3Dmjcj2L5yVV2Y2mpk09sPXD+PTD5TbXuEIHBw7x1BNYjcj3MX8GqJT1H9QqF9iLQKyRYh4X",
-	"lf3HclAuwFo6n3QO+oeTo5PDztHJsD86GEz6J93OYbf/UD2oyAULMfXg6Cf8SZ1/LVppE9q3EUkPhKWG",
-	"0qjUKiENwa711k29fFKr+CQEotBG0B4OiVQgKvuVdrPdqjf36u3WpHlnf6e532x+JXf/Ze0NaUkdopxq",
-	"b4F/roO02AZ0lR3D1UhsjD1XamkiOqOOHBRJU1TB85UENO487B2dDA7Hxw8G3UH/cNK3CaajkXQCVCAW",
-	"YBfrXWVCRBQJ6C3py0DuwLnMbZybTTv5Mb4ncijajQ0Ee3kHnhKABSvzgI+FXpbF/3KVrd3sPKiWF/Ia",
-	"WfwDeYt/zbQmHZDZ4l8OZcJyVQN0MdVVo5JMEbZ/83nsf1+Zp/Rus/ffVyTbF/kXFEXkAJ8KkQnyj2wC",
-	"yP+CCm3LcDhNkLLLhCGAAeQpbR/1lSlfktgbkpVs+VHn4dHopNMdHHROHg4kB9xHj7An1XpBYqN/5IUc",
-	"z7EQGBWq9+hxkEUbVNXQWCR5F/a2tgOGMOc4eMqeqDFpPY2jeHjx7EOOAxGzDOIxpNwzxBrz4PBR5+Gg",
-	"d7SPjvQoAdNplKXFK2SEEOiNoc9HqMvA3qhxpdCYmrRk/4Oj3tGJarv/126/B213krEY28ecaTrVo3ax",
-	"Eu/MYmlgPQcEODiEUqKvPAHk0iEuLR7B58edw8mg1+n132wYGH0b4SCkLnZJaix45VgwjKV7dDjuH04G",
-	"6l5Mlrib+iyR76okvrUAD75V0Mqwf9iTJHvSOZ4cjQZfdbqdXIsqMCAEiRIg/jEp+ODfnntYIOwtfgJw",
-	"SFV3+csPfxt2RpNB5+HDL0863W5/OOn3fvnh72oUw86oc9CfjNT9Pjh8cDQ66MjJDDFf/KdcFb2SaYJI",
-	"Pkumb30Rzx1ezrR8aDeHs05CpQWFWHdjpI/e4FF/9AmsUGrh9pE2kdtQDpdeED5TNyg8NK+kNhZ66PUn",
-	"nYef9k+SnpIJ9QCiQ9Jtp6eWfDbqd4/Hnd7RSa8/kT+MOnJFzFdayWEbzjZubDwcFDYTMDSmIiQ+NDFM",
-	"sOKDQIQ4CBf/GRAmUHU8HKh97o/kXvX6B8OjSf+wO+jsI8nfMxEU1klTZ3xyNOk8TK+4deAeKiYXshB7",
-	"8XHNtzHqHI4lPS9tx/AmF6dOcMJQecJRXWI4COP22/bY5QZ0JoNHnXGqk6QFC+cOfM+j30bUxbGQlWy3",
-	"sZNhzWI1d84zqAdHo87JcNT5ykjJutNzxhV+AaAofPGaKbdw3lycCLJ4RgI3HoCXoNJSJBvPMsXl58kp",
-	"fBwwn5y4rCq2Thzsz+UfT+QNRDgY/mDqOIPOTxsZAm1ndOlz4mufeEFoQRJigbRULpIZQV/Byn4ULo0E",
-	"kV/Zf1wsMubv4PhHM/1KrbLyoso/L7hGKrVKMX/PPShi2ZVaZQlHTT2x2sy/tI7lVWqV5Vwr1UKeJxU/",
-	"Hg8HlVolxyKS9VrPDHLvrjn0yfsFh7VSqxQdJ2viedqvPKlZqIhCEsrFbxg1JIcns1SulPTMlCMkjRFL",
-	"4pM40T6DUh4t5dFSHi3l0VIefafy6BI5Eg4LSZig8h4Ur38puZaS6xtIrrHgcb0GzVyI/qbQ49gWmhVt",
-	"JovXYeSxdPyKFmti8aW2VMLRt3Up35TyTSnflPJNKd/8Ju1tDxNxIismZc5/oTzysEga2UCkmMQ36Bns",
-	"BUNzjp+ztaLBYfr6NRSBM1dvkdcvfYXu7V0peCcJv3isfFfmVo0tB0/iz9jpU+KAU9bHlwPl/1JBWvof",
-	"SfIYeeE8gze1OxLSSJiHc9o4kL/Xkp/r1JcXs8pHJCdSmdHwPDptOMzf9iL6zbOLbZ8539RPcfDNNtUI",
-	"0m08pybCIpmHdtIVDfzKHu3r8gDaJ3EZysA+lRvBAVJgAOD/VmsnikD15ZaSepN4M+UnhZwzdmOaeDF6",
-	"igPFXDSiN5YZl3LsI2EJuSJh8dq5y06JSxziI6w8v3H+IymrqchjvPoS6XizyFd4Ip1GBqTnDJjcICM5",
-	"9q0xpG2wG+E+NljSZWbPZVbSlBVvo0FsbNUryexXRGbxHl8DZOj6taSSVH4HpPKOpYGd37Y0kMdKvvn1",
-	"by6ZtHy68qI5GNov6DtE/j0ed3KOHiNM9nuDbid17TzoPJx0Dk7Gg8POYHxydH80+KQj9b+j8cnwYWfS",
-	"Abp9qzureKjv2PW02cJK5qKPTi4/TuocZW0hGfZj6dtT2NPjg35vWpGnfloZ9T/rdyfy31uK5+WWZx8d",
-	"VcUWMnY+K6JD/gvsJMSlGSODSoZCXHhPKB5USA45pV5ZpIo0eDzn7AKCugUi2RWIhwCWn5gnQyqClAaT",
-	"ITowk9imw7ih4jXncteByWOBOJlxyAkaw/k0HDSElH2GmSqdaxPSBo4vaIBplgNrk+rcwyEGBpxKvmDx",
-	"Z23QEkjuQYSVNgqGnX/nW2azK+bXbrL9dfKFRskYSsbw780YStnzKrJnJwqZj0Pq5EVIbD/Kik5nNEgC",
-	"kBwWnNFZZKVB5MTK/aW8PVaS3SScTlRqOcE1CDl2wh45DVVA9qpYgG767Ze1+PsNcjeqCEGOQ5axz6Zo",
-	"8a/9ZrO5c6d161a72brbvN2+1drbu/vs1tNbmdwue5ulZ/y+VdvZK05ye0Z5nEdh3cwf2O/Ct5fE7fgs",
-	"KkpB9ggcU2f0UsUcs1MV+F9DDhYMzTkhgXMOWX2SXMI6UjkbJGnto/GyEwFNi1ocCiyip5J/CoQR9sIk",
-	"P2bEMTh50AWdJYnhsq6LafB4ROSqwFdPUP/S8SLlHtL3LSRV+uWHv227OMTbdkI9RYcQcRPT77aPL6kf",
-	"+Y8wp/jUI2qVfvnh7xmu02rK/xqtdiaZcToD2G46ARikkmvVWrdeTqcNlaFra6twd+GMXmBvyXGSyzIn",
-	"nDKXOtp5Z2AFKR9uoZMUnMT9g85h56H886B/OFZ/dQ6P1R/j/kF/PBmpf0xGg/hfNhpUtVCpVVQDlVoF",
-	"vq/UKvHnlVol+TqDBIw/z89djEjIn6l4eeIuTZInIONmbExJ+X5Vqicij+4Zfk647RJJ4RGq5DLk2KV4",
-	"y0oZmtzkluMabvAYrjGklw2bIM6wJ0g8mVPGPIIDze3z9LTs1Jl4WmtSjN/EGbzAnC5+vCBU3MQZsvjL",
-	"spNzc0fHp8HmCx4nh01LiTH1NKbBOJW8UC4nJC6FxC6UJ+nO4r0DBEEqU7yLv42IhzMO62q8rMt4zlYN",
-	"EY8kQrRJgkuDM3n4OcIMzalgm0zjMIUDSEgIBVjYA9Mh7xfxLVBTSd6eYpWZ9u1owQwkTbZmAV8HOpg8",
-	"pniDx1gK7LlhPswJ5NlwyHh5TtMkTyXCSC6KiZTDsZDOqU8oz2Q5hTzAVuKAJBVuSiSCnMZxbl65BdAH",
-	"QeeM44RnJcK3oq7Howfd+s7Ozt0kb6H8Tso73xCeZC90mRNnMJSvb9WQIP6cE51oU6cbTW4S6pPnLCDo",
-	"eNKtHk+68IPWA7ayu9NutndU/Kad606n0LzuHKu1lJwshyXH3rjP8XPq6fyvbysym1ZB/I8EObog3OX4",
-	"LATnu6KNMxx5ockNuOzmKmIp6hBKTTK36hpHNeeLV3Wj9qKqc06gHgRsPfa2TAGIVBmMtCCQcCV9mSRX",
-	"JmjacNg4cyOlHMVbqWaTvd5yOlAsT1siTC0rp+ev+KK1LDx8ebUkM4REEVmpwVj510pFplRkSkWmVGRK",
-	"RaZUZEpFplRkSkWmVGR+V4rM9Qnx1y+w348EDYgQKotSQZJ+wyGqcyIEw+hpxBev5a26pUvlqWHXRVyT",
-	"IBd9MrCTxifosYL7ZKiZjQ5WsnPyC5IqcHGVjiB9fuSj7uHws4J5KFJM6wsuc6LibD9JOZziYqiHi599",
-	"ohLemkbgNCTfqbGyM12jhSE5Aw9zlB1ZI82/Uv9lmFiabQHT2n25hE8ViIoTKLd63SOW650eZ3qYjzv1",
-	"r558v7u0HlZCw5lFV7NYS/nxJhYRvnaC91Uu5fw+n5YHozwYv8eD4XDi0jALaFyd09WOfUr0qappagso",
-	"Gn300UjpSiDsTKSieUa07CKgHptHVTTV/kcfwRetBhrKd7WuJsy6ni1eC+rg7QCHEcfe/jRAddRTBUkI",
-	"hYq0cyLF1chXuTi1PvbsHiL34OUj1B0+SEAPSS0XhnwifNj0r5Xg6rHZjLjHgvBts3Db6XX/Ws2vvWS0",
-	"MRWocYJYe774MbY5ym+sMEFJYSEJRMGgq2JLHdbMwBWGhyMMg8eIY/pczgDejSMxjXqm55XmcGvmlt67",
-	"Ib1EncTeZrarjjrpZU9p3QV7kByrgp1QYm9CTrkzVcCeVGGZLLn2faUOg/UDGtGEk3SW9C8H6oNMO/ck",
-	"kVunOi6A7KY1pnz78SDzPUgxn+PnYNBiwDcA2A6dnuEgxILipT2l2MgB5g5DnSBkAeCg0H1Os1i8VjtT",
-	"bE3yFlx/vvihvvg/Fv9nffF/L/6f+uL/rTX+sj+Nms32rY/+dCL/2HHg/5Pq1n/8eXs6nU4/+ON06n6I",
-	"6k/+tKTUVR6Gswp5Qy7nVGmASTbK4vJmSnuJq5xli9RdyANDL7Gqn064CTRuoN+SLpS976EcFBGC6COb",
-	"VIbSp7mGVtTplovimMqTkiuQS8lQTKoEjp9r44NUK02GAxrIFrhPA+yye4hF9+Sw1EBMn9aIDF3XoBKC",
-	"UshrqGfKcfcQQ64i5FTeBLmFcYKF+Gws/iFQe2d/7+7+3l0k16dIP8wnKs1oinW5qFko6ttqj5Pqn/fl",
-	"o+nUfdF+3Gy1d55s7avf2ju7e/L33L+/2ljljIn/mj1nyZ21geSqmeFNyK1aUHCLy6wpm4eF/0zDIrNG",
-	"/BoE24ZxDgHDc+MGyKXjRQJgpTlTZCzWbMs7QhmY3q90u1ZqT4qtLRV4M8y+lZd2Wzco7V51Bib8ZfjA",
-	"kjzfnWRbbIEsyMyrGZwIgReivCuSWQVChHHnpv0FQpvm4JVGjtLejxv0t+diMDfQNV2FLGOCT6VcMOPw",
-	"VHVJeSEqY3lyE8ZiYi1uys2OzZb4YuP7RdqJEMvi08qm3sYiZ8W00ninPpOXRecvf86o+GZMZwH2xNp6",
-	"DMmrGYNMzmoaq6W5o52+W+WSzZUHu5Fp8xoQ3UnjMELdwYjIgRTakbj96OqVUeTn1vWYOlOi6ArjBOty",
-	"LmsQDqlxj9RXsObyJ+LeL7B5dUKo8QnRkeqgQJqRdBL3ZMQpL/DgcNAddHoqF+fx+LgzGujEljpDZ8rp",
-	"m3q74PJSY3zAmV/EvgOpVAWmeiCL6oAH0pnjWXpZp0EdJb3puBU1pOXjXzJqO93o6tvNWuXMdGpmB4tu",
-	"MBV0UaDgCigEBbE3m9T8T83MRCSl5xL/utlU6JIRLyG0Ak+9TfiqMjxDPgvphU6+lqKqKyTYl3w8weaY",
-	"Fm0SyCcP0uFDn3bkT6NOfzwZHU+OFXlM+gfDo5P+X4eDUad3ZOdRkk/lsg0m8oGmcR1+NumMT45Gg0/6",
-	"Bye9/ngyODw6GXxy3BmM4+epsLQ4DL844VhxsjBAZhxLEhx0IQ9OkswoteHZ1LtFM63UKssnWqlVcvNU",
-	"aYKXTtM8Lp5lpXaF5MdLppgm38IvrxCNrDIyZekwxY8NXeUMa/GJ2FZHeVvS59dvnKHq3jJq3EePe6n6",
-	"O+hbef7PsHeOlSx+xrGUpSKp3yEqxaVT6gECMmaHSvZ5cm81aWeDBsF8wyKEQQDO1J+fR1omkqIM96HG",
-	"9L3Cw5FK8wBLC3F+2cRjGYZ2b92Z2kdF6QgXrxCdyQVa/MMY10DEZ9nYxjg/H8wilg/vrTmqS3sFC+Kc",
-	"occCe5hTtk2DC9kztLptZ7LcZpHUfJ9cZURF6QivLxvjvWV5CY82zUb4xukF763gZ2gfxWaMuM6YOorm",
-	"AJnsbClFNfNurJ/ey8U8Xp0s3yYIujjWcUWMY3yvXrDEJJGVBO1nbyJ6XrAZXiZ7FkgVjbcVRi/YN8S1",
-	"RVH4oUgS/TwivpHuUFYCTY89L+BZN/MGst5by6owibcRVVdM5d3IqmYb0rN5H5Lqo6P/kRdU1Y+bTEMf",
-	"hzUHKiHCNxBTrc26Ljk1brKhLtFHR5/IO3TU7/bv93tHo9SvFnFnRNrMQqbbAJEu3USuSENu2XNNXIuA",
-	"lXCdFRKW2cuUiNV4OxkruwAp6cTAOWF8wHRSZrhCGSW/RhmBx7g2N2xU6fvv9JLJRE1schoMsNolFyQT",
-	"EdF4vxb3NSN7I0hJ9c/72s7+QqNLtm7O4L5uApaBvaZQJtdlZ6/dtGt93ZYM5RWP+ZyhzyPMifDx+3J0",
-	"26sHi1JbgzRL5xM19WZzBC8525tJagWW9hUFlCVXvaBuhL0Ct4SrTKXY02e7+Oz1zN5a6HDt/87qgppt",
-	"qhz2HGFvFvnYmsI/GcIuBSXFy+XETsMdoOa7zSCzB7N5laxDeYDfKhk1g5PN4qRWirfxi3AhSlbacZxi",
-	"z4vebbmIcscXr3y5kxmGkIBDCCT0J77xY7i64AD4KjAaTIYoJHLVHOYRJXgVk0+Yzm6j2wKHPxY6ogDc",
-	"Liaxu4pxKSS85HZVZaoZzKmmEAV1NCamRoEeEuh8g8mwVkQ3c04cKjBf/KidJ9yK91qtj8FKHACYS5AY",
-	"BQUCwNLemEt0bNmV+smfI7XBEyC61eTRDyK/k7yelGSuVaiYn252+FT0zWA8vI+quXjE4gze9zkW1COU",
-	"M7Gl6IeH1KFzmLP8ajhAVetTy3dH7eTfW0hAHXIFfQnUrZxLIgTgiFu376SP7J2UU+pOGgQJYY13it3X",
-	"VIioCNtgZGkXo46JBSQ+FUJnCjVmER+5i9czCptXjd9cvALynZPAjUMvlBMYIyyVFhK4mtaxVIg1zq8G",
-	"0TWLn0896jBEfDQj8gIk8FIcrKGPGlSBj8PLHL54JZlDbRoEDJFLwp3Fa5XVCsm3ABEoVAlYy8NZSyJ9",
-	"AlcdS3/xrwsCWDIwqFDAWOCtq2GJTUSSILOIgmkvpHOWMIl91O10u6iqrGC9/vBoPJgcnXROHg3Gk84W",
-	"Imj86JOxeT48Oh52DrudHJindfv2bg7/ujzKVce3LsHtBpF/WkQKy49JYCRHQw/KBKXvoEI+CAAyRTHo",
-	"gvD4dFUFWLsIIpdUhJRv1aaBIOicRReEawsZ9s5wEPmLV5w6gKHSAhwMzmHBhWQbxlDWXHZw7jbzyKa1",
-	"S9ZuboIhllwmXsdaincVyTO/Y+ge2hi7l50tABaKsLOoOk3AINOKZbIFtZcF5OhsHUpgWtlKw+qUfX7J",
-	"fWXu1BJ5d/PIu1UX/8PkzfcOTgIyg/L1q0acy+7wsrb6g/F3hMxpMNv0/Ud8DgXrr4DvsNbquuEdGT5p",
-	"7awt/S/duvVgNanwbaAxDunl0uLzRmlco4AUNye59DWMqreR4urm6+eQpfEiRXi5c8apgKV94LHvlp0M",
-	"KH2mr3LNys3dmuhRHDF05kUqcUVauo9vq7kVJUWtHKwFHH9MUHdwvyOFrweD3lEtFjnyIlYjvh4SwJiU",
-	"CJ5CLLAAOTqQnT/zGHZrSESnBBaQ1IVRrpeMPJnt4hVi6NMv748GvZMHD4++SJe4sB5UahU5cPO3HLz6",
-	"O2XqTX+QE8CcYP50ENCQ4kIjIcSguBZoOB2C5hIp5CoF4hzc02G8YWpNLLfOmPALuvgJ/h5Y9o0gn2ah",
-	"ste8dWdv51a72Wy2dvbeOCzM0OT1qezG6+wydEoCckYdCvf2th3okSUx0JuVEKAZ1MjEAqOP0bTynHA2",
-	"rdQK9HurZ6NtJDp8NQ2O1pPcAuFMZRSmswhTqcbE9AmlAfNtJjZ2+ZjTJdJH9euN0wEkqWiyA/x661p1",
-	"blPip9S5S5271Lnfs84dc8FS67alL7cwo4jSs/Mii4AMMKYYZV6jXq3m1ncKFN0CpVD+X0G6Dvuibf4b",
-	"pCG0fZSrHKApRx7N3giJnJsumpyXdW/A85mLojVeOhalAmoNqqsgHFdh5yCyQzJWE7wRZ78PMCIhnmuh",
-	"YNn1j6pykGrwEAxaEKGli4Z+HuHATRcBkJcCEQKrpFu1ZHCchIwHsTfBuCCgOoSPA0ipIxavA4ezANdU",
-	"DYlPJ5Mh2m230Sb1P7P8YY2D2OYRrffnL86kIyjc9KV+41y+gmtyJJPAnbB+4KpciqvFNPPmkIH1oEJP",
-	"Z2TCvgu6hUiaI61V2W9lUrGhkPhxjD90yUPNM7WRUmuR7kEUmNoSCisov2w1bjVuAT4HBxrBJBWPOD4o",
-	"49nU+XpCKZYgPwqos3g9p/kYJlxDDA3Hw/RRxUJEPpWMPK6yABce8dEZ4brmhAixCxI6UR3QufxHwJLA",
-	"XnU9iHDxT5aFOe7tNJutZkZAvJ0i39s5Tel2sUzgMQd7g0CEfAmz7McGW1PXAhncW0Edd3DedQ6PUR0N",
-	"AnmdwRtm2YkxJxSJEwCMG3Qnyz51zvEFkftm8HTwIkTrKxooMknEsIQILdNlhWWT9gtgtfFUtd/VMoSY",
-	"GzylEEL6BE4uKDayfnAOmNolNuc0o7WzhC2pFZ82SmPbKK2ctpI5xxrZLz/8vdg67W4WzDatbNVMXg6G",
-	"/MWrUFIn7LGdJyJtrJCPK7WK3M5KDYCNGRijepCjRlPoPlvGdT3TWfHlS3kWNsqjqr8Z0kvro1hjz5+N",
-	"XMyjMvKuMCQp2A3sYCo5nEuym6kDNdP36PqoSX2l8sxlmS6ytLysNfDEOhqqhHbWwd5HYxAqUbratbqz",
-	"rAo3cCpi4cC2Bvzyw99jExu2WLYUa7WMe0Yvsfz4OeFMxXrX0Zj4OMDevlHGMHzyxQdB5KtH9Q9wwGoK",
-	"jpv8ake1pvQYoR7L+yVgDdS/JP7cY/toWvlir1lvN9u7EJ5ZRwckELLfY0HQwQf+4r9Eqif5Q7oT+AWU",
-	"H0aF0YBEqouD5l27i4lcZhFy6AYke4I+/yDUv5JUf/GvGl+JGEp+cmE2qNpCGO1KKQyhOvoMJCjJSA4w",
-	"X/zE9tHnLWgSVcllQw7n85Yejfmkc8qplBY/i4Jz+X4783478/5nkXcuOxiTkPinXH6yk/lkJ/PJURRG",
-	"pzCqHnluPtrNfLRrfQQkkF2lDwQpWCPzY7JE8S/JCgHnfBqvzVM5VURQWz/QM3L14PKLqddmnFnLcWvJ",
-	"2iTTHGeWc9xOTbMjbzpFb1+qWWm2qw5vlly/jAlJ9qYfSEbyABQ7JvblE/ms6DQb26N5Jz5m9jkwD81R",
-	"sAnYPLNp2Npuq93kaTxh81RPOZ5MFikrFdHcJTHn7LIguKAL8oGDXSz7c+GIgzwhdTTJv7VAl9hr0ZFt",
-	"tZGfi6Qo2z4KiUfOWEBqiNR9TL0acuZn204wfypFcSWOYI8ozi7VsMMkuYX5FjnEi5GSGVwlOAxcQGj1",
-	"G61buyZtlupNfRFCbiulqjN0qf/7i/7fxuXlZbVxebmFiMrnosLjb99GDubYCQknIj2u7vABNGxlmtWj",
-	"kUTWasVWSXCvozkDAUmZyhY/SW42TGfxUH6C5S3urm0xNb7sqhbjUY+PBz0wHRrNUe6zld/ZrFfqXgow",
-	"gA12W+12gjUIGfNEgjIwCAP50laxyygjMMOdaJRsIDcWgXRai684oNdkIomRrbgDK1lBCvOeWO8vIAkD",
-	"dVXMF7RuaL36rVK/141SUkzShhYbM+b6Bupo1XSuDX66MsKqxuXUl4Mr0sldMu0oSTXJEKHyOfzyw9+k",
-	"NAnSQ64FmLz8LpfCQS1hTv9vt1utnVZ7t125CuiUZ1DA6+sJLH4OdOHLdaEyYHVx1+N/Y1cmbkDOPHPe",
-	"Ih8djw5RHR0HVM4ajYhgEXcIOsQ+geTC8gXrdCTpLNSJuNPaba09EfKlLSnxy/4yPU0DM3nC5UBGA1QH",
-	"zWjxSufRXrx25QxO5dkdDRDI2wRNKxEPphUEGeMC7BMxxw6B6VjVQ2taRqRBSAIrZpZAY4fTwEjTGdsd",
-	"ZFyJuACdWkgFXF4AIBuA30JB8rGiZmNTbUyDrsk7ArhtI5pGPNg/xYHDyOV+t9Xr7ey02juKQom+emEH",
-	"v87TytcoJD5cx3Upipp5ViMebKnf0iO3VEDr9ZxnQynPxmNT1YMrbDFVizU25CVNV+MZSaaXNo/6WAqz",
-	"EPgDvkcVLwLMSB7ceEPi1oTlhpQvRV6ogMdXpbaizPUiNElbFq/WaFqaE8ZJXAzzyGESUvwrdqbno3b2",
-	"bqWMKpIirFIeyZ/Taf3J983aTuul9by69afadFpv7H/8l3sfnPzHRx/+cTrd/vMfnvxpiRnRp2GIA4e8",
-	"F0A/8VPaqbyILAx5WojKsFgLIiAlsBCjvw4nR82dvXqz2W68FfT/zRLU2F5ibW6SqzdYY62fcBxCNjWV",
-	"zzLHWyxXAKy1bdNW5xL8VDQIsRNqKUWbCuMSAwxkGI4wYlxKnTa/b0yDvhCZHTLx2IsfU3uQgsgQBBAx",
-	"T1nVZONhKmVrzRwM+Jy62PBXbFRZg31Q3ms44pIRYDtY4UhYImZiBTLhBSG5VIFCQ3qZ5H2Tpy+8pC6q",
-	"9g8eoVvtenNvC4nFP9n+Q7loAvk0WPwsnMjDAnwAH+IPEUYfPv8QmRcwTb/QMS/0tLqNXOJQybPU8yY8",
-	"v/vhWueuDUDK1aaWE1r87LKEicSiC0gu+5bZ01izl9JaRlZJju49ywL6lq1o8+j6VgoaMFyUcWPBJHFC",
-	"LqmO4HDxCrX37P1PeW0Fqkq296JT/+qFZIw5n/YVaihdsWpStmZv4rKoJUUJlCUwDxHKQqLytvH1EWPv",
-	"A3NUlHjNNtKpUCIBTn0lamonsmQCF4RDgtF2o9loQiGQCOoO8RoY1EPGITeDECYgCFBqKSAE8ZaaJH/7",
-	"cJ9pUOJ9SrxPifcp8T6b4X0yd4AVNZytKSSXz8rAXxTPmRGyy1jFko+WfLSMVfzdcdEhE2EStyJGKpUp",
-	"eVcCdinDlry35L2lDPt7477XXkrqypWkNi8kdZU6UjdSRmqTKlJvXETqfdaQ2qSE1FUqSN1IASlnftYN",
-	"5k9XeWXjy1+3R4IL5kkOjII0sH8aaBYKp1dyFEksLIIlreWMw4oHEOEw7zxVI0CeK8Dmy89VZEcS65lB",
-	"W2gTax5DsQwycaQ2uLDZ3TdvNg0zvnP71q5kTM1ma+f2VdDypoTJi5UxmmXVr/dT9atWmRMuWLCp/GpQ",
-	"sclH2RvGaq8Wn0W9wU+uWmOsh4vAXQaSzA3rTN/q1OTQiGthZUplJ66r4qJdmlOyOO8VlndBwISJnIFD",
-	"LVD1a8Wuw2cP5Ti+lgTxteVfUb/aobiJgFJY+SHVXFHK3Phy0BPPJ19WjNawaKhBTZJEWHL8NF2LqB1X",
-	"Ubd3QF7AM5XWIjuhdcVmlH/Y2hIX6ogZD1Lj3ZX0Lqps0nsH2ds62Qhu2FdmZy3Pf5dO0RZy/JxulKJN",
-	"Y8OxVakpmzFOpYCj2Ug3LZ40UE9nbITTUdMXif4arsQEeUbMyNIYJVfl9fEVPJ2JEMNkeVFYSGnALJXo",
-	"UokuDZi/FxW6nwqWvAKySOFGawbcvKI0XyYUzcB5Cr7J582ugdBAAAEQMpByn0IgLk5n+jFBkunD0cnG",
-	"HOUAI3EQkh3lY3RrtePxcF37PoHeLDh4Rt2spS8frdtALVN5e4c4mBEE95iU1eICXCgBgtSMsiQ1ZkhQ",
-	"p+80qMGi8EpEhKAwAf5zRgIX7tMkUdsZvWSotbffbKLjSbem4F+Q6zSXSlUFmkDuckTOiORpMWCy2ZQt",
-	"EJXHTY7SzgQnb57Fa4/iml61uCUYV82AqpKQaYDlYIHarfMc4OZuc7fZvHPnTrvZ3m2123utPSmBtdo7",
-	"d27vtG5nTs1OO3Vq5D9TOkn/yVbVXDzmr92XW9UmRP6/UCkC4n8+btVNboCdx81668lWtf24Wd958uJx",
-	"s6UeQCN78d82zqe1JMw6E2K8EWMLkjiKOOzCBFQ8e/bs2cGB6376qe9/k/yHqjttC+d0D00rDhayZXl7",
-	"0AsyrdSQvDnR4lXNpG+Td6KXg6shYqPbtnTB3X1lPZlW+tMKqivKqraSLrfAYGJGiep5sVSRaKgAnzPC",
-	"QT/tW/RuXYD7Rv7JiTJUnlil2xa+QAP9SvWOjfuyMF9q92C49mKiX3743+Gc1XRWSbkKkWyoZa8srIe8",
-	"T0EFiw8CHC8XIxGdSgFFy+F5sGQsD9tVeXScLKeM01C2h2tyhhCaK8zBZ7rCbdwsZkgkAp3dXs2K3YxT",
-	"dEgOrniEknN1eAx3SSBSfYu4OJD9Y01bLE39EEvqqCkFds3uSsYa+RiFzCN88Z9AfEopg/G32rDsIuYX",
-	"Z1EYccnN9L+hBBDUiPYRJ55BAlt7oNiWDmu1ak8lSwbjHA8HsPn26ZF7L8i3kRYUAX2GN5gWqrZaK+CF",
-	"kkNsd+pfbSt0IYoPuwm60Ah3FQyGfvnhbzZF/vLD36EwaMeV2nSSns3qHrbYDi8qOCy1gifxKZFkJp9S",
-	"O+B8niq43PcsCcfc+jmJlZM5AcEHQs2x921EOGJRKPdOCsk6+V2Cyx4PB78H7l+sDhYm3kgkc4EigWMz",
-	"ib0dB8yFWCipR4Tc4OCpiJmFUDDHERHM0yEPu43bezs1kxQ9CIk/90Cg0n1d0ECyeheL2jRIHM7Mpw71",
-	"dO4VBiXeFdxSf0Z85DMiRwlhk8GMUA7MQzUBth0xZzp8BV5FRF43i/8VKOP4mMwAj54qMQcnIQ6E6B8e",
-	"H+hIb1BW6qgbQVpR+Rf009VpRlX8rVRY6miML2gwE/E7Uj5j0RzKCqtw5lHnECJCtfEomOldSn0SS5dz",
-	"vnhVl9uQzh0gR1SpVWSnlVpFtplJa6Ker6OK2NX+ZlSBLijW8u/vkTri21E4bM7shCn/diRjhwONof6V",
-	"MUmlyUY9W1YDK8nMm/EQwX38bUQDpQRAIS0BLrMvOoPJ4PCTk87x5NOj0WDcmQyO5GJ0ZhHmrgo/s1OF",
-	"QmKGzmgy6Dx8+OVJp9vtDyf9HqpLmcOh2FO6FwgUTBfhg3bhnY5uyWWmpGNXfTyCQnnx71CVC36+gOrw",
-	"unri+PgAfpa8NvKpm67wVTyVSq2SH66qBKrHpSuS6oK1SUkw02F6F5f2Uriv+vx3ceAQz1PBXpz5xXur",
-	"MndkE88q46nyClMtCqhanYxaIqBUV2Un1u3+SKfZmjMhFq8vCBUg6ScV3mDXDFXrz5f5LFAA7gdgOSlt",
-	"WTYZF4R7ixbTeP2rlKNbXURvyTaoKm3FG3GUieizy7TrtDwQk6CTiBlfx5L6YAJhJaEBX1PF7Yry7hEh",
-	"lTkOMfQslm4z5QnT2wxJHJDmCSlTzMdo2Dv8pKYH7S4xsclVRt3OYbf/sNM7Ohn2D3v9w+6gs7WCfApe",
-	"X7LrJNDuB8lvLsCeL2gY6anI8aXb63zSP+ypVDBv1OK4+2kvw5FzQ5XnuqjDLKsu+nBT0lrFv3UNQwO5",
-	"8FIUYNzk2jCMeW42+WGuGdcw5WTNiiDgpK4Vp3ijrsq29W0ELkSdj8xPocWXgGysQQ/74/FR5+SwMzke",
-	"dR5KZqx++Ox4NOgNupmTnHt71dQ2WOb4mkzkbHSkrz9ELpgXUaAhbUVXqiRgZEbdRz1UHRGH0AvibqWz",
-	"fEkG8G1EBS2IkFdcWQU1whkTkSrHmeYONeRLxkADFwMUR6VBMEGO8qxCpjYK7AMM/LrOhYhOfamNadOB",
-	"bRtQ5Zs6h11U1eRYMHI7ZBTiIk0Quhy4OWm5kdtlcOOyzWfMqtQsP6p2ut3hlqQfru9zjKqjz7qTrczs",
-	"VaaZbndYRR3HIfOQuKgbiZD5hKMhZ2fUI5mRh0wKnFJo1VZ9vVYBkYPU1o2nix/RGePYjy9GIxbbjsT8",
-	"Qihj65yDrAfrakca5xYaVQPldhMqG1USXwpKcdrwzSKkU4Mq0Uh/Y72vxObAgKdSn+ukPN1hD1WTpfII",
-	"hnwAQ2ULKdjmZL5yTRTRkCgz7dzEbKoErSEkvqkSEcf/CkUr+jsXp/ZblRn9rDuRh+cpcUI5tqUEqA6L",
-	"IZXMRhn7hbImyEUYd61FGJMw9Aik/ugq5A1xUY+cSiaE4mTk9dWda3P4+s7lbYWqQxK4NJitWG1OQpUx",
-	"x58zHkMPis4dWOmDxY8eFaShMHmCIDz3ZLNrsYlKv+l+2kPVsXNO3GiTsy5nrH0J6RMepM+mQSfRQL+w",
-	"b+2qFpVVZ6nkCwkTtMnBLh3bfdTTF7CUwLvdIfzPEOTuzyAZn9xkeUv0Dj+RulT304z4rR+suheW3ggk",
-	"lobOaCBlL6isnhq4XDeFQjACLsLzxb/EhoXc4ltv8NfMsAd/XTbqkan4ryTS7uo6v1nIgF389imh5h44",
-	"sKoKm58z92A6wYYCr8lHmBdUJzZya6O4anxxoffkV5PYr6Cy8GYJdO23Rv3u8VjKZlYB68Ln4+HAKI5x",
-	"U6mhPOg8/LQjBzPq9MeT0bGUOsxXhc8G3eHSZ8PxMF1WufCt1Jgng8nxw85o0Ov0+ieDQznQwXhiFlQt",
-	"4smwPxoc9Y5O1Er2/9rt9/TwMy98ftw5nKi2Ct5Sn0+OJp2H6cVd8fKocziG4vnFHySF/NNZqa26/jwp",
-	"7O8S/fKc8QzUNe5Xzr0zGTzqjFOdGIAXpDTT2UhF1jOSgqCBdV9n7gWuF9JgppJdZQnCFFqGLTuSGznq",
-	"fCUF/9HBYKKXxaSqjMeXIqPliSyLcscIkhzaBBVroH9xvpgUVFodvq9TOWIy7DjNgPJHtFKr5E9o/KMZ",
-	"cK5ud62y/nimXsqfzuLH4+GgUqssO4HLHg3gylh//pa9ZA+qmC9UapXlx7JSq6w8lfnnBYcyeWn9mcy9",
-	"u+ZIJu8XHKXcnA3py9UqoHxlcVlC+NbDPN2nL79CYtz0LvyEhOV1+Pu4Dq/pwtvoVv3VXoerL6jlh7u8",
-	"vt7D9bX0Cnmf99q13FCb3IE3cn0tvaFW3mvv//p6YCUZL4KCndGAmlgJjXrJJURuoMX/BmolZH40uUdT",
-	"FmKMsEuEhscIU9Ju0ygTFRyIBYsdEMr2FNtxcezF1Y3gOHGxr4JRIDBR2wpMCbhUYfptKuan6GN0DaXa",
-	"oKmtmoUwVJ6MGeY4CCnXZo5V9eTM6OXg46CsZYGJ+XIy2zqOSOWBz0cP+MXBHI+KrgGH+agtVx8n+eFy",
-	"IOKbjEopLEi4pvhnUR4Z2RC43Z1nK4H9yvMfGLy2ILMoABnNhar946P6brt1G/BwgjzFNfTh/dHDDxvT",
-	"YMJcJpBVKMhnAQGwGhNJ3B3AD1RhApM0EEKklLsb+r5Q1jK54yqKIrve90cPM8ijfOzbk+93lkCAltTV",
-	"UuYljezFnhI8U6pqJirlCJ1FYgn0NvHdZRzDSYwLQVyvcWye0gJr4qqJrV/FJZp/J9W4/p0ymo7GcUbT",
-	"t0poGl4tALMw9DJUQZeaamLmUDMMMs95iuIVHqbKX6e35NiseDXtrNyCHSGBqrBTFwR5gBjJByAMUkEL",
-	"8XrmS6jZJdtuvLiaoaTGshJhmb0tDnG+sSJgxcNTtb6Wck3DND+4rrpf2SrTq/JfHrBAjuiKobs+1Jb4",
-	"tUfuvqfAXX/xXyJFADvNdxG6q/bk1xC6O8Shc/62ldQzjVytfnrRx7lROBYGZV29yRnhmCaGrQx2LJ/a",
-	"wuAJ7j+7YsvxCQLXmgIzAdI+1eVKJrwqUFq26OJU5heLt71x9zfA6Y2oAN7yOOXPiuqKG94Iu9ddIpLc",
-	"3JSWF4x8x/dE5k2bvIuOnzJgXUFKWgIHy/ar262lj+5SBjDKVHVYzohW50nKx+Tb9vIa4gC7NcoFcWOD",
-	"uUg7veXIoYxfZf/xGk1SfdZ3KQzpZW2j10fkgukt3/gL7UCovHxyBeYaF9x7g6WzVbnfvoHgBvV69NtQ",
-	"6zNUk2gwZmkKSYhwylzqgLBTEO0Bv6vIDSPhUAGm/7jU6nrZM39JqiQ1q85FT6Wz8Y1UvOpdJTq/rFW+",
-	"I+SbdS9/Id95Was8I5ive/dL+U6xZBWLNN2VwktBdpT4yo8L5UJ1iJxqvuriV8WcJBFbxhXGEfEISvx9",
-	"BUL/UVytyhq2Rg6lEjXoHHDLysBoNLjtGOl2DrsrRbBOuKyWu4puVdDM5bEBVhGmpDSZ4kCPRw+69Z2d",
-	"nbtJbRzJNUOOnW8ITyrkuMyJq+TI17dqcVTz8aRbVO59r95uTZp39nea+83mV1lTU11eKPm0CW9nb5pU",
-	"/7wvH02n7ov242arvfNka1/91t7Z3ZO/5/791cZGqh4OyUSN+lpNVBtK2sAfdXkVZTq6EuGvubZK6Rs3",
-	"SvH7Js00MZk/4Mx/Q8E6jqSCjrFQpPIGDVmxQEs1g05YSR/OuM/sZIqmOyp0gy0LATPJjJjBXs/iOn1w",
-	"ymh84c05cyNVcMjO+5TEAYLhZjMZvWN8cmuF7fF3hMwVJa9+8RGfV17m1iPNUXEUMl0Pp5FenbfnrFbb",
-	"sLOJevCWOlKBLlRoGty0FLeO4MrGcxqZYBpHKEKp3RzD3Iz6szqSInt1ehRUf51oEUetpYdpw/hZefm/",
-	"jX9K7UPR3f95RHyFSmcRysUF2sRpam+pmEj5r+PxcWc0MGgfg7haFmap337TgEszCcPZsxxOittQKVtP",
-	"xqQdYSoWYc1UNhj/klHbGJnV9521DZnppI5KMaNPH671OasLMYsIC7F4HTicBaxIF9BBAuvuuqLYgpe1",
-	"iktCTL0iv2eIvXOSWIWvCLMsRkPuo06czs8jRmLVWUaEiCgS2HMZEpEUbUCx10G2WOXIskTVe8XQyn30",
-	"COLnEJCS0rES1F0CuiMixKcwCJehxzkXYVUNk0VKKdzaDmIU+ROdmUHXPkTx8OLzl/GqeHGay3t54GcC",
-	"FYwxKLKVxSt0sfjRM/XzUlC2fRUixIlkMthl2/amrKx/Fgci39sMXrqPekaYt4BH9IJwFXqkZBDzSuom",
-	"uLcOmrqPHqeyPqRJyYkEfnJvOXx1Hz02JOkSRDhniSoLG2vyVyxeBxTEIEn1aNjpjhvNZls1XYzZ20fd",
-	"9M0b6J1AVeLHajqVVHFvFVZ230RgRT5GZ9g7hwrwxYk9B3Z2TlQdDwcr2h50h0VtYzQIzjiWUkckBX6o",
-	"hq6KyA9VokssUHXQHa5oOoUwLO6EZjphaMhVGC1kFRobIFoqT0Z1OB4q/zzXhaYyB3k1lHEfUhmtG8kK",
-	"ss+JcEpRirhg4t5qpPC+zvsBAcQqhC/QbBmShILG3R0+2FaV59cX2F6Lb5Zc0jYGx1mYdAomHc6K5oyK",
-	"mMdJnuSTUKXUyGfshQjHS4e4JvJlPfTzSsNIVQ2wx4JXjgU3rgTEXoqrhuZIwt1nHjstyIrS+J0HNsmO",
-	"Ulkm8AW2y3ujyM/sVWJBVOlXGsvA5bLpGLUGIbPGmJ0JkQ+SecgNs5LVqSmZU9tYDVdXU+GL/5SEJm9w",
-	"5pMTl1XF1gnYU6ti64nGYsnrSWfCDNgFTtY3HfBpciO59DnxdYbQ5CnjdCZ5vloR7J2zyGTQE/bOMCgs",
-	"vqKfxmqgvS2/pPwAyVytcgOnxCUOkRoqV0UxXIICMlv8y6EsXzC8uXtnczhY1vohBcZYXtxA3i2M1nnf",
-	"Iq8cVCn1llJvKfWWUm8p9a4WQyFd6q9CEr3qSN5KGH2HmsDvSPi9UXn0XUnWpez7W5F937noqyrA9jln",
-	"PA/Fkxd1pnphsUS7BGelr3qAaCxen0FOaSgiMGcUAEn2TPf2rhLysVwSToQUj8wWry+IBwf7PPJxEMcR",
-	"Zcf1Nqteq4Q09IqS0y1eh5H3NuO4ypoUb74a2koi8PGlKSK2s6akmE+KsJkHJMSZCzsGNKHFP1BnODDs",
-	"BBIqFfj+vo2ICGOX1EoHnqqkIiIvxL8dGNB7dMnlHEPptV7n2p7Thtzf6/Bkz2l+OJrFrGVOXU5wSJaC",
-	"ht+OUwnDquJU1OpGsGpwkeJKYirFVj59mFClVDuTTv666KzLWADZiTsH/cno6KQgt4Z5ZH/QH8kfev2D",
-	"4dEEcn0W5uV4cHzYHRwdwiB6fWj70879wcPBpNNLOyOXjHx1yDmkKS4ad+qJ9Xpu1AXJD1aOOeMdXTro",
-	"N7o+ErYMehOw6mzRUqPVxtr9qn2X+nmYEWCMuhrXzwFukn7Hsr6sFUSGWfEKBKsnSugxosfiH0vsbksp",
-	"b3nDKSRIoEoraVGnUUyvGw4yJR8pHouTjeHYxSp3TY6IlLpDFj8rQRZisGbER1XHw9SHkOYtYxbRyoZ+",
-	"25bgpVCPHKmQawibP2ehLsBRvazrH0jgPKt/Q56pHJfXbfdprD20+5kiUiYRp4LZEam+IyvJQkCEwMiP",
-	"8/BnQecP8sT3OMnarzdIRGpGcJHfnNSUlRrl8YsXs7b0JGq73Bufw7UnzNhaU1a22Oq08SG6+lFJ91FA",
-	"9vKiTFPqUqpMd/yeSSxZ+/cr/m4q/f7K5KMhE+FNhlVdSfAB098FdSPsFYQSuSp4CnvvJXdB1oaWritN",
-	"g3OsUafq8LxVSgKsq2EQt7OhXrMCmIjjmhOrEJqqAFfqPtYxG+kW49Tsai+TKhLFeTXeSN+xArl+r0DI",
-	"00hQyQz7ENy+zu93P/22SnQD5+OtqQfKhbEGOvYxUkuhSoxaX9+EGq1PrAp607FJic+N+uQ5C4hUsqvH",
-	"ky78oKW8rTL45m2Cb0zep00zIwmlD918Ze+6yjOB0WAyzFbZXnLvhLi4RK4qyp0q+q0z0GxQ9FuKKCGJ",
-	"s1ywCFxKY2KMyXpIYNgeTIa1ogtnzolDBdQqhVTcNMk2sUGa7To6gCRkgsRuZNAHlvbGpLTrhYTjK/Vj",
-	"XxX/TcQT2bPeysw1QVKpEHXZ2VQyxNSSmjovLELamwKrpb2tyY1yryxXXpYrL8uVl+XKoVw5+nevVk4u",
-	"55S/vdAGS+ASeom5KZljNP9frRCH8lLckjxT2dmq6sJyhzNFylF1WomTbE4rlhkU0BkQEYimlZVJOqeV",
-	"LZTOSqj2qPjKNNe6qiX7D6FKiu/v3YXZbV2jfvR7lEy9VG68Vfe+lUUPTuSywNNVbSwJV820J/d+4BZE",
-	"qacEBVMPeT0yRitba60kJvTNxarsspG8Ih8djw5RHR0HVNIR1EKNuEPQIfaJPP7yueX3VNKnShYoz/md",
-	"1m7rCsdcvr4lL3fZcbZLswiEywGNBqgO7EqKAiGnp9HitQtpOhGDp7DyBE0rEQ+mFQR51wLsEzHHDoFp",
-	"WSbdmuYpklSCeIEUN5SvAleI/CyClRgcGJoTDvXFpXQFFaNJXAbMxchjTgLybEyDrslIDEYuw0EjHuyf",
-	"4sBh5HK/2+r1dnZa7R2VsZhcEn/u6Y38Ok8yX6OQ+NrNx5JpViMebKnf0iO3XAvW63kUHNy3Riqr6sEV",
-	"tpiyj+tK3XbT1XhGW9nSAD7UqwQ7NqhMCjas/Op2NaS4MWEl8zPOd9C13pzo8ijvvVspvig3x6pinfw5",
-	"ndaffN+s7bReWs+rW3+qTaf1xv7Hf7n3wcl/fPThH6fT7T//4cmfPlge37kRF4mTMcmv4lxObxh7neSk",
-	"evfB11ATdl3s9aqseNkKEtie0Aq4+5K6FwARzcDS800ah3TWLWyQeCdJpG/8U5JqPuUeLnh+Jc9wGmJv",
-	"w5+TbTWzShJyf23kE0M722q1t+XyfL3WQYOXlWS9Z8oM26uwj47y1gMYHwRc29btYgh4fo1STSbFMjds",
-	"NCsypdp6SiCVyjpDxjtFxMl5ffOWWQQUwrMUFd8miQDswpvlELAYyHtOIgCTeJscAium8m6SCJhtSM/G",
-	"PiZvl2tyWdH4uJHjuTwab6VOQzXL+I4EELzypf2GPCKl5vk27CQCIroWT2xMPUuTax9lC5Znv4kLgaR8",
-	"2tm+OCIuJKOR2ovym8RZTEE5SmJH7NrscVH7fMkRLUSCCO+b2g56ymDfMBNXt3whdzVDaEyDjjWexb+k",
-	"VhiHIiTlYSC1Exh2cGLYKf3MN4juzdk2lnDSlD2mZqXxjd2CBS7opcaYolvAo8E3oggv8xAeXBdg5v3g",
-	"cgBOY+aoh7AKpFMCdH5tAJ35nLML7PUiOBP5SY7i3L2GV6qALIPUhc/j9S0M+LJrelS1r5RFW+oa0CX8",
-	"h53RZNB5+PDLk0632x9O+r0G6mRal/KLrmmAw8UrSQRgmT6H9JEUJ3C+mrIHQLewA7Ui34Ly8epkZ3m7",
-	"wzQo2uCViFVr93MrYZzFZgWwy7bkVi9dgPz1sFtvtevtvYLyPr/5ej4lUKwEipVAsRIoVgLFSqBYCRS7",
-	"AaDY6YxM2HcqceSSZMVW5nwl5MRl1lSZwsWPnhN5zEhbi59D6uUC8VPxINUL6uaZpAp+nrB+4A7cLXSK",
-	"BdG+Aj8KqLN4PVcYBUfSp3bo5fY4SIXb53duE6dRvFsKRJHM32WoWMMDi8QvP/wtBmT88sPfayh/j9i7",
-	"rAW85XLD3k6z2WpmgG+3U0LB7VyxuNvLYG8lILAEBJaAwBIQWAICS0BgCQgsAYElILAEBJaAwBIQWAIC",
-	"S0BgCQgsAYElILAEBJaAwPcCCORUfDOmswB7a70No+RV24xbQgpLSGEJKSwhhSWksIQUlpDCQkjhEIfO",
-	"eYkrLHGFJa6wxBWWuMISV1jiCktcYYkrLHGFJa6wTEBX4s1KvNnvHm82DUrAWQk4KwFnJeCsBJyVgLMS",
-	"cFYCzn4dgLM3QY7FNcffPXDss353sh45tlL1V21nCp0n6/KWeBttgS6vyrcB3Kh9eDPEjSHO9w64UZN4",
-	"G8TN8qm8G8BNvA2Z6aSOyjLgWglOLcGpJTi1BKeW4NQSnFqCU0twaglOLcGpJTi1BKf+LsGpJR71HeFR",
-	"h/iZPNVC8pgloFRs34MPPPbdstQ8DgtiGKeVpkeet8QYyRFDZ150qVyzKfE85m2J5Vvytdj6XQRoGxPU",
-	"HdzvIBahB4PeUW2FQtuIPUow2kCVJw/BoaRQnkQqV3P8zGPYrSERnRLQuYkUoNTIlow8me3iFWLo0y/v",
-	"jwa9kwcPj75opIQo60GlVpEDN3/Lwau/UxJV+oOcIOjgwCGet5GLY0gv9WZ37a9kK8H86SCgIcUhK8IC",
-	"HA4/k+x7YNh3CgAh+Td1sUIunONT6tHQ8mnIlbV49NiUnnaJbk89CoARp7Fce81bd/Z2brWbzWZrZy8L",
-	"9M3lGmot8Wu/ITQuTYMaFjcN3q1YNg2uVS5r1pu3S7nsatA4C+a2CUDOvP6yptDJS4gtT2UCvHpGcMor",
-	"AKt3v76D1iMjd+qtZr3VLEBQ2yer+W8AqM4hFFdtXS/1svyaOZFPiqCNabMl5GBTr2bdba5t0XINMkaJ",
-	"pzlzZvJpsQX40OBs7P6kep/BVLIzyVC9dOdzqfNjFOAw4hhwTU8jvnjtUgeDQqCwNXHwQKIaGAtv5INJ",
-	"Gd4jwmAQwZtHQjxXdkNOl4Ekqom3EYrzo19++JsyXMai3S8//F1yq88VfBDuZS55KHi8Ab6JOJlxXLMj",
-	"FwzoMKW2yDeQjwNCOUZi8TpwOAtwDRHOGfp0Mhmi3XYb1dGw80nnoH84OTrpDR71R5/0Dyf9k+7R4bh/",
-	"OBnAgyx6KPVf/i6yEURpCFH1z/twO7VevtC31NYSJ2OBaXhC51fa9pCGkYdXb7oljnSHD6QYcjj8LC11",
-	"wC9r4U5pqlUzKMQ5xWkU11td4jcBAeJgbwA+5uLT2I/vWYQV00PG6FWQ5xGQtJ3DY1RHg0ByW3jDx4Ek",
-	"c5cgV2ELi7BsYBUbdCfLPnXO8QWRAowxpsGLcrU1m0+OY9VQ/ZYK0MEhi9Ay2UpYooQSsECq0pcET6aq",
-	"3UDJbRJfMKckIJI+lCVAKsKcXFBsgKbBOXGoy5aAr9In2QIlIHncAH2ZAaqk0FnYRmcpBHU2LWUxTMs1",
-	"MvpqvNa0slVDeE4CLBBD/uJVyFym9tjS+FlaBJePK7WK3M5KDayaGRumepA7n4zTGQ2wl9Wc1lP1ii9f",
-	"SlbxzFD3SuldvTakl9ZHI3JGOAmcAjEjE8y1ub9PI2nmlnyf3UwdYJZm1KyGloeGAd/WPJtnuLHCkjra",
-	"edfrTzoPP+2fJBx6cPio83DQOwLlr46GnPqEcutg70sl8IzxlDiljoZnHSAXTkV8+5xRLkK9qpAfVa8M",
-	"jhVEJXVpEeyMXmL58XPC2S8//L2hogB8HGBv3yCBMXzyxQdB5KtH9Q9wwGrKFp/8ingSVZgC0Qr1OGAI",
-	"B6yB+gpUtI+mlS/2mvV2s70LTtY6OiCBkP0eC4IOPvAX/yVSPckf0p3AL6CvMCoMAFekujho3rW7mMhl",
-	"FiGHbkDwJOjzD0L9K0n1F/+qnZSIoeQnF2aDqi2E0a685hGqo8/gipaM5ADzxU9sH33egiZRlVw25HA+",
-	"b+nRmE86p5xKceSzKDiX77cz77cz738WeeeygzEJiX/K5Sc7mU92Mp8cRWF0CqPqkefmo93MR7vWR0AC",
-	"2VX6QJCCNTI/JksU/5KsEHDOp/HaPJVTRQS19QM9I1cPLr+Yem3GmbUct5asTTLNcWY5x+3UNDvyplP0",
-	"9qWalWa76vBmyfXLmJBkb/qBZCQPQO8AIBxC8lnRaZ5W5CGbVsw78TGzz4F5aI6CTcDmmU3D1nZb7SZP",
-	"4wmbp3rK8WSyADSpJ+UuiTlnlwWexS7IBzpTtJRpA6bkCakESP4NITqWmNBAR3bIgPxcRTABqG4fhcQj",
-	"ZywgNUTqPqZeDTnzs20nmD+Vsp4SR7BHFGeXcv6hZu9SbdTfIod4ICwmEn+sBIAZzIVwqX6jdWu31UBD",
-	"SYKqN/VFSMCUp3YUXer//qL/t3F5eVltXF5uITCqqbBphm7fRg7m2AkJJyI9ru7wQSquKBmNJLJWKw6J",
-	"AWcVmjMQkFScxuInyc2GyrIfNwh2q+Ut7q5tMTW+7KoWrRtDx8eDHsStGNVE7rOFwDXrlbqXNDByt9Vu",
-	"JyaikDFPJMYhYxiSL8lDOSZ2xHcKx5GE1l0QqbdRF6yuQJwx6elgrYyQDfeo0fzgPbsFfS+mTR2NadAX",
-	"IdavqZt/8QqxubYEO8rouqojKYUV23bXDa8Wj0rNzs0Hq6yILIAPY4kg05eSTp/iOOoOkL6//PA3KUGC",
-	"xJBrAcYgvwvimP0UfeSUyna71dpptXfblaukLbg+SPrN4s+nwRUB6EtIfhXsfBq8R9z5NCiB59cJPJ8G",
-	"7xJ5voraCphGX0iNGQ784tWmNRuUdS3WZ3OutBRDi31AWdN9IQG8Tzx8kQpcDMZkUYYeNCtK7syVOUXi",
-	"u0wbPoxOw1ewqwY6so5CPMavE4bsUtCbVXzu14l96mt1lxHlxUuPOxv2nLj8AhzTmjw1BjG7gp+SMxJG",
-	"kptm9nny1/no4Pju8eeT0dHBF+dfPWpfjo9bD47x88/GBz0vK4CujFxcsfd3775cHecw2igwoDAiwKdh",
-	"iAOHvJfcQcRPmS6kWGRF+6cl7MzSW/5MKZ6HGI3Gk6Pmzl692Ww33irL0OaIM02r14Y1SyhuKc6s9Gj+",
-	"bjya2qItCWawxuM04TiEjFUqq1VOurHcWTFjNH4ZJRlAJDYNQuyEWhEajodWig95GGeQogIjxqVim2Lh",
-	"kg+LzDnXBl3JgO2TnMKWSLrinHjKcC8bh/GcEQ0jr5mrGT6nLjYSHjY3i0lPorIzgJAhRRGcgtEJS4tN",
-	"DM0mnUhILkOQcob00sDN1P0fXlIXVfsHj9Ctdr25t4XE4p9s/6FcNIF8Gix+Fk7kYQF+rA/xhwijD59/",
-	"iMwLmKZf6JgXetqih1ziUCk1qedNeH73w7XJC2zkjksQdhiPo/xhQoufVcGpWOHJK0v7shPtYDE4w6Uk",
-	"l9GQknvg3jTQnpa3akM7Yda3UfC5EeUYN34STeCwEjr9WnvPJoFUagKBqvLKfdGpf/VCso0c3+o3m82d",
-	"O61bt9rN1t3m7fat1t7e3We3nt5K86mdvWU3+vet2s7eBhkJCgS1lDuuZvz/Bci6tcC8FGgo8WNY7vO8",
-	"C+/KkLQRwW6JSCsRaSUirUSklYi0EpFWItJKRFqJSCsRaSUirUSklYi0EpFWItJKRFqJSCsRaSUirUSk",
-	"lYi0EpFWItJKRFqJSCsRaSUirUSklYi0EpFWItJKRFrp0SwRaSUirUSklYi0EpH2doi0gbumbu9q4WRt",
-	"6rUyS936DWAivOb1l03KPSiXf/3yF+Mx35r8odly+dcsf0yoJSC2BMSWgNgSEFsCYt8CECu5aXLghOG6",
-	"JU62xMmWONkSJ1viZEucbImTLXGyJU62xMmWONkSJ1viZEucbImTLXGyb4+TfQNQqZyaFHjeDFz6tsDc",
-	"6obI3K0UNFeLjVlsLupo3eeKaNwSM1tiZkvMbImZLTGzJWa2xMyWmNkSM1tiZkvMbImZLTGzJWa2xMxe",
-	"P2Y2C67Ie/Usd/tmMDZ6adBrNCS+yMPYShxQeSW+CWakhOu8N7jOGwBu3gmMZlM8RYkTeY84kdIzX3rm",
-	"S8986ZkvPfOlZ36pZ770k5V+stJPVvrJSj9Z6Sf79fjJPiFh6SorXWWlXbB0lZWustJVVrrK/u1dZQXp",
-	"ZIpsoSaZBOf42TI32DCxT15HIg3tVyvzZ2jHIxXfjOkswJ7QmmHfpcVsf0wDpXQhToVjEmEsEWSFba8V",
-	"eQ4TC3kGahzrRWkzhFSCNJOcc+ZGoeKbHTvm7sjAp1fH0W3HEXnTCoqEHYoHGZkX/0JEhFjeIHH+DDxf",
-	"/EtA2gcwE2FEXLokAtglyGPBDCM34rHWfqQG5hKYZ0YV1LYVq0khf1v8p09CzkSuixoil45sbp6OAIgb",
-	"IJeOFwkIV8wBteMw5G2pEisLcs63hJX/ekKCiC8TI904xEMtgkdVphFDCy7j4FXJevN+8+47HIQkCPBK",
-	"3UWHw4KMLRV3+YncKpeKORM0pBeQo2Xxo9xZ4kASmBT37xLPU5dQ+OxhSPa/R36Xftz+CP671UT+0KEf",
-	"t2/vIn+CnY/3Pvrooxby+5ifOcHHd/daTeTfx4ErPn7cvvNE/f0ddcPzj9ut3du7d3Zu7d5G/oHjfHy7",
-	"vYv8g8D5WH7S8ebn+CELZh8/Gjw60v8enzMemh9cxRSwN/T8QHz8/Uvkd8VMLsXHQeR5L2uoeOAtGHez",
-	"pca9c6ulxr0jJ5OMezc97k2G3dyxhz0ZHNwfdcaDh6mx27+um0CRauaSC+qQQhNqz7Kb2nubhMRgNPdw",
-	"iIFWlITVCVzOqPsEDWy5lZ2GVGqfIccXi1dw6B9Lrm3pTuSCePKUNrBqAYiWG9fbtv51e87ZBXUJ3x6T",
-	"MKTBTDTGkg+SP3QOe6OjQe9k0NPGK3o0fptRzOcegTGYu12x14h+Q8PtiKpl227dajebe3frNDbCnjF+",
-	"QQKX8e2c0NPU/9X3dk936uS2c7sO/5T/b/fW6dmZe/d20RYRD88FcaX4MaaBQ+4zFi49lXOw1WCl8Urm",
-	"WCU+8qlHhSCzKHCZ2Co8qh6dxcmabnoTmdgePxMh8bsec775g57fiGBP8qI/tu/8sX33RnfxG8ID4sH/",
-	"bG8VJt/3dbxewY0WX+Jg2PYxkl3hfAotqfHJm12vJpgCj8aKKOJ7gwbhrd1k0yVTnhEud31GmNQwilnw",
-	"Q9twLpfAmItqZn2k5iJIlL5cr2l7RWPG2EyvrNnUZJvlr+qF+OHMF9tmNtsPIkHch/pfQ32gu3DF/mEe",
-	"nXrUqeNTEUrVoh5i8Y35sD4joYdFaP4NaRcsf4HWQ4UAdTUgDhFCLgoWN0lLDuMknloRMXXQYDLUWpZ2",
-	"JIHuH1v4cDzuf2qxRwr5mIfUO0/gASLK+0ssm/ycubFtlmnjgw6k+2Q4NjnTaAAnP1i8viBeDVERMrR4",
-	"pWImBQ2wV5NkSnybQQh4ytA55u53mBNrZdk9iFFV3cTzCcgMbG9p0VFPzCMhSG4uNtkc0tKZh0MaRm6B",
-	"YNZljLskwC5G+iWNgDHSGQk04/PYTBumE2ktJayx6NQjyakLIv9UHTop3G7QvX6LBtc+APVDMSaIIJ84",
-	"OKDCZ2nzu7yQjdEGab4Rk0kqY0b3qDMa9yF13WEfcmY86I9G/Z6lNlmKdE6RAvbEafhsKbpLOwtnnLrY",
-	"JVnJQeoacxWKq5mQ7Rs1x0pNZejhZ6gzHKCB6RTVUcy71tw5mv3MPfxsOx70Nrsg/IKS7/587n08D+un",
-	"fEuNhR6Nl4+jM5+jThgSESLgIFdgDUpIcM6J88221LpOPSrOaTA7ecYifoLn8xNxEo9uq0hVmc9HxGGz",
-	"AOS6R4S71AmvsPZ4Pk+b+B92vjwZ9btHnxwOvur3lsuDb9WrteOp3h9Pp9PKQb8/GZ/0+o8G3f7J4HDS",
-	"/2Q0mHwpnzypbEaDoos9jwazIWczToRYKgo559gHpwcktwkY8lns3zCc2HDSdyD1+MSleLsTuZQd4ADP",
-	"CP/DjIQHzCXVrRuVdhzseVJq3VpeZkhQbfdUVg99W1h3BaoaJqdtvRFYvc+YEERzdZdt1RBDPpH8yXYV",
-	"auuH4vZ6P08Z8wgO9IaeYz6TG75sJwVBGJ3ikECsfpH4KqTMjRzMOZkpz+K7kWPvg8L/TG9o8TZKaeSm",
-	"dI/dvfqpGoLPAhoyeW5IgE894hoFpGjFe+RCEl5fvblq3YsWW2oUDPLLIZcIElww7wI8ikt66/uRh8Or",
-	"9LN4hYj8yAUPOifYW9b2AXO++WQ4vuoUIgEyY+SDdHSGPcEaeXud5ZEll1SEiRvDks5B1A7lDa1uV5XW",
-	"9rD/bmgwFj2NQN04D33vD2phqltbiEU1JXtdEK4kYxzIgwQZABf/QK127dr7fsCZL/s3wv2VGJxAYNDd",
-	"RwrhZJmiam8pnTte/OfOnVutO82duuqDJn1sNRAVY6op9v6zMTsLpdR7fX3nutSDuV2nQpiOT58J3fGK",
-	"U3zAgm/Is1EUBIQvPQBSMAcV0X572WkaMRYStwcMZvMjBc507SfSdj/f1mlcgn754W+csVCZZG9M3Y5V",
-	"kGV6dyyMyBNPitfgWJx2WRAQJ7w6Z4wNnggjFoH12HrngmJ0PL5fvPgeDmYRnpEVG0ldyvzcBRgkmXsG",
-	"4yN0a+duvXWzvOcpvsDbcunh4HtEyjEP9fDTR71+/dLMGYsCV/0Jeg7ZNivnMJdkLj0r5594RLgoNKbI",
-	"B9qMUkBj706UiKjnNh71R+PB0eEfRv2H/c64f8OLWShS7NQFWOcu1IItXVLhcEKC+5zOzsNglSDOkBYi",
-	"XYJOOfXOQQQPiZel5cxam4y2i1egYlDOavKijTNokiDkBDURRu29vRqYQBRw9AzTS3DimEy3F5hTSI+V",
-	"duyf4VNOHayRcDqJVgNBxIdCS8jTdX2maljWP4y7o37/8OT+aPDJp5PD/nhsb7I1Z0hihc68KIxwMt1f",
-	"fvhbs9H85Ye/I/i7BX9fYcy/epPocuOIIrge9UkgCbOA4NQzkHIU/gvPPcA5XDDEnGiOUbAJ4d3QIb+g",
-	"5LvtL2jgsu8OSMipIyTnvC8ZmqhuSe1pnazWemNZDdh1j4q5h5/pzm+Yt/gkxN62H3ocCzmJ5/Azx5JA",
-	"5ts7zTt37tzeqas9FfR5zLrTJpBzItlLfqc7XhgpgKzczprUSeb0kniisZl5HVxvBYZ1zGdv0W4GoKAH",
-	"b3orwiZEgvAJ9clX4KM/E2S5a0ehEcHVH2MRzqRwd864EnsykkHKL6A5npYUjiddxKC7ffT//V/n54/3",
-	"ff9JAx0VJ7VTOr9Uwlks0wEmOdRoMzFnGtWPGcC4opAJHcFGpN60+NkLqQ/Jhs+xZnHPCWcN1JFCbw1h",
-	"/5QJZCUn/7De3NlvNj9EBP78EIBi6GLxowc4M2Khof3Y7JBajncgBIXUJ9ty61wDEJInWu3jJsrXnUaz",
-	"9ubSl6Ebq0+PBbObtSZZ8peBqi6RELJoHeNptoWxwgNgCcMFTL+WQXDkTlUaNOHj+WM1oic4eFYMBxK/",
-	"MyAQuhEcUIm0+ZUgbW4Q5PGbAzRcg7O9p6oJkJxr7Sq+v9LLWXo5Sy/nDXo5b96T+Y6ck1LIfR04kcfe",
-	"r7/uXbrrSjfV5m6qfytnwO/JJn+9Zul3ZpHtZ9BgsfEusVRGfmKgNUZZooyyNFBwfXIv3xI9GmdaKTZ5",
-	"NhuyuVajeTOWwuKZl5ao92iJupo5IcOqCs7BEp3jV2SJMFUnf72WiPF3hMxpMEM6AaTY3BYh9Kd5U0SR",
-	"OGgMF/mlGCXplhIsKQFpyF4hQXxk6gMvfsI29eVX5Mh2ZLiFi5Oq+ahiLhmYPbnUS5b0U6DzifAhm9EV",
-	"ySy7GSStiRRWVlPsECEgMwn2T6nJoZLoXmlCqBntiacC2t3EFgt2ibwma5DjietkW98/jWkAdVkcLJhQ",
-	"KZeW96+rCMv1hOrBQtWfDAn//9n7uuU2cizNV0Fo5oIqU5RESa6yOjZ2syjaxWlb5FCUu3sshwwxIQpy",
-	"/rCATFquDkd4L/d6b6sj2r0XFZ6IuqqYJ+Cb+Ek2cA6ABDKTEv2vmuadLebPyQPg/J/vjFFRKJNzQ2I+",
-	"CeaDWOFRtO6rj4/SSZorRiNBll7zpLJScFre/xl73Kf86o/s5ZBNuMzEe4CneoE4WsxB9EeQes7+giyh",
-	"nxt0ASgMqF0FGOZZ7aiWZwiUZ/Bhnh30OqNnytJ+1jvsdZ6tFt5Z+JJ2rAqbOpWPYy8/WM4ibsDnkrMf",
-	"IGJXAedVwPlWdNB95vK2MBfgHvlI15+n1WwV/V5Fv1fR71X0exX9XkW/V9Hv318p/PvYCqtQ/CoUv3wo",
-	"/pbauauswCor8PmLDKsG0E3BfhM/r4K8SeeXMkzsOU+4tfur/BVsnApT9w8Bex/t0c0HUIkrolzY6siV",
-	"KRM8Dfn4IY95diNW68C/GkFaRXZNqLH43z6phWotVxjOGJlSKQHCUhlmuvT3i+O1ko+Ca601YRnYoRD5",
-	"hGyCN48aRKD1KQmMsvgx5xKfoIxWgw+tmYSwjcp0LR6LpwmtW5TqDho8NWFXi5rmxYlrQGZ3Nrb2lgKZ",
-	"/adElU0zGgVRlL5gYRDDbLSqBQFrYEbn44amGU8m3Ky4TGMnOpqloTq7soiImp4WvQHjyolRB104WlS7",
-	"QC3jNeE2gK0m8ylE20qz35k7+z1hkwI9Vu/3YhCCgS13I6bO6CSI0rW22yXU6HseYveuv11gv2w3t+++",
-	"OjlpqX+3X63Xz01ysExB/tzEboSeUVS7H+NBkhvgf8AqRC/RxU1CHtqkhTs77JKSmHKNkA63RoomVs9b",
-	"aab0XDLEAVpIUh1HPx9Lc8n6MyZCQc8zh6fnNI+ytf1M5Kx5jaVfSVjqvZjmNRIT2UOmYv52g05FOlM7",
-	"tjG+YMhAJbZptK7knsxL8PfUe5Cb69RpJev2p1LdbJPXHjPxa8ouRsmQqDKkrOJqTQL3EVat19lVxhoY",
-	"qs+W2cooWBkFK6NgZRSsjIKVUXBLjIJXH6XfHotpVafN8I8frc7KloB3Hkpt//M3M8ZlRbNNovSMRoVe",
-	"K4VZ0EbRewqDVN7GcW0P3TcHB1dANgIJaNbrL24r6/QskpO1Tv/w6PhR9+BkraqCId3Is5cLNvW/w8+Q",
-	"skECYVulDsfKptKnJNfdjs6sNieOteyxXIbVMMYMCC5Bhn/qFfhCQqsuh1a1uOp2pnT5xSXULEyZmP+K",
-	"GZ+MiZgn1Xiqmd9R2WQhfXmTcXeA0wviNMG45HXXPoKLXjXXXjD2/KaL/6SuedVce8mouOnav6hravl2",
-	"8z7TZ9rsLSMmiuElS6iEr7o5SuJXCdM6yfsnzfNyaYMWq8I4YN6Jw6mo0RJ7Z5H1qg3VVJcEN5VBGbMk",
-	"lSSPAdVrjOmBxjNPomE9X3n1nq07k+yKuSSyJn++vHzU313WF2b9qdRSQdedmeRDHpuhsa2yuIt5wuM8",
-	"huFjHy76fAPQWRZEoFPrAhnFryyZ/qLP53vtKygwXO2qul0FA139HfVFtpTSFfh2ZY0CzrRQhleI1ZEw",
-	"oBRqMrzSXM+Tf/aVt+L1Y8LLNfXqK5Qdrmzt+Vt3DnaaV+YcQmINintmlJj3+G4BlJLQ6CLNWydJ4Fzu",
-	"XWXvnb91MRWKqxu9JBM05JS8e/1/zYxeSkbmgiaZ8bBcqrRubN+Q2v4Md4h4HlPntFHPdm6dJF9zLOVJ",
-	"0ifVcUwLplIWI5q+/EzKGyef1o25UezqFa0QOt19DmdNnaYZ9TdKxH/MeVhHSbG9LFgMiv/bNC3zVXNN",
-	"qrXk2csjmCgMUvMwTYYs5IKNswBHvSLoUyfFasvzKH1henyqv3p/PBbR2v6aicqpnyQTMyZamgGbWfqc",
-	"JZC6Taf4dpaINAJVuV/8U4mEtYHGL9JnR9jxj5b9eUwEtkzYsnanaKeIm6w11xIx3Rhb3Ji1ThXl3vVY",
-	"mHowsESJX2tEplOW8LAIo6tFpzZaoycdOcVixanXmxyLKaYizdJxCnO/9WRp2In4ePUie+I2prbDbK2r",
-	"mJa6QP56ThN2GM3/DkWZgWnEIqY5rQU6SDF+yeVxpbe6qK0e0Fd7o127QXzRfT/Kr1ICl1dpRY453UfT",
-	"FOclqj8IZw1aBGLsAtmFXwhRBX9VCFPsVys5ro7VgOKKz7p5v8KG0Jt4v26eutkiMPAPH80/z0j127xH",
-	"cShJRzD4dBrJT7NHjWoSOD0jGbPI27GEARvxZ3utx2epTI8pS8C8dO/zLrKvlrgLYibj6zr20rA8PDyV",
-	"Do3qfwV2GIRZ4jRkkWnBMwdkXMe2YqvfuuV+BWXv5ynQnsLEVtAnMeXqkZNsA2L854qW/6VO0hlNnvNk",
-	"ciZaqZgolUBj9bwH6YyJhJpGpf6UJeQ+TxTzyPeCSh6Bqdd1s1D/xeRacy33aHdesXEG97V0AoKnm1Qw",
-	"6hX0bmK5t1d8Nuippe35p29Q3yTcJIjfJ+dvZiwC92DG6ZnuHaUSK/WK4OpyrcekMeBX7l8II6NSFrKX",
-	"ZCziE6VY5boxZ2u4VvSdKnGnLFwqMZsmfakyFWzGZUalMtTcrZSeZeDyzd8qy60UEizSxh4KOUvCacqT",
-	"TL0jBKkHM3D9mxPocQ0GPbAb/4X0Bde2+n8xeZJskGed/uEoeKaYbMzb+d+la1kjW7VpLYuEC3hmYz5V",
-	"RqBcsJ/+AK8YBA9G/ZteUZz6MtOWeA9O/IUDJAszW5qhPonM45QkJaaVhRH63pCa50obg0QgVWlAGCk/",
-	"ydlk6NEwJNZ/osRHSq3tSN3D0Z2AJcM0q0DjgBKuhITTFBIyYwPyNNGfKnM/2ds6SUYmKVckZBW7GZ4q",
-	"abI7KFeplOCXKcNwkvOyzoYGEhaxMUcfRjI0QAO4Lcth7VIyyTn2Y7JJLkDc4O4rbT/oGeIQNRfA0sp6",
-	"LMYN2CAHNgWjPsXPcJdOwT4JSilwKskYxP+YKwqgt49KJ9yAnqpv3qAZ7p+vYrXRUQwh0gTzh+sKBJzL",
-	"acaTSyVQznkMhdssJ2M+jjDyq+dem3YgltHoQjuOao2fxPM3P+Y8ATarVQlTWdQIqO11judDi2eaRWpp",
-	"adJKWLb5gj/nm3Kq1MVm//7mlE6Y3Ny+993u9tbd3W/XW4q9nYI9+yTw2dXwjMnTcRqydcvDpMK2uhxH",
-	"7DnEJgilrAp3DGvhpuRnUp0DOFWeQVm0o4HNfC6YvNDlNo6AbZFHFEFNuTf2xEUajXjynDx5Mhg9rdWM",
-	"+F9Oo42JoCGDA3qkXUwyEOk5j6DwnPTMOWVCkgNBzzOyQzbI/H8LBmr3wFWOZKPuXQuvbngLuf6RS/5d",
-	"e2tve/u7rc3B6I4i444m4w6Scaf0yXeCQe+O+eQ7+pPvbLe27riffAc++c7Ov3zbarfarY0jJmY8TMVG",
-	"yDa8jbGuZcKQTbTcoELQ5BIwRU+SoCLwmGmQQenoWwxBWbcXsdSJEr4gAGtepP77PU3GKemwJBM0asLB",
-	"LUxNlih1p/e23iX0jPKrdP8keeLdCs8C1hUL8+LFi9bZ+Kw1SWetM4EteDyC0KxeLy7o5pRf/c84DWkU",
-	"nDGRpf9DsEkewafRMU1Pp/zKcKsQtSgfX0YpDSW0EBZz7W9iUJPA8cJ7sakzkXSiq5oyQc/ZhMYkg0bS",
-	"KUKtGDQPN+LmW+oL6xR0R+o1D1pQzxEjCKxRS+BVDCzqi3WVqcsTqUSE+bamWveKLeNvC1Yyd33NRXDi",
-	"o1n+QSoyXGi/aU2vTkdtlTRiiOSv6FOytF9jd0Doz9dwD7ojonbCZtUq2PxrNTL5irDrbjHfmU8VycKi",
-	"szgqjo7V307BbCLMJBlTQWLGjbqbCJpkp8ohAUwTPjXWqNYI4D9Bd0RK0qkTmEAMFHj0jCdj7MOr2KeN",
-	"i5dngodE+WaoeGB92QwKTWb0pyJ0zB2k6HKdygySpTykwgFn0Q6/dRWVuZQxJWZpStB17oVGTQue5oRp",
-	"zXFBoV9zxsRE+wLKeM1SkQBPmBAp+WE0GpDdrS2z9AGUihZbKAYYm2lECY3mv9AQ0EisMUb9q41CtFET",
-	"iTYEZj02oUpQJ3L0gppqpoILjLBYIwJczN+c8cirRcHwEsTwUy/oDcQ/BuYZcq5DVnYsmOuRoNWT9Wrq",
-	"XJMoz1kf24asil3lta1DlFKtk2TknKpD6flO1VCZpsyFIapKmGbFCdOBc9hr6FEJVsCJGMs8ZiEPKZlx",
-	"SdW3T1MBbxZk/vc6OUbLNoc7+BUpDZVBzUVhCNPLHMRYUoNrjc3QKKDgwATR/C10y8lUg7lbfqeIfp+p",
-	"L8tYEnI7X9CV1f4+agIfUFpZz1K5H0p6NAbBqPMD2awE6VwJZcN0r9a170PGVNBxxsT8V2lrenV+IhWc",
-	"YUe3TmLIprFy/RJSm3+ROgFjSHTNxrJT1wI/AeztxZu6Sa5VbJjA0YsoSJaGOAlAb1/s3BY0JjEV6Iaj",
-	"NHTyL8rfymh8Buk9784EyYaSPBplTFDRgKwymremDDbXKA/qxvWmfZYdKQN3bkSKeRIVYqyfKtCcpyD7",
-	"XY5iGSCWX6ci0RKC/gRcZFdTLhYZ8GwTEpMzL5XrVRiawrZInaQiuS6bBPVzIfH0LGCQOv56s4LT0Ivr",
-	"yAtzs00HyuIjF3zE+9B8CVHsSxovoF6vWZWKJompjkcrd85ZPKDvANw4huGbMUtA7EBUtNgPjuEZcgxw",
-	"1tiiKfhZ0/mbifYBn3QXSuwN8uTo8dNFpuBHuhDfbn+3u7V379tv19UHHl17zCDbWOQFZtyR8aQBkAu4",
-	"6e3Zfl9pU6oyV8fWmAV+H4gJ79teDI4DqpXpGEH5hpbFZUEBUlDySQIGo8mCRAVQnZP+TgVhkT7hU6Wf",
-	"JM4zwP4A9bPe16bLRDBZq5DLSTsnxIRa9gZcvglLQhqmXrLdlH1IEqr/tO81yc4WSXOys20gqEg8/08I",
-	"dqlLTOxSF//rcZNJCmEkNoZ+WXW9Uh/FqoJlpgH0KEmF2sjl4B71c83YBFDk1530Pe4ORQxGpyCQiHUh",
-	"JrJqEjvuI1snyRHz0kNY5GP3Cq4idmRAQQ98mEOCM0MGUQJD2LvABLUMTVhov0jaES2OANZFLKX0eqU4",
-	"G2rdeQpz2JeSyUqFeTODi7oFTZGeuZ+SOIXFut8fBqeDYfAf/dNBd/ioN+od9JUBnKQ63MSaulpDjoVT",
-	"/kxzSVt1ph2iT1FySRM0KPyPNNvN2cdKzprNKfWLYUWa9dHAyqyRkzV3ioiEyCQWERkAz5uQP0/W1pvm",
-	"cMaOSaInuGXMA368STEWOU31se2d/b17+3v3LkjjeNRZrzva6k+FgXKp1DDYqguTGJ4ZNHOFBARifdvy",
-	"2hIZY58yrclMAZgNOupTJvYVkdst8s03nlBK/HDdjQNYSON00D8a1Unz0/VvvjlJCNlubZNvvvFjxJgj",
-	"4hKvIOQk39pq32WJnP5hu6VuOPSVMbppJhJpYtw6G2gVSykKaPooIIFipOimybo02FVL8TE/52Oui9ZD",
-	"RiSNADASuOgIg82zKP0xZzSkaslraG5XabZen7ekntMLa6yVUoXE0O6hxWvSQha3yTffdAAgVe1m5ckK",
-	"FpniOwmZGVNaUhMMqaY8gTtjJoxsbXphhSa5fJE1nQjNeu1CtlvbxbnALd8pHrmvf6v0sTmvtZ6OYYUb",
-	"IDroDMkGeuydNGRkd2ubNHqHj4OHvYPTzsNe93C0/odastplsgL8uJH6uH3ymAk0BKT/i1PqZZBlkLoK",
-	"FceHwfHoh/6w9x/dgwU07JRpcONd1MbuLJdk6QppLkmk0W/SIwsr/FzCtkjj++Dg9Kj34DAYHQ+7Cyjb",
-	"rSxaRHks1Z4Yw1rQjJpb7c2xudmuuaIYdUCD5iEYWU3CaUYYucz4emmymmahrpkbI8E78AkL1rTm1WZd",
-	"iWA57pHLjJdWZ6fyPH2EdipHSPIkM8FndWDi+T8SHWk1dhN4hVo8pe572m2yQY4TvV/pWcRIF2p7SUPn",
-	"fXS3V8h10bIy+X2AuGz+dpyofYih3/X92lO2A/L1qKDVXFVi0A4I1q4JhmjvxPNn3c1Wdoh9xxdd48JH",
-	"Io1BMAwedUfD/ulh0D/tHd7vDx8FB/0Fq7UDEvM+9G26ClHM/xEzZT67pDh/dl+ZnrGQjQF1+9x9kDNE",
-	"kLp06WXv1wrwHRChR8UaL+SikmoG09VqcO+YWnvQKfTUFuj8rd7y1qbFyI9fpmRNHkoaB8EoOB0ED4JH",
-	"3cOR/YhgIV+VdHNc0noSvdJ4y12nEFfzFhSHybBAI+b8tzFPSeOgOwoe/tCtEta/hrAdcsBiykv6UHse",
-	"UzRz0UIzhFCJmkjmcqrMXQiVCZqHbH2fNJbbaEqg9UIWT9MM1bzLiIv5Gy8krAGnEIc6BP+iuJGUNbeV",
-	"u43uUG2wg+6jQX/UPez0rlufPXI/T/DQYzE/cOACMkjKot8nQZ1JhwjwykwcK2vBIJyTRMkXAnkmfFzj",
-	"/vFhp9c/hH1y0IXz+EPwfe9hbxQcBGixtpXlV7ca7IqN8ww+ysHB0lLMNqjOf03GIk1qTMRS+Br8bwxL",
-	"+fVdpaZdL2drDTpIhCwZJ7hRJLe3tkCd9P+IYPOoaYbdf+t2Rt0Dgk4eNDkMGZVp4tjMmBhEidAGceuH",
-	"1j+AUTWivA0C+r7SDdpIFJTJTORK4++TPqj1nNBoYrIV2AQOcXVnw/imErXR4WsM+8b94OEPgTpMw6B7",
-	"NBoej46HQY150AaxPYJ0RMjKhaLgRCnDrl8ELRL0/pNzLmKI1ZWCjhYaAO5Oc9IYqUN02v3zoDcMDvqn",
-	"wfFI2VFBJ+gvIGiHDLUzXOrz8QgpSRj0nwEq5IbChobaIuro9E+Pj46DYW8RHbvkEVQ64nFNBZ+weFO5",
-	"KDyBYhXjU4SomcotSZDVGbMz/VrIE2HppKsPKu0XDSj1OjrtD3sPuo9OD7pHo95h/7T34DjoHS2gdI8Y",
-	"3F9Dk1ZKNWRioEuXspeK8spUgKjBuIOjGhYQcZccKV/LLXj2tSgS4n08BvXARyPouRU5KzclVtB1FDw8",
-	"UFri6Ph+r6PMve4Ccr4lpsnVT6S4NJlIcx5lgkLEj6Qmg+dVUT1JSj76ZmLrEzYhPvi0lNS5ob3chVEg",
-	"jcfBw/7wNOj0HgWnD3uK2ws+6jsSlKrLQdepp3iHw9agY5ClPsUGOwEaYvDELnO3I+EZtkNBSrbsxJJG",
-	"cDzqHo56HXXOyelB73F3+MCs1kmy82XUVfOD9JVbB/DJNdZGRV897v9Rq6uZhk+v11cf4Wi0UDuhZ1HH",
-	"9iV4XeesoAtySB1Lc98Pin+gMbjAFiy9uk2GbIYA6nCe7IAR7ywUY0d06DXNyxRRNxpOYSUmC9UHu9pX",
-	"DFbmthW5gmbputIsj/sPlGIZdjvd77sH/eECyndKlOtUgEe3SQ8spvoGQi01Rs2Bpbh7Y4ywkLYb5Mge",
-	"NRMYrK9jMcHBXdhityxytQvb9NZFrnZhC3/dyNUubMbbGLnaBQvsAyNXcPPXiVzhqz8iclXhwp7x/53e",
-	"T8fCc8wZuSi0Mk6TkP/EYt2VeFNvsg0HKB0ejHqPg1KwZbcmQP17iK7tQrTHia3VLmD7U0bWJFaqfFhg",
-	"DWm5RYG1XYhHOWG1BUQDm7+qO1BDUvuzugSkoR1F6HSj0brjI3wm76DmG0GYp6JqkKmPw08zcBg2dmlL",
-	"8UqobzrhBgWhDs+Rnmvjg0jLLjlCIdrx+zxcbpfCB7p0Bib6xQadQ7dOkHOcHPbu9c8GaOnd67811f+1",
-	"Ff3u9d8U++EPGAY6WQNX9kj5IkvENZHuvS8e18T33iUH1dClE3Mu98uUtZtfoYDuoVONJ4vLSpZiEfUt",
-	"HLVTj23rC4n+lgzZGOdx+s6XL5gK4H0O/VQ1N7h0DLud4yNlux50lQ7qD4P1plZeXqmDLZRAhLdc0sXs",
-	"/e4TxtHpJwmjI133iqqvgjVJSo70jAO/Q6CXyIwm2fwfCVPa5GjQW69lnPph8Tu3t25LDF3Ts61ls5FR",
-	"V2MWmkJ3g0m2T+6nvMC2NKLaQAEXCFx+JA6Ranz0IAtypmuxk5p+Tkfkodg9HXSHvf5B/xQlYPfPne7B",
-	"9Uu7bVQOdldgPF9/Gy19W+BeA37lGXpFBpMuLzTRYiik6ws+yh/y78fB4QizCst8zQ4p4VSwJNRddX7U",
-	"db90IYuVUB4Ew1EvePjwL6dBp9MdjFBg00lORYijG029PepEW5wvTXW+LEvzQffwAKRVTVi57gt2zXog",
-	"cqPdZ8rzXqyKHPzTwkKw4AMG8s2sl2s7UHJO+RV1EKv1i9UtSrhcN7BkqaXEvTjqj4KHvsheakX3DD9K",
-	"nUFfni8Fkp7FcSxK0hZxKnkfFg2DwyO1Pz6ATXcdNglm3SdphVHJH9AAu8V1lTq7Atjrcv5Gp9+dCiND",
-	"euGALUPmt8pRgIZELEe0IlFJFw84CAv6XJVsCmLP9RNsOV2aF/KykLGmYjbVQ1jpGOyea6vZGnXVjBiV",
-	"2quNStkOLE8Yn75vC9YpYeS6m0zwau8LB6/qYlV7tzNWtefHqvTHf9ZgFeyLu58uUeCUM3/iJMGn35Af",
-	"lkr4t86INIaQ9Wbh+s0Z8I8Prtz91BmFu7D9N25PKvEubPyN/26Rg9IX7pCNTxc3CJeIFpTev0s2voTP",
-	"XXrrnnrrrfW462m+SzZup8NdovNbsvG53drSG78jG6SrVHal1qYM5Hg06BXlN3lMASixpkbHNcT922vr",
-	"a66h7d7StPU6g4+hrdcZ1Bf/nPY6gwXEbW/dQF2cJ7bgALtTBkcDEvoJ1/ck+eZnLviOwdHg2vQqfNH2",
-	"4i+qq7Fajnw9oqO+Oqus53whWPslxUlb8BVK7/wOIqhlsnesuvwdB3PKH7VbfNTvLpRT/hal90Y8yyOq",
-	"x3T31KaRujMGYjdKmhRDiEENO3NMUtIZ3N/sHA7+bZmeopZpq/M8YOigS2B0NX63Ov9De/iVTAAH7Pvu",
-	"1naTjOkZq58oE+chGHYGnTct9y2CWQyPUyaZQEu4MeqNjh8GQ2RY71Dt8N7R6BojcFtp3k4JZQFrOPZJ",
-	"3zUaZEZn1M2eVIETsBud2yeUj5gp3VhEy7fFblw6kCX/2wSyytz4ruDGKoy1iEn3bl8Iq+xmbf0ew1cL",
-	"vmX7VhVtLCCy/VUzYrVd9EptohenXO3rsD6xqT4AYD5GJlSJGnCQscg6cxWcOuOxwZZ3QnZheQxaWCDl",
-	"XPduQKzyPFUdUfFCSc5hsI5Xua23FGJqGsz3KB3TSO1EAYQDKgOf5DQilBz0OiO1r3uHvU7Lay4Z9A+6",
-	"JMfBhsGgB/oKcX8fA7qTWhB1c6DcqxLEWgHOlCgnz2pzV4jZuRmI4cvPcgB9xG+PWWIipftqv224UZHQ",
-	"u8O66uZerJKZ5Mo6pWSrCemfFJSnRpkysxcAFNLUmJn6lbiI9eQyBUCQmTrmN2whwuMpHWcMsAzGqdRT",
-	"5fGwbJD+i4QJZYBzmfGxbB1Neeu+IvsRFc+ZkK1gOo041uzC32UrvLe19N2P8ogFOB/8/W48GtM4ZuKD",
-	"7u1nF0x8ALHHyfMkfeF9Jhze+klSjIzF/G3IAU3XndAKS1ReEl451V1o045JJub/KQHPTBY6VpYxra5/",
-	"nvq8Tj01lXmx+wakY9EIWBMsfqOD2vM3G5Fj55Skid+yvgy5LaTXqGo8mTQTgJtN5n83sHuWwv06ywfD",
-	"8xrlgCchn/HQGvPFfKrysxws00KUA/AIs/q0jMzoESxrQF0tkkMIuli3nzhRSha70maxHdS0OEow54PZ",
-	"5LN5KiKUGWUP6Bd9Mp6/iUDwhanjW/L5byEAz3M5TZP5rzMWAeqdadRnM1bM2nGATGKaMC4Q9FXykAlE",
-	"O3FwgpqEXbF4GqWIyeKCUnwvqJz/GnG67y3yAccrGt2r1j4Z/ivZ3tpqbm2t7+PIEE30GDELqd1jzgZy",
-	"9IziiDCsMOj6vEKw4zRTSba29re2LjSWnUREjIsWGYDrDh8DeFV5XFishgQuFMV7imDIjm3DoxBphfIE",
-	"5uCo02IvKjjO5YKpwpluleJ0I0n1McAOlZBjtNHy7kgPHCt419oy3OtbLD59EVUG/IQRP2RQDOaCg6hX",
-	"N2bzX4BV6qM0f2CMTsyTiTIftVVkLkGeAULw/M0ZDdP3YV8bSFZegGLWL3TjHGb4MOSa+e1HtQX1by6D",
-	"jUByngksHP4r2cGb4b8pBH8ih0SflY9YIj1ObhWsdDdijNfN35IxjTRgZOigFtKUQNkGLpeHUlTiCYan",
-	"EI7IB34qsUcTAmBaZsCRXjLg0Y5zgcG3wd/rN6K5/Oa9qNtKJGJQhQie5PMtgNlklm17WzU7EOeXWXFr",
-	"eaUZdAlSpY51IfuJxWfivXaTXThc95iK+S9pk0ByRf285/18mScXaj+bn9v+3ZJlQAAyUs5/q9tuGiDL",
-	"ZW15y9HEbLeulExaTU4v85Aq72bCBABXizoBZ2eLN42dr86dBeYDL58CZl+seAymnZtyk47Ss/qBdNR/",
-	"9QrN34LRaHUK/EWwYotbzYiQhxpNy8VRwtijVLoT7fkWGZnKcAdOyUnYOrOqGIap0px0gsOOgzpj5bb9",
-	"itTVaQUna4BkwEA7AjQaWolIerBNPqYdTl+RJwkg4FzM3+BLjGVRlEQAGPv7P1jn2ZTkRV+tNxo0LaAw",
-	"Cedvzzhk31wfrkXu8zElahXFJL0W5diEboQdsK7IuMyjiXJuKrNBXMzNQgg1/agVnLgknV3L5dTMOLHm",
-	"TJLOKlGUUnyyBpP1UHdmFvEKWoMbV31b/ZAwB5bKwb3zGuas2+mEwipR9AZOL3v3+udrwbos2Ncml0OW",
-	"iZfBeMymGQvfvf4bYm6+e/3zSOTs3eu/rdcPclTnQBOUFvPQLDyfwaozK+KNeQvAJduQzABjIyyHG4XR",
-	"A/MM4HX5Ahaj0evC2bfI/P/4y1HkqcrrABjUpWWvfybSGkMM0g2flJ5XE/pxTPUC8q+Sqi1DNHrVJmb2",
-	"jZuFBfhegCgrfUCzYFua135N0znnLoqfjn0gOqCeaVPaSIsHMaotk2D6WEg9ICjiY5ZIGJelJ+YEUzq+",
-	"YMpOqAzBefHiRYvCz61UTDb1vXLzYa/TPTzqbqh7XjXXMp7BNLz66UDKP67i/68112ZMSJyV025t45PS",
-	"KUvolK/tr+20toCgKc0uYGLRgmIfmCPOaoZwPpq/zVLjM5/lckxFLdIYZhcucy0E3GkcJgchMXKjbOhq",
-	"43LrJBlppFolc1Ip0SGyp6wAwOHJ/FcI69lBnuuEaS3fYEkIf9Hw3JpmDWDrRsOhfiuuTJksqVJcbUAo",
-	"UAyBeWJ2bczSPGDZgF+VNw4Masd4OxNybf9J/Tzo4pJNb47c2qvmjTdcdXKZpTETx5KJQDnvS911n065",
-	"epdi1NI3mFf1pkEYCibl0nf2kowJnPTaC5e5q2aK2xJ32d2wzMV6myxz6TUTWl89ba7piVM4D6y9tbVo",
-	"7re9brO9tVU8i1/pxw0ZVZ+5trvMI76nIUwClBnesn3zLceJGcXC9Ht2br7pfirOeBiyBO/YvfmOwzS7",
-	"n+aJfsXezTc8YtlFGh6mWRBF6QtD292l3oRKnZ5FaiHX9pbhXA/rJ6IjGKjWFSIVeO8S3/aAZuwFfTni",
-	"MUvz7E88uwjCkGdQrjgoZi6rx7Xv3fy4I56xnuzPmIhSGuKXh+yc5lFmxrepE73/1zVahHg3L6WSy39d",
-	"wznyN02ZH+q36Q99VZmv1kXIH+VLKPO+5c1DBaG1cH7gk7rxd0/VmZB5HFPxcm1/7XuQvr7CqAYJ69QF",
-	"mPXlnHVrrbmW0Qm83J4hqyLXnr5qrk1TeZMaK1nU18zIJ0PECMWhquXz37pZNQxSudINn1I3/Fl3jLFk",
-	"/PKP7KUWwSAKv0/Dl5/s4HQEoxmrkdN1h2iAM2Qqu6s0NdStChnwKxxh+mPOBQvX9jORs1cVdbK9jDrZ",
-	"rmyvXqg23kqdfIw62W23l2GDAxeAaAE1x32lnT6zdqqZwPzEzCFeck5ws16bNW8aBV77nmkh5heN8i5N",
-	"3y7pzY7g9HrVdJMmfNVce59ukE/hAHrEfZjPZAg6WCnID1SQytP/PK6K1S0rV2XlqvzTuCofJYQh8Da+",
-	"qErVrpTMHUylB3DoBhnME+lh6uV6DqwVyWDokAlg2Sm8mZLHPMv1xfsnSYBTM3Ckh8yxBbNx1PnhYB0m",
-	"1RWo0cn8TcQlI43BweGD9dbiQVBnDJ8UwuhZnz0zyk0w29Dx/1LIJ0GWQle21NVJw6O9bJQiclMRQ1KN",
-	"UEshzUcxSu3V+PF4yua/0FIcvFmmH2PQevLDSQK9jLq7Ybfd1k0gALdV1Aq6+KPqQ7oP8YfigyAMD07i",
-	"brvdJLQ8FIyc058YBjE9ah50RySp1IrPdAur8HmoJ3uxiDVhBSCLEZrSySLKCmQ9GTKZ6SD8UzIoUjzu",
-	"GPPGu9c/1+dP3r3+my30e/f6Z5tNgWwJpjTc5INOYhSpE1uB6DQ9eutyoswerxjWy2ZUJ9T46QhbJdLe",
-	"39oijR/qClzWCTOYQfBIt7Bk4S0hZr2pEr08FXZoUMgIO2cZn9X4cs2TREPBmcE1Y9O9vVQKpklwWtCU",
-	"JVR6fIXKYCMIilFu3tdfLBWiHigxtDK4vqTBdXtiGWbxr4lgBEq4uHDVRdvk0I4QWyZg8cFGJRC5siq/",
-	"UsTCcn9lmd4+y7RTqrCo6MbCgHDU+1IRgiqqtGLG+8bQb26+c+Loz6rBl2fKCtI2YfCnoDfqHT441Sgc",
-	"R8Go1z9cMtQ+LD16FWf/ncXZ9bq9T5C9gr5OxeK4+yeKuVf22QeG283etdt1pcw+XJm5TFypsVuoxjCm",
-	"XXdcF+eD67VYpwib12ux2tkIn6jI6XpVt1TouyI/DJErN+yTuGFO4dAHxb0Xrs8q7r2Ke/+zxL2XKb1x",
-	"BPHCWLcnXc3Q66aGnYAya5hfL5YRr/snyTbZIL0a4exNItm3g7SdYHXarCDV2HC19T88GJo/QHc3BuZK",
-	"TQVOC8W71z8bZwXBa4oiZIOtIf+Ac7CLMidnsH6pRLY8zEwH/CEGbEdgI9G6O9BvmsPunvlvV6aHpwER",
-	"/owLE94M2UlSciI97q3rmfi6hTyG3opUtrwPWEDKdP6bJExK5ja42UYS9GQxSm3R1lJvjLNgFrzMHy5T",
-	"cNXgZuhZ4BeMhtgjGQx6TZLNf5vyMZR2u139ADLEMxaTHZxWuHAfsZAXm6hvRyrYuvQpxepkjgid+moC",
-	"bTm2gr6eWnci4ZOIJ8+fNkyVeDplyTkWd59BbXeLZhGVktOklbBs8wV/zjfllI6Z3Ozf35zSCZObd9vf",
-	"bd/bu3t3bx23akGNV0WtY8ssLkLTNVZYZWh6KfRPmByn0QV3h6YD+MIly4DdC5MJSF0fqrnBIYN1MAPX",
-	"x0IJgFTIzYTG7GQNUx38Jyrmb4h6V8x8UC4WF/MuWMTM2HfsCX7Zsmff/0ZMMBlolHPAnnzfbpJzfsXC",
-	"IE7zJIODLhhLxooj63aSmYUkcXZSTb/Bja+K6RWP8/gxFVypT/vS4vNclmQsAbww3W+dx2TKpW3uMS2A",
-	"uB9lxqfYUObOfXp/ZsQ8qaXQZUvTgi/E8zcokWwXZxmdppiJX9uP0/hUHFwv4a7ELEkR28HQWmaR5bPL",
-	"fNhPoLqwmxngYm6a+88ApwYmwNPYq3v15SlkiaapxDwUyEJoqtLZKGAUbUIi2OvsWyBrT5Kda9TmJeMl",
-	"rXlBARhLudZFV12l0as8qwNaXBGny7ZwqQ1QzDUzjZvjCxpDVtDmwOGr43TGBKmN6BgouOXTXSsn64s5",
-	"Wbcs13Wrwokf5W6usmJfLyu2SondXqdVD2c2XqR1It/fbUW61KKhJvA/Qy0nV4orZGQg0jAHGVDp8KRT",
-	"3jqjyThtjdO4dSbAmN84o8lznkwKi6QowZ21QWguftkPaZxGxvWpe9/F+7/wqWXFAhddlqUhIxPteZY9",
-	"hrWmaXyt4Wr105Z6QWHG1D3dZi5fPX31/wMAAP//zOgE/SiBAwA=",
+	"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",
+	"N/8vAAD///nI2qLbogMA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

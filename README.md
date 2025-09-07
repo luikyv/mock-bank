@@ -53,7 +53,7 @@ Add the entries below to `/etc/hosts` (or `C:\Windows\System32\drivers\etc\hosts
 127.0.0.1 directory.local
 127.0.0.1 keystore.local
 127.0.0.1 database.local
-127.0.0.1 localstack.local
+127.0.0.1 aws.local
 ```
 
 ### Quick Start

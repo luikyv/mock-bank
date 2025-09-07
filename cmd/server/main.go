@@ -376,6 +376,7 @@ func openidProvider(
 		provider.WithMTLS(AuthMTLSHost, oidc.ClientCert),
 		provider.WithTLSCertTokenBindingRequired(),
 		provider.WithPAR(oidc.HandlePARSessionFunc(), 60),
+		provider.WithUnregisteredRedirectURIsForPAR(),
 		provider.WithJAR(goidc.PS256),
 		provider.WithJAREncryption(goidc.RSA_OAEP),
 		provider.WithJARContentEncryptionAlgs(goidc.A256GCM),
