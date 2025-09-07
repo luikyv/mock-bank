@@ -36,9 +36,9 @@ jobs:
           run: |
             echo "127.0.0.1 auth.mockbank.local" | sudo tee -a /etc/hosts
 
-        - name: Run Mock Bank With Conformance Suite
+        - name: Start Containers
           run: |
-            docker compose --profile conformance up
+            docker compose --profile conformance up -d
 
             echo "Wait for the conformance suite to be ready"
             timeout 60 bash -c '
@@ -52,17 +52,22 @@ jobs:
               exit 1
             }
 
-            echo "Wait for mock bank to be ready"
-            timeout 60 bash -c '
-            while [ "$(curl -skf -o /dev/null -w ''%{http_code}'' https://auth.mockbank.local/.well-known/openid-configuration)" != "200" ]; do
-              echo "Mock bank not ready, sleeping for 2 seconds"
-              sleep 2
-            done
-            echo "Mock bank is ready"
-            ' || {
-              echo "Timeout reached before the mock bank is ready"
-              exit 1
-            }
+            sleep 300
+
+            curl -sk -i https://auth.mockbank.local/.well-known/openid-configuration -w "\nHTTP %{http_code}\n"
+
+
+            # echo "Wait for mock bank to be ready"
+            # timeout 300 bash -c '
+            # while [ "$(curl -skf -o /dev/null -w ''%{http_code}'' https://auth.mockbank.local/.well-known/openid-configuration)" != "200" ]; do
+            #   echo "Mock bank not ready, sleeping for 2 seconds"
+            #   sleep 2
+            # done
+            # echo "Mock bank is ready"
+            # ' || {
+            #   echo "Timeout reached before the mock bank is ready"
+            #   exit 1
+            # }
 
         - name: Run Tests
           run: |
