@@ -32,13 +32,13 @@ jobs:
           run: |
             make setup-cs
         
-        - name: Add host entries
+        - name: Add Host Entries
           run: |
             echo "127.0.0.1 auth.mockbank.local" | sudo tee -a /etc/hosts
 
         - name: Run Mock Bank With Conformance Suite
           run: |
-            docker compose --profile conformance up -d
+            docker compose --profile conformance up
 
             echo "Wait for the conformance suite to be ready"
             timeout 60 bash -c '
