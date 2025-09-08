@@ -242,7 +242,7 @@ func main() {
 	}
 	server := &http.Server{
 		Addr:    ":443",
-		Handler: mux,
+		Handler: loggingMiddleware(mux),
 		TLSConfig: &tls.Config{
 			// Only hosts starting with "matls-" require mTLS.
 			GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
@@ -261,9 +261,12 @@ func main() {
 			},
 		},
 	}
+
+	log.Println("starting server")
 	if err := server.ListenAndServeTLS("", ""); err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
+	log.Println("server shutdown")
 }
 
 // reverseProxyWithFallback is a helper function that creates a reverse proxy
@@ -315,4 +318,27 @@ func reverseProxyWithFallback(reverseProxy, fallbackProxy *httputil.ReverseProxy
 		reverseProxy.ServeHTTP(w, r)
 	}
 
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+		log.Printf("incoming request %s %s %s", r.Method, r.URL.Path, r.RemoteAddr)
+
+		next.ServeHTTP(wrapped, r)
+
+		duration := time.Since(start)
+		log.Printf("outgoing request %s %s %d %v", r.Method, r.URL.Path, wrapped.statusCode, duration)
+	})
+}
+
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
 }

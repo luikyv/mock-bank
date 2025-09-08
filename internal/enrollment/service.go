@@ -213,8 +213,8 @@ func (s Service) RegisterCredential(ctx context.Context, id, orgID string, crede
 	return s.updateStatus(ctx, e, StatusAuthorized)
 }
 
-func (s Service) InitAuthorization(ctx context.Context, consentID, enrollmentID, orgID string, opts FIDOOptions) (string, error) {
-	e, err := s.Enrollment(ctx, Query{ID: enrollmentID, LoadClient: true}, orgID)
+func (s Service) InitConsentAuthorization(ctx context.Context, consentID, enrollmentID, orgID string, opts FIDOOptions) (string, error) {
+	e, err := s.Enrollment(ctx, Query{ID: enrollmentID}, orgID)
 	if err != nil {
 		return "", err
 	}
@@ -227,19 +227,8 @@ func (s Service) InitAuthorization(ctx context.Context, consentID, enrollmentID,
 		return "", errorutil.Format("%w: relying party mismatch", ErrInvalidRelyingParty)
 	}
 
-	var enrollConsent func(ctx context.Context, consentID, orgID string, opts payment.EnrollmentOptions) error
-	if strings.HasPrefix(consentID, payment.ConsentURNPrefix) {
-		if !slices.Contains(e.Permissions, PermissionRecurringPaymentsInitiate) {
-			return "", errorutil.Format("%w: permission not allowed", ErrInvalidPermissions)
-		}
-		enrollConsent = s.paymentService.EnrollConsent
-	} else if strings.HasPrefix(consentID, autopayment.ConsentURNPrefix) {
-		if !slices.Contains(e.Permissions, PermissionPaymentsInitiate) {
-			return "", errorutil.Format("%w: permission not allowed", ErrInvalidPermissions)
-		}
-		enrollConsent = s.autopaymentService.EnrollConsent
-	} else {
-		return "", errorutil.New("invalid consent id")
+	if !slices.Contains(e.Permissions, PermissionPaymentsInitiate) {
+		return "", errorutil.Format("%w: permission not allowed", ErrInvalidPermissions)
 	}
 
 	challenge := generateChallenge()
@@ -257,7 +246,43 @@ func (s Service) InitAuthorization(ctx context.Context, consentID, enrollmentID,
 		enrollmentOpts.DailyLimit = *e.DailyLimit
 	}
 
-	return challenge, enrollConsent(ctx, consentID, orgID, enrollmentOpts)
+	return challenge, s.paymentService.EnrollConsent(ctx, consentID, orgID, enrollmentOpts)
+}
+
+func (s Service) InitRecurringConsentAuthorization(ctx context.Context, consentID, enrollmentID, orgID string, opts FIDOOptions) (string, error) {
+	e, err := s.Enrollment(ctx, Query{ID: enrollmentID}, orgID)
+	if err != nil {
+		return "", err
+	}
+
+	if e.Status != StatusAuthorized {
+		return "", errorutil.Format("%w: enrollment is not in authorized status", ErrInvalidStatus)
+	}
+
+	if opts.RelyingParty != e.RelyingParty {
+		return "", errorutil.Format("%w: relying party mismatch", ErrInvalidRelyingParty)
+	}
+
+	if !slices.Contains(e.Permissions, PermissionPaymentsInitiate) {
+		return "", errorutil.Format("%w: permission not allowed", ErrInvalidPermissions)
+	}
+
+	challenge := generateChallenge()
+	enrollmentOpts := payment.EnrollmentOptions{
+		EnrollmentID:           e.ID,
+		DebtorAccountID:        e.DebtorAccountID,
+		UserIdentification:     e.UserIdentification,
+		BusinessIdentification: e.BusinessIdentification,
+		Challenge:              challenge,
+	}
+	if e.TransactionLimit != nil {
+		enrollmentOpts.TransactionLimit = *e.TransactionLimit
+	}
+	if e.DailyLimit != nil {
+		enrollmentOpts.DailyLimit = *e.DailyLimit
+	}
+
+	return challenge, s.autopaymentService.EnrollConsent(ctx, consentID, orgID, enrollmentOpts)
 }
 
 func (s Service) AuthorizeConsent(ctx context.Context, consentID, id, orgID string, assertion FIDOAssertion) error {

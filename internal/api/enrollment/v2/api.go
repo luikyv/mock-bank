@@ -560,17 +560,20 @@ func (s Server) EnrollmentRegisterFidoCredential(ctx context.Context, request En
 
 func (s Server) EnrollmentCreateFidoSigningOptions(ctx context.Context, req EnrollmentCreateFidoSigningOptionsRequestObject) (EnrollmentCreateFidoSigningOptionsResponseObject, error) {
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
-	var consentID string
-	if req.Body.Data.ConsentIDType != nil {
-		consentID = string(*req.Body.Data.ConsentIDType)
-	}
-	if req.Body.Data.RecurringConsentID != nil {
-		consentID = string(*req.Body.Data.RecurringConsentID)
-	}
 
-	challenge, err := s.service.InitAuthorization(ctx, consentID, req.EnrollmentID, orgID, enrollment.FIDOOptions{
-		RelyingParty: req.Body.Data.Rp,
-	})
+	var challenge string
+	var err error
+	if req.Body.Data.ConsentIDType != nil {
+		challenge, err = s.service.InitConsentAuthorization(ctx, *req.Body.Data.ConsentIDType, req.EnrollmentID, orgID, enrollment.FIDOOptions{
+			RelyingParty: req.Body.Data.Rp,
+		})
+	} else if req.Body.Data.RecurringConsentID != nil {
+		challenge, err = s.service.InitRecurringConsentAuthorization(ctx, *req.Body.Data.RecurringConsentID, req.EnrollmentID, orgID, enrollment.FIDOOptions{
+			RelyingParty: req.Body.Data.Rp,
+		})
+	} else {
+		err = errorutil.New("invalid consent id")
+	}
 	if err != nil {
 		return nil, err
 	}
