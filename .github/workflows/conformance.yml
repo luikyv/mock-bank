@@ -41,14 +41,13 @@ jobs:
         run: |
           set -euxo pipefail
 
-          # Dump logs if any command in this step fails
           dump_logs() {
             echo "===== DOCKER COMPOSE SERVICES ====="
             docker compose config --services || true
             echo "===== DOCKER COMPOSE PS ====="
             docker compose ps || true
-            echo "===== RECENT LOGS (mtls, auth, mockapi, cs-runner if present) ====="
-            docker compose logs --no-color --tail=200 mtls auth mockapi cs-runner || true
+            echo "===== RECENT LOGS (gateway, mockbank, cs-*) ====="
+            docker compose logs --no-color --tail=200 gateway mockbank cs-httpd cs-server cs-mongodb || true
           }
           trap 'echo "[TRAP] Failure detected. Collecting diagnostics..."; dump_logs' ERR
 
@@ -60,26 +59,20 @@ jobs:
           docker compose --profile conformance up -d
 
           echo "== Services (with current profiles) =="
-          docker compose config --services
+          docker compose --profile conformance config --services
 
           echo "== Containers =="
-          docker compose ps
+          docker compose --profile conformance ps
 
-          # ---------- helper: wait for an HTTPS endpoint from the host ----------
+          # ---- wait for CS on host ----
           wait_http() {
             url="$1"; timeout_s="${2:-120}"
             start=$(date +%s)
             while :; do
-              code=$(curl -sk -o /dev/null -w '%{http_code}' "$url" || echo 000)
-              if [ "$code" = "200" ]; then
-                echo "OK: $url"
-                return 0
-              fi
-              if [ $(( $(date +%s) - start )) -ge "$timeout_s" ]; then
-                echo "TIMEOUT ($timeout_s s) for $url (last code: $code)"
-                return 1
-              fi
-              echo "Waiting for $url (last code: $code). Sleeping 2s"
+              code="$(curl -sk -o /dev/null -w '%{http_code}' "$url" || true)"
+              [ "$code" = "200" ] && echo "OK: $url" && return 0
+              [ $(( $(date +%s) - start )) -ge "$timeout_s" ] && echo "TIMEOUT ($timeout_s s) for $url (last code: ${code:-000})" && return 1
+              echo "Waiting for $url (last code: ${code:-000}). Sleeping 2s"
               sleep 2
             done
           }
@@ -87,39 +80,34 @@ jobs:
           echo "== Wait for Conformance Suite on host (https://localhost:8443) =="
           wait_http "https://localhost:8443/api/runner/available" 120
 
-          echo "== (Optional) Show mock bank OIDC doc from host =="
+          echo "== (Optional) Host OIDC check (may be 502 while backend boots) =="
           curl -sk -i https://auth.mockbank.local/.well-known/openid-configuration -w "\nHTTP %{http_code}\n" || true
 
-          # ---------- determine compose network name ----------
-          # Grab any container from this compose project, read its network id, then resolve the network name
+          # ---- get compose network name ----
           compose_net="$(docker compose ps -q | head -n1 | xargs -r docker inspect -f '{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}' | xargs -r docker network inspect -f '{{.Name}}' || true)"
-          if [ -z "${compose_net:-}" ]; then
-            echo "Could not determine compose network; dumping ps for context:"
-            docker compose ps
-            echo "Failing early since inside-network wait depends on the network."
-            exit 1
-          fi
-          echo "== Compose network: $compose_net =="
+          echo "== Compose network: ${compose_net:-<unknown>} =="
 
-          # ---------- wait for mock bank from inside the docker network ----------
-          # We connect to mtls:443 while preserving SNI/Host as auth.mockbank.local using --connect-to.
-          # This bypasses the need for 'auth.mockbank.local' to resolve inside the container.
-          echo "== Wait for Mock Bank inside the compose network (via mtls) =="
+          # ---- wait for Mock Bank via gateway inside the network ----
+          # Keep Host/SNI = auth.mockbank.local but TCP-connect to gateway:443.
+          echo "== Wait for Mock Bank inside the compose network (via gateway) =="
           start=$(date +%s)
           while :; do
-            code=$(docker run --rm --network "$compose_net" curlimages/curl:8.10.1 \
-              -sk --connect-to auth.mockbank.local:443:mtls:443 \
+            code="$(docker run --rm --network "$compose_net" curlimages/curl:8.10.1 \
+              -sk --connect-to auth.mockbank.local:443:gateway:443 \
               -o /dev/null -w '%{http_code}' \
-              https://auth.mockbank.local/.well-known/openid-configuration || echo 000)
+              https://auth.mockbank.local/.well-known/openid-configuration || true)"
+
             if [ "$code" = "200" ]; then
               echo "Mock bank is ready (inside network)"
               break
             fi
+
             if [ $(( $(date +%s) - start )) -ge 300 ]; then
-              echo "TIMEOUT (300s) waiting for mock bank (last code: $code)"
+              echo "TIMEOUT (300s) waiting for mock bank (last code: ${code:-000})"
               exit 1
             fi
-            echo "Mock bank not ready yet (last code: $code). Sleeping 2s"
+
+            echo "Mock bank not ready yet (last code: ${code:-000}). Sleeping 2s"
             sleep 2
           done
 
