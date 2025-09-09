@@ -304,14 +304,8 @@ func reverseProxyWithFallback(reverseProxy, fallbackProxy *httputil.ReverseProxy
 
 		reverseProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 			log.Println("Proxy error:", err)
-			if strings.Contains(err.Error(), "connection refused") {
-				log.Println("Connection refused, serving fallback")
-				r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-				fallbackProxy.ServeHTTP(w, r)
-				return
-			}
-
-			http.Error(w, "Bad Gateway", http.StatusBadGateway)
+			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			fallbackProxy.ServeHTTP(w, r)
 		}
 
 		r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
