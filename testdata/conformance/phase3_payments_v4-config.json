@@ -3,10 +3,8 @@
       "discoveryUrl": "https://auth.mockbank.local/.well-known/openid-configuration"
   },
   "directory": {
-      "apibase": "https://matls-directory.local",
       "client_id": "directory_client",
-      "discoveryUrl": "https://directory.local/.well-known/openid-configuration",
-      "keystore": "https://keystore.local/"
+      "keystore": "https://keystore.sandbox.directory.openbankingbrasil.org.br/"
   },
   "client": {
       "client_id": "client_one",
@@ -135,6 +133,8 @@
       "brazilCpfTemporization": "76109277673"
   },
   "resource": {
+      "resourceUrl": "https://matls-api.mockbank.local/open-banking/payments/v4/pix/payments",
+      "consentUrl": "https://matls-api.mockbank.local/open-banking/payments/v4/consents",
       "loggedUserIdentification": "76109277673",
       "debtorAccountIspb": "00000000",
       "debtorAccountIssuer": "0000",
@@ -142,7 +142,9 @@
       "debtorAccountType": "CACC",
       "paymentAmount": "100.00",
       "brazilCpf": "76109277673",
-      "brazilOrganizationId": "00000000-0000-0000-0000-000000000000"
+      "brazilOrganizationId": "00000000-0000-0000-0000-000000000000",
+      "brazilPaymentConsent": { "data": {} },
+      "brazilQrdnPaymentConsent": { "data": {} }
   },
   "consent": {
       "productType": "personal"
@@ -258,6 +260,8 @@
       },
       "payments_api_pixscheduling-patch-detentora_test-module_v4": {
           "resource": {
+              "resourceUrl": "https://matls-api.mockbank.local/open-banking/payments/v4/payments",
+              "consentUrl": "https://matls-api.mockbank.local/open-banking/payments/v4/consents",
               "loggedUserIdentification": "76109277673",
               "debtorAccountIspb": "00000000",
               "debtorAccountIssuer": "0000",
@@ -270,6 +274,8 @@
       },
       "payments_api_real-email-invalid-creditor-proxy_test-module_v4": {
           "resource": {
+              "resourceUrl": "https://matls-api.mockbank.local/open-banking/payments/v4/payments",
+              "consentUrl": "https://matls-api.mockbank.local/open-banking/payments/v4/consents",
               "loggedUserIdentification": "76109277673",
               "debtorAccountIspb": "00000000",
               "debtorAccountIssuer": "0000",

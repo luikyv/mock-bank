@@ -49,6 +49,7 @@ services:
         aliases:
           - database.local
 
+  # TODO: Remove this service. Mock the unit tests since the cs will use the real database.
   psql-test:
     profiles:
       - test
@@ -97,6 +98,12 @@ services:
           - directory.local
           - matls-directory.local
           - keystore.local
+          - keystore.sandbox.directory.openbankingbrasil.org.br
+          - auth.sandbox.directory.openbankingbrasil.org.br
+          - matls-api.sandbox.directory.openbankingbrasil.org.br
+    # Make the host machine accessible from the container.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   mockbank-ui:
     profiles:

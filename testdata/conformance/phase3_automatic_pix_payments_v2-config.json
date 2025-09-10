@@ -82,9 +82,9 @@
       "discoveryUrl": "https://auth.mockbank.local/.well-known/openid-configuration"
   },
   "directory": {
-      "keystore": "https://keystore.local/",
-      "discoveryUrl": "https://directory.local/.well-known/openid-configuration",
-      "apibase": "https://matls-directory.local",
+      "keystore": "https://keystore.sandbox.directory.openbankingbrasil.org.br/",
+      "discoveryUrl": "https://auth.sandbox.directory.openbankingbrasil.org.br/.well-known/openid-configuration",
+      "apibase": "https://matls-api.sandbox.directory.openbankingbrasil.org.br/",
       "client_id": "directory_client"
   },
   "resource": {

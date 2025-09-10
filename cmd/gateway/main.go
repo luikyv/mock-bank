@@ -191,9 +191,10 @@ func main() {
 
 	mux.Handle("directory.local/", directoryHandler())
 	mux.Handle("matls-directory.local/", directoryHandler())
-
+	mux.Handle("auth.sandbox.directory.openbankingbrasil.org.br/", directoryHandler())
+	mux.Handle("matls-api.sandbox.directory.openbankingbrasil.org.br/", directoryHandler())
 	mux.Handle("keystore.local/", keystoreHandler())
-	mux.Handle("matls-keystore.local/", keystoreHandler())
+	mux.Handle("keystore.sandbox.directory.openbankingbrasil.org.br/", keystoreHandler())
 
 	// Mock Bank backend can be accessed from the host machine for local development.
 	// If the connection is refused, fallback to the container.
