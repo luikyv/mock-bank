@@ -677,7 +677,7 @@ func grantEnrollmentStep(
 			if as.StoredParameter(sessionParamCPF) != e.UserIdentification {
 				slog.InfoContext(r.Context(), "enrollment was not created for the correct user")
 				info := "enrollment not created for the correct user"
-				reason := enrollment.RejectionReasonHybridFlowFailure
+				reason := enrollment.RejectionReasonDivergentOwnership
 				_ = enrollmentService.Cancel(r.Context(), e, enrollment.Cancellation{
 					From:            payment.TerminatedFromHolder,
 					RejectionReason: &reason,

@@ -228,7 +228,7 @@ func (s Service) InitConsentAuthorization(ctx context.Context, consentID, enroll
 	}
 
 	if !slices.Contains(e.Permissions, PermissionPaymentsInitiate) {
-		return "", errorutil.Format("%w: permission not allowed", ErrInvalidPermissions)
+		return "", errorutil.Format("%w: permission not allowed", ErrMissingPermissions)
 	}
 
 	challenge := generateChallenge()
@@ -264,7 +264,7 @@ func (s Service) InitRecurringConsentAuthorization(ctx context.Context, consentI
 	}
 
 	if !slices.Contains(e.Permissions, PermissionPaymentsInitiate) {
-		return "", errorutil.Format("%w: permission not allowed", ErrInvalidPermissions)
+		return "", errorutil.Format("%w: permission not allowed", ErrMissingPermissions)
 	}
 
 	challenge := generateChallenge()
@@ -377,7 +377,7 @@ func (s Service) Enrollment(ctx context.Context, query Query, orgID string) (*En
 			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.TerminatedFromHolder})
 		}
 	case StatusAwaitingEnrollment:
-		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(CredentialRegistrationTimeout)) {
+		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(5 * time.Minute)) {
 			reason := RejectionReasonAwaitingEnrollment
 			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.TerminatedFromHolder})
 		}

@@ -657,6 +657,11 @@ func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
+	if errors.Is(err, enrollment.ErrMissingPermissions) {
+		api.WriteError(w, r, api.NewError("PERMISSAO_INVALIDA_VINCULO_CONSENTIMENTO", http.StatusUnprocessableEntity, err.Error()))
+		return
+	}
+
 	if errors.As(err, &errorutil.Error{}) {
 		api.WriteError(w, r, api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error()))
 		return

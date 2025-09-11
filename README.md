@@ -97,6 +97,7 @@ To run MockBank with the Open Finance Conformance Suite:
    ```
 
 ## TODO
+- Keep everything possible with Alice.
 - Add doc.go's.
 - Finish accounts and loans.
 - Improve the html.

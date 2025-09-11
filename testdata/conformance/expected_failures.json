@@ -1,11 +1,1 @@
-[
-    {
-        "test-name": "automatic-payments_api_multiple-consents-core_test-module_v2n2",
-        "variant": "*",
-        "configuration-filename": "./testdata/conformance/phase3_automatic_payments_v2-config.json",
-        "current-block": "",
-        "condition": "EnsureRecurringPaymentsJointAccountCpfOrCnpjIsPresent",
-        "expected-result": "warning",
-        "comment": "**CHANGE ME** explain why this failure occurs"
-    }
-]
+[]

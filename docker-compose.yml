@@ -97,10 +97,10 @@ services:
           - matls-api.mockbank.local
           - directory.local
           - matls-directory.local
-          - keystore.local
-          - keystore.sandbox.directory.openbankingbrasil.org.br
           - auth.sandbox.directory.openbankingbrasil.org.br
           - matls-api.sandbox.directory.openbankingbrasil.org.br
+          - keystore.local
+          - keystore.sandbox.directory.openbankingbrasil.org.br
     # Make the host machine accessible from the container.
     extra_hosts:
       - "host.docker.internal:host-gateway"

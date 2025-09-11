@@ -599,6 +599,14 @@ func (s Service) Create(ctx context.Context, p *Payment) error {
 								return s.reject(ctx, p, RejectionNotInformed, "payment reference must be 'zero' for the first payment")
 							}
 
+							_, err := s.accountService.Account(ctx, account.Query{Number: p.CreditorAccountNumber}, c.OrgID)
+							if err != nil {
+								if errors.Is(err, account.ErrNotFound) {
+									return s.reject(ctx, p, RejectionInconsistentOwnership, "invalid creditor account number")
+								}
+								return err
+							}
+
 							return acceptOrSchedule(ctx, p, c)
 						}
 					}

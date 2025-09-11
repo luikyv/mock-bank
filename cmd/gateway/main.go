@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -9,15 +8,19 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
+	"github.com/google/uuid"
 )
 
 func main() {
@@ -197,24 +200,14 @@ func main() {
 	mux.Handle("keystore.sandbox.directory.openbankingbrasil.org.br/", keystoreHandler())
 
 	// Mock Bank backend can be accessed from the host machine for local development.
-	// If the connection is refused, fallback to the container.
-	mockbankLocalhostURL, _ := url.Parse("http://host.docker.internal")
-	mockbankLocalhostReverseProxy := httputil.NewSingleHostReverseProxy(mockbankLocalhostURL)
-	mockbankURL, _ := url.Parse("http://mockbank")
-	mockbankReverseProxy := httputil.NewSingleHostReverseProxy(mockbankURL)
-	mbHandler := reverseProxyWithFallback(mockbankLocalhostReverseProxy, mockbankReverseProxy)
+	mbHandler := reverseProxyWithFallback("host.docker.internal:80", "mockbank:80")
 	mux.HandleFunc("auth.mockbank.local/", mbHandler)
 	mux.HandleFunc("matls-auth.mockbank.local/", mbHandler)
 	mux.HandleFunc("matls-api.mockbank.local/", mbHandler)
 	mux.HandleFunc("app.mockbank.local/api/", mbHandler)
 
 	// Mock Bank frontend can be accessed from the host machine for local development.
-	// If the connection is refused, fallback to the container.
-	mockbankAppLocalhostURL, _ := url.Parse("http://host.docker.internal:8080")
-	mockbankAppLocalhostReverseProxy := httputil.NewSingleHostReverseProxy(mockbankAppLocalhostURL)
-	mockbankAppURL, _ := url.Parse("http://mockbank-ui:8080")
-	mockbankAppReverseProxy := httputil.NewSingleHostReverseProxy(mockbankAppURL)
-	mbAppHandler := reverseProxyWithFallback(mockbankAppLocalhostReverseProxy, mockbankAppReverseProxy)
+	mbAppHandler := reverseProxyWithFallback("host.docker.internal:8080", "mockbank-ui:8080")
 	mux.Handle("app.mockbank.local/", mbAppHandler)
 
 	// Serve participant information over HTTP because the Conformance Suite
@@ -270,11 +263,34 @@ func main() {
 	log.Println("server shutdown")
 }
 
-// reverseProxyWithFallback is a helper function that creates a reverse proxy
-// with a fallback mechanism. It handles TLS connections, client certificates,
-// and request body buffering. If the reverse proxy encounters a connection
-// refused error, it will serve the request from the fallback proxy.
-func reverseProxyWithFallback(reverseProxy, fallbackProxy *httputil.ReverseProxy) http.HandlerFunc {
+func reverseProxyWithFallback(mainAddr, fallbackAddr string) http.HandlerFunc {
+
+	mainURL, _ := url.Parse("http://" + mainAddr)
+	mainReverseProxy := httputil.NewSingleHostReverseProxy(mainURL)
+	fallbackURL, _ := url.Parse("http://" + fallbackAddr)
+	fallbackReverseProxy := httputil.NewSingleHostReverseProxy(fallbackURL)
+
+	var healthy atomic.Bool
+	check := func() {
+		c, err := net.DialTimeout("tcp", mainAddr, 200*time.Millisecond)
+		if err == nil {
+			log.Printf("%s is healthy\n", mainAddr)
+			healthy.Store(true)
+			_ = c.Close()
+		} else {
+			log.Printf("%s is unhealthy, falling back to %s\n", mainAddr, fallbackAddr)
+			healthy.Store(false)
+		}
+	}
+	check()
+	go func() {
+		t := time.NewTicker(500 * time.Millisecond)
+		defer t.Stop()
+		for range t.C {
+			check()
+		}
+	}()
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.TLS == nil {
 			log.Println("No TLS connection established")
@@ -296,35 +312,32 @@ func reverseProxyWithFallback(reverseProxy, fallbackProxy *httputil.ReverseProxy
 			r.Header.Set("X-Client-Cert", url.QueryEscape(string(pemBytes)))
 		}
 
-		// Buffer the request body.
-		var bodyBytes []byte
-		if r.Body != nil {
-			bodyBytes, _ = io.ReadAll(r.Body)
+		if healthy.Load() {
+			log.Printf("forwarding request to %s\n", mainAddr)
+			mainReverseProxy.ServeHTTP(w, r)
+		} else {
+			log.Printf("falling back to %s\n", fallbackAddr)
+			fallbackReverseProxy.ServeHTTP(w, r)
 		}
-		r.Body.Close()
-
-		reverseProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-			log.Println("Proxy error:", err)
-			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-			fallbackProxy.ServeHTTP(w, r)
-		}
-
-		r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-		reverseProxy.ServeHTTP(w, r)
 	}
 
 }
 
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fapiID := r.Header.Get("X-Fapi-Interaction-Id")
+		if fapiID == "" {
+			fapiID = uuid.NewString()
+		}
+
 		start := time.Now()
 		wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-		log.Printf("incoming request %s %s %s", r.Method, r.URL.Path, r.RemoteAddr)
+		slog.InfoContext(r.Context(), "incoming request", "method", r.Method, "path", r.URL.Path, "remote_addr", r.RemoteAddr, "interaction_id", fapiID)
 
 		next.ServeHTTP(wrapped, r)
 
 		duration := time.Since(start)
-		log.Printf("outgoing request %s %s %d %v", r.Method, r.URL.Path, wrapped.statusCode, duration)
+		slog.InfoContext(r.Context(), "outgoing request", "method", r.Method, "path", r.URL.Path, "remote_addr", r.RemoteAddr, "interaction_id", fapiID, "status_code", wrapped.statusCode, "duration", duration)
 	})
 }
 

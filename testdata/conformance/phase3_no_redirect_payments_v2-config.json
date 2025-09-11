@@ -271,12 +271,6 @@
                   ]
               }
           ]
-      },
-      "enrollments_api_webhook-rejected_test-module_v2-2": {
-          "alias": "mockbank"
-      },
-      "enrollments_api_webhook-revoked_test-module_v2-2": {
-          "alias": "mockbank"
       }
   }
 }

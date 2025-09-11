@@ -16,4 +16,5 @@ var (
 	ErrInvalidAssertion             = errorutil.New("invalid assertion")
 	ErrInvalidChallenge             = errorutil.New("invalid challenge")
 	ErrFIDOOptionsAlreadyRegistered = errorutil.New("fido options already registered")
+	ErrMissingPermissions           = errorutil.New("missing permissions")
 )

@@ -115,6 +115,7 @@ const (
 	RejectionReasonHybridFlowFailure               RejectionReason = "REJEITADO_FALHA_HYBRID_FLOW"
 	RejectionReasonFidoFailure                     RejectionReason = "REJEITADO_FALHA_FIDO"
 	RejectionReasonInternalSecurityFailure         RejectionReason = "REJEITADO_SEGURANCA_INTERNA"
+	RejectionReasonDivergentOwnership              RejectionReason = "REJEITADO_TITULARIDADE_DIVERGENTE"
 	RejectionReasonOther                           RejectionReason = "REJEITADO_OUTRO"
 )
 
