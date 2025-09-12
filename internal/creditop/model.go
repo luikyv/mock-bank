@@ -63,7 +63,10 @@ type Contract struct {
 	TotalInstalmentType                 InstalmentPeriodicityTotal
 	RemainingInstalments                *int
 	// This should be DIA, SEMANA, MES, ANO, SEM_PRAZO_REMANESCENTE.
-	RemainingInstalmentType InstalmentPeriodicityRemaining
+	RemainingInstalmentType                   InstalmentPeriodicityRemaining
+	PortabilityIsEligible                     bool
+	PortabilityIneligibleReason               *PortabilityIneligibilityReason
+	PortabilityIneligibleReasonAdditionalInfo *string
 
 	OrgID     string
 	CrossOrg  bool
@@ -430,4 +433,13 @@ const (
 	InstalmentPeriodicityRemainingMonth InstalmentPeriodicityRemaining = "MES"
 	InstalmentPeriodicityRemainingYear  InstalmentPeriodicityRemaining = "ANO"
 	InstalmentPeriodicityRemainingTotal InstalmentPeriodicityRemaining = "SEM_PRAZO_REMANESCENTE"
+)
+
+type PortabilityIneligibilityReason string
+
+const (
+	PortabilityIneligibilityReasonContractLiquidated PortabilityIneligibilityReason = "CONTRATO_LIQUIDADO"
+	PortabilityIneligibilityReasonJudicialAction     PortabilityIneligibilityReason = "CLIENTE_COM_ACAO_JUDICIAL"
+	PortabilityIneligibilityReasonIncompatibleMode   PortabilityIneligibilityReason = "MODALIDADE_OPERACAO_INCOMPATIVEL"
+	PortabilityIneligibilityReasonOther              PortabilityIneligibilityReason = "OUTROS"
 )

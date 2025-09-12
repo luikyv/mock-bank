@@ -135,8 +135,38 @@ func (s Service) Extend(ctx context.Context, id, orgID string, ext *Extension) (
 		return nil, err
 	}
 
-	if err := s.validateExtension(ctx, c, ext); err != nil {
-		return nil, err
+	if c.Status != StatusAuthorized {
+		return nil, ErrCannotExtendConsentNotAuthorized
+	}
+
+	if c.UserIdentification != ext.UserIdentification {
+		return nil, ErrExtensionNotAllowed
+	}
+
+	if c.BusinessIdentification != nil && reflect.DeepEqual(c.BusinessIdentification, ext.BusinessIdentification) {
+		return nil, ErrExtensionNotAllowed
+	}
+
+	rs, err := s.resourceService.Resources(ctx, c.OrgID, resource.Filter{
+		ConsentID: c.ID.String(),
+		Status:    resource.StatusPendingAuthorization,
+	}, page.NewPagination(nil, nil))
+	if err != nil {
+		return nil, errorutil.Format("failed to get resources pending authorization: %w", err)
+	}
+	if rs.TotalRecords != 0 {
+		return nil, ErrCannotExtendConsentPendingAuthorization
+	}
+
+	if ext.ExpiresAt != nil {
+		now := timeutil.DateTimeNow()
+		if ext.ExpiresAt.Before(now) || ext.ExpiresAt.After(now.AddDate(1, 0, 0)) {
+			return nil, ErrInvalidExpiration
+		}
+
+		if c.ExpiresAt != nil && !ext.ExpiresAt.After(*c.ExpiresAt) {
+			return nil, ErrInvalidExpiration
+		}
 	}
 
 	c.ExpiresAt = ext.ExpiresAt
@@ -185,47 +215,6 @@ func (s Service) runAutomations(ctx context.Context, c *Consent) error {
 			slog.DebugContext(ctx, "consent reached expiration, moving to rejected")
 			return s.reject(ctx, c, RejectedByASPSP, RejectionReasonConsentMaxDateReached)
 		}
-	}
-
-	return nil
-}
-
-func (s Service) validateExtension(ctx context.Context, c *Consent, ext *Extension) error {
-	if c.Status != StatusAuthorized {
-		return ErrCannotExtendConsentNotAuthorized
-	}
-
-	if c.UserIdentification != ext.UserIdentification {
-		return ErrExtensionNotAllowed
-	}
-
-	if c.BusinessIdentification != nil && reflect.DeepEqual(c.BusinessIdentification, ext.BusinessIdentification) {
-		return ErrExtensionNotAllowed
-	}
-
-	rs, err := s.resourceService.Resources(ctx, c.OrgID, resource.Filter{
-		ConsentID: c.ID.String(),
-		Status:    resource.StatusPendingAuthorization,
-	}, page.NewPagination(nil, nil))
-	if err != nil {
-		return errorutil.Format("failed to get resources pending authorization: %w", err)
-	}
-
-	if rs.TotalRecords != 0 {
-		return ErrCannotExtendConsentPendingAuthorization
-	}
-
-	if ext.ExpiresAt == nil {
-		return nil
-	}
-
-	now := timeutil.DateTimeNow()
-	if ext.ExpiresAt.Before(now) || ext.ExpiresAt.After(now.AddDate(1, 0, 0)) {
-		return ErrInvalidExpiration
-	}
-
-	if c.ExpiresAt != nil && !ext.ExpiresAt.After(*c.ExpiresAt) {
-		return ErrInvalidExpiration
 	}
 
 	return nil

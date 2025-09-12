@@ -13,6 +13,7 @@ import (
 	"github.com/luikyv/mock-bank/internal/api"
 	"github.com/luikyv/mock-bank/internal/api/middleware"
 	"github.com/luikyv/mock-bank/internal/consent"
+	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/page"
 	"github.com/luikyv/mock-bank/internal/resource"
 	"github.com/luikyv/mock-bank/internal/session"
@@ -36,13 +37,14 @@ type BankConfig interface {
 }
 
 type Server struct {
-	config          BankConfig
-	host            string
-	sessionService  session.Service
-	userService     user.Service
-	consentService  consent.Service
-	resourceService resource.Service
-	accountService  account.Service
+	config            BankConfig
+	host              string
+	sessionService    session.Service
+	userService       user.Service
+	consentService    consent.Service
+	resourceService   resource.Service
+	accountService    account.Service
+	enrollmentService enrollment.Service
 }
 
 func NewServer(
@@ -53,15 +55,17 @@ func NewServer(
 	consentService consent.Service,
 	resourceService resource.Service,
 	accountService account.Service,
+	enrollmentService enrollment.Service,
 ) Server {
 	return Server{
-		config:          config,
-		host:            host,
-		sessionService:  service,
-		userService:     userService,
-		consentService:  consentService,
-		resourceService: resourceService,
-		accountService:  accountService,
+		config:            config,
+		host:              host,
+		sessionService:    service,
+		userService:       userService,
+		consentService:    consentService,
+		resourceService:   resourceService,
+		accountService:    accountService,
+		enrollmentService: enrollmentService,
 	}
 }
 
@@ -544,6 +548,57 @@ func (s Server) PatchResourceStatus(ctx context.Context, req PatchResourceStatus
 	}
 
 	return PatchResourceStatus204Response{}, nil
+}
+
+func (s Server) GetEnrollments(ctx context.Context, request GetEnrollmentsRequestObject) (GetEnrollmentsResponseObject, error) {
+	pag := page.NewPagination(request.Params.Page, request.Params.PageSize)
+	enrollments, err := s.enrollmentService.Enrollments(ctx, request.UserID, request.OrgID, pag)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := EnrollmentsResponse{
+		Data: []struct {
+			ClientID             string             "json:\"clientId\""
+			CreationDateTime     timeutil.DateTime  "json:\"creationDateTime\""
+			EnrollmentID         string             "json:\"enrollmentId\""
+			ExpirationDateTime   *timeutil.DateTime "json:\"expirationDateTime,omitempty\""
+			Permissions          []string           "json:\"permissions\""
+			Status               string             "json:\"status\""
+			StatusUpdateDateTime timeutil.DateTime  "json:\"statusUpdateDateTime\""
+			UserID               string             "json:\"userId\""
+		}{},
+		Meta:  api.NewPaginatedMeta(enrollments),
+		Links: api.NewPaginatedLinks(s.host+"/api/orgs/"+request.OrgID+"/users/"+request.UserID.String()+"/enrollments", enrollments),
+	}
+
+	for _, e := range enrollments.Records {
+		perms := make([]string, len(e.Permissions))
+		for i, p := range e.Permissions {
+			perms[i] = string(p)
+		}
+		resp.Data = append(resp.Data, struct {
+			ClientID             string             "json:\"clientId\""
+			CreationDateTime     timeutil.DateTime  "json:\"creationDateTime\""
+			EnrollmentID         string             "json:\"enrollmentId\""
+			ExpirationDateTime   *timeutil.DateTime "json:\"expirationDateTime,omitempty\""
+			Permissions          []string           "json:\"permissions\""
+			Status               string             "json:\"status\""
+			StatusUpdateDateTime timeutil.DateTime  "json:\"statusUpdateDateTime\""
+			UserID               string             "json:\"userId\""
+		}{
+			EnrollmentID:         e.URN(),
+			CreationDateTime:     e.CreatedAt,
+			Status:               string(e.Status),
+			StatusUpdateDateTime: e.StatusUpdatedAt,
+			ExpirationDateTime:   e.ExpiresAt,
+			UserID:               e.OwnerID.String(),
+			ClientID:             e.ClientID,
+			Permissions:          perms,
+		})
+	}
+
+	return GetEnrollments200JSONResponse(resp), nil
 }
 
 func writeResponseError(w http.ResponseWriter, r *http.Request, err error) {

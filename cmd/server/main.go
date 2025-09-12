@@ -19,6 +19,7 @@ import (
 	"github.com/luikyv/mock-bank/internal/api/app"
 	autopaymentapi "github.com/luikyv/mock-bank/internal/api/autopayment"
 	consentapi "github.com/luikyv/mock-bank/internal/api/consent"
+	creditportabilityapi "github.com/luikyv/mock-bank/internal/api/creditportability"
 	enrollmentapi "github.com/luikyv/mock-bank/internal/api/enrollment"
 	loanapi "github.com/luikyv/mock-bank/internal/api/loan"
 	oidcapi "github.com/luikyv/mock-bank/internal/api/oidc"
@@ -26,6 +27,7 @@ import (
 	resourceapi "github.com/luikyv/mock-bank/internal/api/resource"
 	"github.com/luikyv/mock-bank/internal/client"
 	"github.com/luikyv/mock-bank/internal/creditop"
+	"github.com/luikyv/mock-bank/internal/creditportability"
 	"github.com/luikyv/mock-bank/internal/customer"
 	"github.com/luikyv/mock-bank/internal/enrollment"
 	"github.com/luikyv/mock-bank/internal/idempotency"
@@ -178,6 +180,7 @@ func main() {
 	paymentService := payment.NewService(db, userService, accountService, webhookService)
 	autoPaymentService := autopayment.NewService(db, userService, accountService, webhookService)
 	enrollmentService := enrollment.NewService(db, userService, accountService, paymentService, autoPaymentService, webhookService)
+	creditPortabilityService := creditportability.NewService(db, creditOpService)
 
 	op, err := openidProvider(db, opSigner, clientService, userService, consentService, accountService,
 		creditOpService, paymentService, autoPaymentService, enrollmentService)
@@ -190,7 +193,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	oidcapi.NewServer(AuthHost, op).RegisterRoutes(mux)
-	app.NewServer(bankConfig, APPHost, sessionService, userService, consentService, resourceService, accountService).RegisterRoutes(mux)
+	app.NewServer(bankConfig, APPHost, sessionService, userService, consentService, resourceService, accountService, enrollmentService).RegisterRoutes(mux)
 	consentapi.NewServer(bankConfig, consentService, op).RegisterRoutes(mux)
 	resourceapi.NewServer(bankConfig, resourceService, consentService, op).RegisterRoutes(mux)
 	accountapi.NewServer(bankConfig, accountService, consentService, op).RegisterRoutes(mux)
@@ -198,6 +201,7 @@ func main() {
 	paymentapi.NewServer(bankConfig, paymentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 	autopaymentapi.NewServer(bankConfig, autoPaymentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 	enrollmentapi.NewServer(bankConfig, enrollmentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
+	creditportabilityapi.NewServer(bankConfig, creditPortabilityService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 
 	handler := middleware(mux)
 	slog.Info("starting mock bank")

@@ -1,5 +1,5 @@
-//go:generate oapi-codegen -config=./config.yml -package=creditportabilityv1 -o=./api_gen.go ./swagger.yml
-package creditportabilityv1
+//go:generate oapi-codegen -config=./config.yml -package=v1 -o=./api_gen.go ./swagger.yml
+package v1
 
 import (
 	"context"
@@ -24,13 +24,12 @@ type BankConfig interface {
 	Brand() string
 	CNPJ() string
 	ISPB() string
-	BranchCode() string
 }
 
 type Server struct {
 	config             BankConfig
 	baseURL            string
-	service            *creditportability.Service
+	service            creditportability.Service
 	idempotencyService idempotency.Service
 	jwtService         jwtutil.Service
 	op                 *provider.Provider
@@ -41,7 +40,7 @@ type Server struct {
 
 func NewServer(
 	config BankConfig,
-	service *creditportability.Service,
+	service creditportability.Service,
 	idempotencyService idempotency.Service,
 	jwtService jwtutil.Service,
 	op *provider.Provider,
@@ -125,7 +124,69 @@ func (s Server) Handler() (http.Handler, string) {
 }
 
 func (s Server) CreditPortabilityGetCreditOperationsContratIDPortabilityEligibility(ctx context.Context, request CreditPortabilityGetCreditOperationsContratIDPortabilityEligibilityRequestObject) (CreditPortabilityGetCreditOperationsContratIDPortabilityEligibilityResponseObject, error) {
-	return nil, nil
+	orgID := ctx.Value(api.CtxKeyOrgID).(string)
+	consentID := ctx.Value(api.CtxKeyConsentID).(string)
+	eligibility, err := s.service.Eligibility(ctx, request.ContractID, consentID, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := ResponsePortabilityEligibility{
+		Data: struct {
+			ContractID  string "json:\"contractId\""
+			Portability struct {
+				Channel     *ResponsePortabilityEligibilityDataPortabilityChannel "json:\"channel,omitempty\""
+				CompanyCnpj *string                                               "json:\"companyCnpj,omitempty\""
+				CompanyName *string                                               "json:\"companyName,omitempty\""
+				Ineligible  *struct {
+					ReasonType               ResponsePortabilityEligibilityDataPortabilityIneligibleReasonType "json:\"reasonType\""
+					ReasonTypeAdditionalInfo *string                                                           "json:\"reasonTypeAdditionalInfo,omitempty\""
+				} "json:\"ineligible,omitempty\""
+				IsEligible           bool                                                 "json:\"isEligible\""
+				Status               *ResponsePortabilityEligibilityDataPortabilityStatus "json:\"status,omitempty\""
+				StatusUpdateDateTime *string                                              "json:\"statusUpdateDateTime,omitempty\""
+			} "json:\"portability\""
+		}{
+			ContractID: eligibility.ContractID,
+			Portability: struct {
+				Channel     *ResponsePortabilityEligibilityDataPortabilityChannel "json:\"channel,omitempty\""
+				CompanyCnpj *string                                               "json:\"companyCnpj,omitempty\""
+				CompanyName *string                                               "json:\"companyName,omitempty\""
+				Ineligible  *struct {
+					ReasonType               ResponsePortabilityEligibilityDataPortabilityIneligibleReasonType "json:\"reasonType\""
+					ReasonTypeAdditionalInfo *string                                                           "json:\"reasonTypeAdditionalInfo,omitempty\""
+				} "json:\"ineligible,omitempty\""
+				IsEligible           bool                                                 "json:\"isEligible\""
+				Status               *ResponsePortabilityEligibilityDataPortabilityStatus "json:\"status,omitempty\""
+				StatusUpdateDateTime *string                                              "json:\"statusUpdateDateTime,omitempty\""
+			}{
+				IsEligible:  eligibility.IsEligible,
+				CompanyName: eligibility.CompanyName,
+			},
+		},
+		Meta:  api.NewMeta(),
+		Links: api.NewLinks(s.baseURL + "/credit-operations/" + request.ContractID + "/portability-eligibility"),
+	}
+
+	if eligibility.Channel != nil {
+		resp.Data.Portability.Channel = pointerOf(ResponsePortabilityEligibilityDataPortabilityChannel(*eligibility.Channel))
+	}
+
+	if eligibility.IneligibilityReason != nil {
+		resp.Data.Portability.Ineligible = pointerOf(struct {
+			ReasonType               ResponsePortabilityEligibilityDataPortabilityIneligibleReasonType "json:\"reasonType\""
+			ReasonTypeAdditionalInfo *string                                                           "json:\"reasonTypeAdditionalInfo,omitempty\""
+		}{
+			ReasonType:               ResponsePortabilityEligibilityDataPortabilityIneligibleReasonType(*eligibility.IneligibilityReason),
+			ReasonTypeAdditionalInfo: eligibility.IneligibilityReasonAdditionalInfo,
+		})
+	}
+
+	if eligibility.Status != nil {
+		resp.Data.Portability.Status = pointerOf(ResponsePortabilityEligibilityDataPortabilityStatus(*eligibility.Status))
+	}
+
+	return CreditPortabilityGetCreditOperationsContratIDPortabilityEligibility200JSONResponse{OKResponsePortabilityEligibilityJSONResponse(resp)}, nil
 }
 
 func (s Server) CreditPortabilityPostPortabilities(ctx context.Context, request CreditPortabilityPostPortabilitiesRequestObject) (CreditPortabilityPostPortabilitiesResponseObject, error) {

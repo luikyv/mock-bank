@@ -119,6 +119,22 @@ type ConsentsResponse struct {
 	Meta  *api.Meta  `json:"meta,omitempty"`
 }
 
+// EnrollmentsResponse defines model for EnrollmentsResponse.
+type EnrollmentsResponse struct {
+	Data []struct {
+		ClientID             string             `json:"clientId"`
+		CreationDateTime     timeutil.DateTime  `json:"creationDateTime"`
+		EnrollmentID         string             `json:"enrollmentId"`
+		ExpirationDateTime   *timeutil.DateTime `json:"expirationDateTime,omitempty"`
+		Permissions          []string           `json:"permissions"`
+		Status               string             `json:"status"`
+		StatusUpdateDateTime timeutil.DateTime  `json:"statusUpdateDateTime"`
+		UserID               string             `json:"userId"`
+	} `json:"data"`
+	Links *api.Links `json:"links,omitempty"`
+	Meta  *api.Meta  `json:"meta,omitempty"`
+}
+
 // MockUserRequest defines model for MockUserRequest.
 type MockUserRequest struct {
 	Data struct {
@@ -235,6 +251,15 @@ type GetConsentsParams struct {
 	PageSize *PageSize `form:"page-size,omitempty" json:"page-size,omitempty"`
 }
 
+// GetEnrollmentsParams defines parameters for GetEnrollments.
+type GetEnrollmentsParams struct {
+	// Page Número da página que está sendo requisitada (o valor da primeira página é 1).
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Quantidade total de registros por páginas.
+	PageSize *PageSize `form:"page-size,omitempty" json:"page-size,omitempty"`
+}
+
 // GetResourcesParams defines parameters for GetResources.
 type GetResourcesParams struct {
 	// Page Número da página que está sendo requisitada (o valor da primeira página é 1).
@@ -315,6 +340,9 @@ type ServerInterface interface {
 	// Get consents of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/consents)
 	GetConsents(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetConsentsParams)
+	// Get enrollments of a user
+	// (GET /api/orgs/{orgId}/users/{userId}/enrollments)
+	GetEnrollments(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetEnrollmentsParams)
 	// Get shared resources of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/resources)
 	GetResources(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetResourcesParams)
@@ -892,6 +920,65 @@ func (siw *ServerInterfaceWrapper) GetConsents(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// GetEnrollments operation middleware
+func (siw *ServerInterfaceWrapper) GetEnrollments(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "orgId" -------------
+	var orgID OrganizationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", r.PathValue("orgId"), &orgID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "orgId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "userId" -------------
+	var userID MockUserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetEnrollmentsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", r.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "page-size" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page-size", r.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page-size", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEnrollments(w, r, orgID, userID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetResources operation middleware
 func (siw *ServerInterfaceWrapper) GetResources(w http.ResponseWriter, r *http.Request) {
 
@@ -1161,6 +1248,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("PUT "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/accounts/{accountId}", wrapper.UpdateAccount)
 	m.HandleFunc("POST "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/businesses/{businessId}/bind", wrapper.BindUserToBusiness)
 	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/consents", wrapper.GetConsents)
+	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/enrollments", wrapper.GetEnrollments)
 	m.HandleFunc("GET "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/resources", wrapper.GetResources)
 	m.HandleFunc("PATCH "+options.BaseURL+"/api/orgs/{orgId}/users/{userId}/resources/{resourceId}/consents/{consentId}", wrapper.PatchResourceStatus)
 
@@ -1439,6 +1527,25 @@ func (response GetConsents200JSONResponse) VisitGetConsentsResponse(w http.Respo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetEnrollmentsRequestObject struct {
+	OrgID  OrganizationID `json:"orgId"`
+	UserID MockUserID     `json:"userId"`
+	Params GetEnrollmentsParams
+}
+
+type GetEnrollmentsResponseObject interface {
+	VisitGetEnrollmentsResponse(w http.ResponseWriter) error
+}
+
+type GetEnrollments200JSONResponse EnrollmentsResponse
+
+func (response GetEnrollments200JSONResponse) VisitGetEnrollmentsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetResourcesRequestObject struct {
 	OrgID  OrganizationID `json:"orgId"`
 	UserID MockUserID     `json:"userId"`
@@ -1523,6 +1630,9 @@ type StrictServerInterface interface {
 	// Get consents of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/consents)
 	GetConsents(ctx context.Context, request GetConsentsRequestObject) (GetConsentsResponseObject, error)
+	// Get enrollments of a user
+	// (GET /api/orgs/{orgId}/users/{userId}/enrollments)
+	GetEnrollments(ctx context.Context, request GetEnrollmentsRequestObject) (GetEnrollmentsResponseObject, error)
 	// Get shared resources of a user
 	// (GET /api/orgs/{orgId}/users/{userId}/resources)
 	GetResources(ctx context.Context, request GetResourcesRequestObject) (GetResourcesResponseObject, error)
@@ -1960,6 +2070,34 @@ func (sh *strictHandler) GetConsents(w http.ResponseWriter, r *http.Request, org
 	}
 }
 
+// GetEnrollments operation middleware
+func (sh *strictHandler) GetEnrollments(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetEnrollmentsParams) {
+	var request GetEnrollmentsRequestObject
+
+	request.OrgID = orgID
+	request.UserID = userID
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEnrollments(ctx, request.(GetEnrollmentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEnrollments")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEnrollmentsResponseObject); ok {
+		if err := validResponse.VisitGetEnrollmentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetResources operation middleware
 func (sh *strictHandler) GetResources(w http.ResponseWriter, r *http.Request, orgID OrganizationID, userID MockUserID, params GetResourcesParams) {
 	var request GetResourcesRequestObject
@@ -2028,43 +2166,44 @@ func (sh *strictHandler) PatchResourceStatus(w http.ResponseWriter, r *http.Requ
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

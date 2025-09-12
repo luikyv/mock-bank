@@ -221,6 +221,9 @@ CREATE TABLE credit_contracts (
     total_instalment_type TEXT,
     remaining_instalments INT,
     remaining_instalment_type TEXT,
+    portability_is_eligible BOOLEAN NOT NULL,
+    portability_ineligible_reason TEXT,
+    portability_ineligible_reason_additional_info TEXT,
 
     org_id TEXT NOT NULL,
     cross_org BOOLEAN NOT NULL DEFAULT FALSE,

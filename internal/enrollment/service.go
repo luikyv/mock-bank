@@ -11,11 +11,13 @@ import (
 	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/google/uuid"
 	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/api"
 	"github.com/luikyv/mock-bank/internal/autopayment"
 	"github.com/luikyv/mock-bank/internal/consent"
 	"github.com/luikyv/mock-bank/internal/errorutil"
+	"github.com/luikyv/mock-bank/internal/page"
 	"github.com/luikyv/mock-bank/internal/payment"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 	"github.com/luikyv/mock-bank/internal/user"
@@ -365,25 +367,46 @@ func (s Service) Enrollment(ctx context.Context, query Query, orgID string) (*En
 		return nil, ErrClientNotAllowed
 	}
 
+	return e, s.runAutomations(ctx, e)
+}
+
+func (s Service) Enrollments(ctx context.Context, ownerID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Enrollment], error) {
+	query := s.db.WithContext(ctx).Model(&Enrollment{}).Where("owner_id = ? AND org_id = ?", ownerID, orgID).Order("created_at DESC")
+
+	enrollments, err := page.Paginate[*Enrollment](query, pag)
+	if err != nil {
+		return page.Page[*Enrollment]{}, err
+	}
+
+	for _, c := range enrollments.Records {
+		if err := s.runAutomations(ctx, c); err != nil {
+			return page.Page[*Enrollment]{}, err
+		}
+	}
+
+	return enrollments, nil
+}
+
+func (s Service) runAutomations(ctx context.Context, e *Enrollment) error {
 	switch e.Status {
 	case StatusAwaitingRiskSignals:
 		if timeutil.DateTimeNow().After(e.CreatedAt.Add(5 * time.Minute)) {
 			reason := RejectionReasonAwaitingRiskSignals
-			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.TerminatedFromHolder})
+			return s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.TerminatedFromHolder})
 		}
 	case StatusAwaitingAccountHolderValidation:
 		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(15 * time.Minute)) {
 			reason := RejectionReasonAwaitingAccountHolderValidation
-			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.TerminatedFromHolder})
+			return s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.TerminatedFromHolder})
 		}
 	case StatusAwaitingEnrollment:
 		if timeutil.DateTimeNow().After(e.StatusUpdatedAt.Add(5 * time.Minute)) {
 			reason := RejectionReasonAwaitingEnrollment
-			return e, s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.TerminatedFromHolder})
+			return s.Cancel(ctx, e, Cancellation{RejectionReason: &reason, From: payment.TerminatedFromHolder})
 		}
 	}
 
-	return e, nil
+	return nil
 }
 
 func (s Service) CancelByID(ctx context.Context, id, orgID string, cancellation Cancellation) error {

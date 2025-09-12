@@ -308,6 +308,26 @@ paths:
         '204':
           description: Status updated successfully
 
+  /api/orgs/{orgId}/users/{userId}/enrollments:
+    get:
+      summary: Get enrollments of a user
+      operationId: getEnrollments
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/mockUserId'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: User enrollments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentsResponse'
+
+
 components:
   schemas:
     UserResponse:
@@ -637,6 +657,49 @@ components:
           properties:
             url:
               type: string
+    EnrollmentsResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required:
+              - enrollmentId
+              - status
+              - permissions
+              - creationDateTime
+              - statusUpdateDateTime
+              - userId
+              - clientId
+            properties:
+              enrollmentId:
+                type: string
+              status:
+                type: string
+              permissions:
+                type: array
+                items:
+                  type: string
+              creationDateTime:
+                type: string
+                format: date-time
+              statusUpdateDateTime:
+                type: string
+                format: date-time
+              expirationDateTime:
+                type: string
+                format: date-time
+              userId:
+                type: string
+              clientId:
+                type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        links:
+          $ref: '#/components/schemas/Links'
     Meta:
       type: object
       description: Meta informações referente à API requisitada.

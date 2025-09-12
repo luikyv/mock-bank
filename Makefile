@@ -85,6 +85,6 @@ cs-tests:
 
 cs-tests-wip:
 	@conformance-suite/venv/bin/python conformance-suite/scripts/run-test-plan.py \
-		no-redirect-payments-webhook_test-plan_v2-2 ./testdata/conformance/phase3_no_redirect_payments_v2-config.json \
+		no-redirect-payments_test-plan_v2-2 ./testdata/conformance/phase3_no_redirect_payments_v2-config.json \
 		--export-dir ./conformance-suite/results \
 		--verbose

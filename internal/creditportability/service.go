@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
+	"github.com/luikyv/mock-bank/internal/api"
 	"github.com/luikyv/mock-bank/internal/creditop"
 	"github.com/luikyv/mock-bank/internal/resource"
 	"github.com/luikyv/mock-bank/internal/timeutil"
@@ -13,45 +15,64 @@ import (
 
 type Service struct {
 	db              *gorm.DB
-	creditopService *creditop.Service
+	creditopService creditop.Service
 }
 
-func NewService(db *gorm.DB, creditopService *creditop.Service) *Service {
-	return &Service{db: db, creditopService: creditopService}
+func NewService(db *gorm.DB, creditopService creditop.Service) Service {
+	return Service{db: db, creditopService: creditopService}
 }
 
-func (s *Service) AccountData(ctx context.Context, portabilityID string) (*AccountData, error) {
+func (s Service) AccountData(ctx context.Context, portabilityID string) (*AccountData, error) {
 	return &AccountData{
 		Number: "12345678",
 	}, nil
 }
 
-func (s *Service) Eligibility(ctx context.Context, contractID, consentID, orgID string) (*Eligibility, error) {
+func (s Service) Eligibility(ctx context.Context, contractID, consentID, orgID string) (*Eligibility, error) {
 
-	if _, err := s.creditopService.ConsentedContract(ctx, contractID, consentID, orgID, resource.TypeLoan); err != nil {
+	contract, err := s.creditopService.ConsentedContract(ctx, contractID, consentID, orgID, resource.TypeLoan)
+	if err != nil {
 		return nil, err
 	}
 
-	eligibility := &Eligibility{}
-	if err := s.db.WithContext(ctx).
-		Where(`contract_id = ? AND org_id = ?`, contractID, orgID).
-		First(eligibility).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			reason := IneligibilityReasonOther
-			additionalInfo := "Eligibility not defined for this contract"
-			return &Eligibility{
-				IsEligible:                        false,
-				IneligibilityReason:               &reason,
-				IneligibilityReasonAdditionalInfo: &additionalInfo,
-			}, nil
-		}
-		return nil, fmt.Errorf("could not fetch eligibility: %w", err)
+	if !contract.PortabilityIsEligible {
+		return &Eligibility{
+			ContractID:                        contractID,
+			IsEligible:                        false,
+			IneligibilityReason:               contract.PortabilityIneligibleReason,
+			IneligibilityReasonAdditionalInfo: contract.PortabilityIneligibleReasonAdditionalInfo,
+		}, nil
 	}
 
-	return eligibility, nil
+	portability, err := s.Portability(ctx, contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	if slices.Contains([]Status{StatusRejected, StatusCancelled}, portability.Status) {
+		status := EligibilityStatusAvailable
+		return &Eligibility{
+			ContractID:      contractID,
+			IsEligible:      true,
+			StatusUpdatedAt: &contract.UpdatedAt,
+			Status:          &status,
+		}, nil
+	}
+
+	status := EligibilityStatusInProgress
+	channel := ChannelOFB
+	return &Eligibility{
+		ContractID:      contractID,
+		IsEligible:      true,
+		StatusUpdatedAt: &portability.StatusUpdatedAt,
+		Status:          &status,
+		Channel:         &channel,
+		CompanyName:     &portability.InstitutionName,
+		CompanyCNPJ:     &portability.InstitutionCNPJ,
+	}, nil
 }
 
-func (s *Service) Create(ctx context.Context, portability *Portability) error {
+func (s Service) Create(ctx context.Context, portability *Portability) error {
 	eligibility, err := s.Eligibility(ctx, portability.ContractID.String(), portability.ConsentID.String(), portability.OrgID)
 	if err != nil {
 		return err
@@ -73,4 +94,20 @@ func (s *Service) Create(ctx context.Context, portability *Portability) error {
 		return fmt.Errorf("could not create portability: %w", err)
 	}
 	return nil
+}
+
+func (s Service) Portability(ctx context.Context, id string) (*Portability, error) {
+	portability := &Portability{}
+	if err := s.db.WithContext(ctx).Where("id = ?", id).First(portability).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	if clientID := ctx.Value(api.CtxKeyClientID); clientID != nil && clientID != portability.ClientID {
+		return nil, ErrClientNotAllowed
+	}
+
+	return portability, nil
 }

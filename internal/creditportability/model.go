@@ -34,6 +34,7 @@ type Portability struct {
 	InstalmentAmount                    string
 	InstalmentCurrency                  string
 	DueDate                             timeutil.BrazilDate
+	ClientID                            string
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
@@ -81,13 +82,14 @@ const (
 
 type Eligibility struct {
 	IsEligible                        bool
-	IneligibilityReason               *IneligibilityReason
+	IneligibilityReason               *creditop.PortabilityIneligibilityReason
 	IneligibilityReasonAdditionalInfo *string
 	Status                            *EligibilityStatus
 	StatusUpdatedAt                   *timeutil.DateTime
 	Channel                           *Channel
 	CompanyName                       *string
 	CompanyCNPJ                       *string
+	ContractID                        string
 }
 
 type EligibilityStatus string
@@ -102,15 +104,6 @@ type Channel string
 const (
 	ChannelOFB       Channel = "OFB"
 	ChannelRegistrar Channel = "REGISTRADORA"
-)
-
-type IneligibilityReason string
-
-const (
-	IneligibilityReasonContractLiquidated IneligibilityReason = "CONTRATO_LIQUIDADO"
-	IneligibilityReasonJudicialAction     IneligibilityReason = "CLIENTE_COM_ACAO_JUDICIAL"
-	IneligibilityReasonIncompatibleMode   IneligibilityReason = "MODALIDADE_OPERACAO_INCOMPATIVEL"
-	IneligibilityReasonOther              IneligibilityReason = "OUTROS"
 )
 
 type AccountData struct {
