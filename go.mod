@@ -72,6 +72,6 @@ require (
 
 require (
 	github.com/go-jose/go-jose/v4 v4.1.2
-	github.com/luikyv/go-oidc v0.12.0
+	github.com/luikyv/go-oidc v0.13.0
 	golang.org/x/crypto v0.41.0 // indirect
 )
