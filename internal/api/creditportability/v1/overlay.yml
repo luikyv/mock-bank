@@ -24,6 +24,26 @@ actions:
   description: Remove $ref fields from links properties to ensure the application of the custom x-go-type
   remove: true
 
+- target: $.components.schemas.ResponsePortabilityEligibility.properties.data.properties.portability.properties.statusUpdateDateTime
+  update:
+    format: date-time
+
+- target: $.components.schemas.ResponsePortabilitiesByPortabilityId.properties.data.properties.statusUpdateDateTime
+  update:
+    format: date-time
+
+- target: $.components.schemas.RequestCreditPortabilityPayment.properties.data.properties.paymentDateTime
+  update:
+    format: date-time
+
+- target: $.components.schemas.POSTResponseCreditPortabilityPayment.properties.data.properties.paymentDateTime
+  update:
+    format: date-time
+
+- target: $.components.schemas.ResponsePortabilitiesByPortabilityId.properties.data.properties.loanSettlementInstruction.properties.settlementDateTime
+  update:
+    format: date-time
+
 - target: $..[*][?(@.format == "date")]
   update:
     x-go-type: timeutil.BrazilDate
@@ -36,10 +56,17 @@ actions:
     x-go-type-import:
       path: github.com/luikyv/mock-bank/internal/timeutil
 
+- target: $..[*][?(@.pattern == "^(?!\s)[\w\W\s]*[^\s]$")]
+  update:
+    pattern: '^\S(?:[\s\S]*\S)?$'
+
 - target: $.components.responses[*].headers.x-fapi-interaction-id
   remove: true
 
 - target: $.components.responses[*].headers.x-v
+  remove: true
+
+- target: $.components.parameters.xIdempotencyKey.schema.pattern
   remove: true
 
 - target: $.paths./portabilities.post.requestBody.content.application/jwt
@@ -66,7 +93,6 @@ actions:
       schema:
         $ref: '#/components/schemas/RequestCreditPortabilityPayment'
 
-# JWT to JSON conversion for response bodies
 - target: $.components.responses.POSTResponseCreditPortability.content.application/jwt
   remove: true
 - target: $.components.responses.POSTResponseCreditPortability.content

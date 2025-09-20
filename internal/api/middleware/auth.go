@@ -61,7 +61,7 @@ func AuthWithOptions(op *provider.Provider, grantType goidc.GrantType, opts *Opt
 			tokenScopes := strings.Split(tokenInfo.Scopes, " ")
 			if !areScopesValid(scopes, tokenScopes) {
 				slog.InfoContext(ctx, "invalid scopes", "token_scopes", tokenInfo.Scopes)
-				api.WriteError(w, r, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "token missing scopes").Pagination(true))
+				api.WriteError(w, r, api.NewError("FORBIDDEN", http.StatusForbidden, "token missing scopes").Pagination(true))
 				return
 			}
 

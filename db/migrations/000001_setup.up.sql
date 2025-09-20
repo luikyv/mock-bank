@@ -132,6 +132,11 @@ CREATE TABLE accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id UUID NOT NULL REFERENCES mock_users(id),
     number TEXT NOT NULL,
+    branch_code TEXT,
+    brand_name TEXT NOT NULL,
+    check_digit TEXT NOT NULL,
+    company_cnpj TEXT NOT NULL,
+    compe_code TEXT NOT NULL,
     type TEXT NOT NULL,
     subtype TEXT NOT NULL,
     available_amount TEXT NOT NULL,
@@ -140,6 +145,7 @@ CREATE TABLE accounts (
     overdraft_limit_contracted TEXT,
     overdraft_limit_used TEXT,
     overdraft_limit_unarranged TEXT,
+    currency TEXT NOT NULL,
 
     org_id TEXT NOT NULL,
     cross_org BOOLEAN NOT NULL DEFAULT FALSE,
@@ -178,6 +184,7 @@ CREATE TABLE account_transactions (
     partie_compe_code TEXT,
     partie_number TEXT,
     partie_person_type TEXT,
+    currency TEXT NOT NULL,
 
     org_id TEXT NOT NULL,
     cross_org BOOLEAN NOT NULL DEFAULT FALSE,
@@ -191,6 +198,7 @@ CREATE TABLE credit_contracts (
     type TEXT NOT NULL,
     owner_id UUID NOT NULL REFERENCES mock_users(id),
     number TEXT NOT NULL,
+    company_cnpj TEXT NOT NULL,
     ipoc_code TEXT NOT NULL,
     product_name TEXT NOT NULL,
     product_type TEXT NOT NULL,
@@ -221,9 +229,7 @@ CREATE TABLE credit_contracts (
     total_instalment_type TEXT,
     remaining_instalments INT,
     remaining_instalment_type TEXT,
-    portability_is_eligible BOOLEAN NOT NULL,
-    portability_ineligible_reason TEXT,
-    portability_ineligible_reason_additional_info TEXT,
+    has_insurance_contracted BOOLEAN,
 
     org_id TEXT NOT NULL,
     cross_org BOOLEAN NOT NULL DEFAULT FALSE,
@@ -517,13 +523,68 @@ CREATE TABLE jwt_ids (
 );
 CREATE INDEX idx_jwt_ids_org_id ON jwt_ids (org_id);
 
-CREATE TABLE schedules (
+CREATE TABLE credit_portability_eligibilities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    task_type TEXT NOT NULL,
-    next_run_at TIMESTAMPTZ NOT NULL,
+    contract_id UUID NOT NULL REFERENCES credit_contracts(id) ON DELETE CASCADE,
+    is_eligible BOOLEAN NOT NULL,
+    ineligibility_reason TEXT,
+    ineligibility_reason_additional_info TEXT,
+    status TEXT,
+    status_updated_at TIMESTAMPTZ,
+    channel TEXT,
+    company_name TEXT,
+    company_cnpj TEXT,
+
+    org_id TEXT NOT NULL,
+    cross_org BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+CREATE INDEX idx_credit_portability_eligibilities_org_id ON credit_portability_eligibilities (org_id);
+CREATE UNIQUE INDEX idx_credit_portability_eligibilities_org_id_contract_id ON credit_portability_eligibilities (org_id, contract_id);
+
+CREATE TABLE credit_portabilities (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    consent_id UUID NOT NULL REFERENCES consents(id) ON DELETE CASCADE,
+    
+    status TEXT NOT NULL,
+    status_updated_at TIMESTAMPTZ NOT NULL,
+
+    contract_id UUID NOT NULL REFERENCES credit_contracts(id) ON DELETE CASCADE,
+    contract_number TEXT NOT NULL,
+    contract_ipoc_code TEXT NOT NULL,
+    
+    creditor_institution_name TEXT NOT NULL,
+    creditor_institution_cnpj TEXT NOT NULL,
+    proposing_institution_name TEXT NOT NULL,
+    proposing_institution_cnpj TEXT NOT NULL,
+    proposing_institution_contacts JSONB,
+    
+    proposed_interest_rates JSONB NOT NULL,
+    proposed_fees JSONB NOT NULL,
+    proposed_finance_charges JSONB NOT NULL,
+    proposed_cet TEXT NOT NULL,
+    proposed_amortization_schedule TEXT NOT NULL,
+    proposed_amortization_scheduled_additional_info TEXT,
+    proposed_instalment_periodicity TEXT NOT NULL,
+    proposed_total_instalments INTEGER NOT NULL,
+    proposed_instalment_amount TEXT,
+    proposed_instalment_currency TEXT,
+    proposed_amount TEXT NOT NULL,
+    proposed_currency TEXT NOT NULL,
+    proposed_due_date TEXT NOT NULL,
+    
+    digital_signature_proof_document_id TEXT NOT NULL,
+    digital_signature_proof_signed_at TEXT NOT NULL,
+    
+    customer_contacts JSONB NOT NULL,
+    client_id TEXT NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE,
+    rejection JSONB,
+    loan_settlement_instruction JSONB,
+    status_reason JSONB,
+    payment JSONB,
 
     org_id TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
-CREATE INDEX idx_schedules_org_id ON schedules (org_id);

@@ -14,11 +14,8 @@ info:
     Os dados serão devolvidos na consulta desde que o `consentId` relacionado corresponda a um consentimento válido e com o status `AUTHORISED`.\
     É também necessário que o recurso em questão (conta, contrato, etc) esteja disponível na instituição transmissora (ou seja, sem boqueios de qualquer natureza e com todas as autorizações/consentimentos já autorizados).\
     Além disso as `permissions` necessárias deverão ter sido solicitadas quando da criação do consentimento relacionado (`consentId`).\
-    Relacionamos a seguir as `permissions` necessárias para a consulta de dados em cada `endpoint` da presente API.
-    <br>
-    ### Observação:
-      - No endpoint `/contracts/{contratId}/payments` a paginação ocorrerá sob os dados contidos no campo `releases` do tipo lista.
-    <br>
+    Relacionamos a seguir as `permissions` necessárias para a consulta de dados em cada `endpoint` da presente API.   
+
     ## Permissions necessárias para a API Loans
 
     Para cada um dos paths desta API, além dos escopos (`scopes`) indicados existem `permissions` que deverão ser observadas:
@@ -38,7 +35,7 @@ info:
     ### `/contracts/{contractId}/payments`
       - permissions:
         - GET: **LOANS_PAYMENTS_READ**
-  version: 2.4.0
+  version: 2.5.0
   license:
     name: Apache 2.0
     url: 'https://www.apache.org/licenses/LICENSE-2.0'
@@ -215,14 +212,11 @@ paths:
       operationId: loansGetContractsContractIdScheduledInstalments
       parameters:
         - $ref: '#/components/parameters/contractId'
-        - $ref: '#/components/parameters/page'
-        - $ref: '#/components/parameters/pageSize'
         - $ref: '#/components/parameters/Authorization'
         - $ref: '#/components/parameters/xFapiAuthDate'
         - $ref: '#/components/parameters/xFapiCustomerIpAddress'
         - $ref: '#/components/parameters/xFapiInteractionId'
         - $ref: '#/components/parameters/xCustomerUserAgent'
-        - $ref: '#/components/parameters/pagination-key'
       responses:
         '200':
           $ref: '#/components/responses/OKResponseLoansInstalments'
@@ -267,14 +261,11 @@ paths:
       operationId: loansGetContractsContractIdPayments
       parameters:
         - $ref: '#/components/parameters/contractId'
-        - $ref: '#/components/parameters/page'
-        - $ref: '#/components/parameters/pageSize'
         - $ref: '#/components/parameters/Authorization'
         - $ref: '#/components/parameters/xFapiAuthDate'
         - $ref: '#/components/parameters/xFapiCustomerIpAddress'
         - $ref: '#/components/parameters/xFapiInteractionId'
         - $ref: '#/components/parameters/xCustomerUserAgent'
-        - $ref: '#/components/parameters/pagination-key'
       responses:
         '200':
           $ref: '#/components/responses/OKResponseLoansPayments'
@@ -344,7 +335,7 @@ components:
                 pattern: '[\w\W\s]*'
                 maxLength: 2048
         meta:
-          $ref: '#/components/schemas/Meta'
+          $ref: '#/components/schemas/MetaError'
     EnumContractAmortizationScheduled:
       type: string
       description: |
@@ -430,7 +421,9 @@ components:
     EnumContractReferentialRateIndexerSubType:
       type: string
       description: |
-        "Sub tipos de taxas referenciais ou indexadores, conforme Anexo 5: Taxa referencial ou Indexador (Indx), do Documento 3040"
+        "Sub tipos de taxas referenciais ou indexadores, conforme Anexo 5: Taxa referencial ou Indexador (Indx), do Documento 3040.
+
+        [Restrição] Caso no campo postFixedRate seja informado um valor aplicável ao contrato, o envio deste campo será obrigatório."
       enum:
         - SEM_SUB_TIPO_INDEXADOR
         - PRE_FIXADO
@@ -468,7 +461,7 @@ components:
     EnumContractTaxPeriodicity:
       type: string
       description: |
-        "Periodicidade da taxa . (Vide  Enum)
+        "Periodicidade da taxa. (Vide  Enum)
         a.m - ao mês
         a.a. - ao ano"
       enum:
@@ -563,7 +556,21 @@ components:
         - TRIBUTOS_RECEITAS_ORCAMENTARIAS
         - VEICULOS
         - VEICULOS_AUTOMOTORES
-      example: NOTAS_PROMISSORIAS_OUTROS_DIREITOS_CREDITO
+      example: NOTAS_PROMISSORIAS_OUTROS_DIREITOS_CREDITO   
+    EnumContractProductSubTypeCategory:
+      type: string
+      description: |
+        Categoria destinada à classificação específica relacionada à submodalidade do produto.
+        As orientações a seguir devem ser observadas para o correto preenchimento deste campo:
+        * O preenchimento com o enum `CREDITO_PESSOAL_CLEAN` será obrigatório, a partir da publicação da versão 2.5.0 da API Empréstimos, **para contratos em aberto**, quando aplicável;
+        * O enum `CONSIGNADO_SIAPE`, **que engloba todos os contratos consignados sob a regulamentação do Sistema Integrado de Administração de Recursos Humanos (Siape), apresentando informações de servidores estatutários, temporários, celetistas (CLT), entre outros**, será de envio obrigatório, a partir do início do piloto para crédito consignado;
+        * Contratos liquidados até a entrada em produção (go live) da versão 2.5.0 poderão ser preenchidos com a opção OUTRO;
+        * As demais submodalidades devem ser classificadas na opção `OUTRO`.
+      enum:
+        - CREDITO_PESSOAL_CLEAN
+        - CONSIGNADO_SIAPE
+        - OUTRO
+      example: CREDITO_PESSOAL_CLEAN
     EnumWarrantyType:
       type: string
       description: 'Denominação/Identificação do tipo da garantia que avaliza a Modalidade da Operação de Crédito contratada  (Doc 3040, Anexo 12)'
@@ -582,7 +589,7 @@ components:
         - OPERACOES_GARANTIDAS_OUTRAS_ENTIDADES
         - ACORDOS_COMPENSACAO
       example: CESSAO_DIREITOS_CREDITORIOS
-    LinksContractId:
+    LinksNonPaginated:
       type: object
       description: Referências para outros recusos da API requisitada.
       required:
@@ -591,37 +598,9 @@ components:
         self:
           type: string
           format: url
-          maxLength: 2000
+          maxLength: 4048
           description: URI completo que gerou a resposta atual.
           example: 'https://api.banco.com.br/open-banking/api/v1/resource'
-        first:
-          type: string
-          format: uri
-          maxLength: 2000
-          description: URI da primeira página que originou essa lista de resultados. Restrição - Obrigatório quando não for a primeira página da resposta
-          example: 'https://api.banco.com.br/open-banking/api/v1/resource'
-          pattern: '^(https:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&\/\/=]*)$'
-        prev:
-          type: string
-          format: uri
-          maxLength: 2000
-          description: "URI da página anterior dessa lista de resultados. Restrição - \tObrigatório quando não for a primeira página da resposta"
-          example: 'https://api.banco.com.br/open-banking/api/v1/resource'
-          pattern: '^(https:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&\/\/=]*)$'
-        next:
-          type: string
-          format: uri
-          maxLength: 2000
-          description: URI da próxima página dessa lista de resultados. Restrição - Obrigatório quando não for a última página da resposta
-          example: 'https://api.banco.com.br/open-banking/api/v1/resource'
-          pattern: '^(https:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&\/\/=]*)$'
-        last:
-          type: string
-          format: uri
-          maxLength: 2000
-          description: URI da última página dessa lista de resultados. Restrição - Obrigatório quando não for a última página da resposta
-          example: 'https://api.banco.com.br/open-banking/api/v1/resource'
-          pattern: '^(https:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&\/\/=]*)$'
     Links:
       type: object
       description: Referências para outros recusos da API requisitada.
@@ -631,31 +610,31 @@ components:
         self:
           type: string
           format: url
-          maxLength: 2000
+          maxLength: 4048
           description: URI completo que gerou a resposta atual.
           example: 'https://api.banco.com.br/open-banking/api/v1/resource'
         first:
           type: string
           format: url
-          maxLength: 2000
+          maxLength: 4048
           description: URI da primeira página que originou essa lista de resultados. Restrição - Obrigatório quando não for a primeira página da resposta
           example: 'https://api.banco.com.br/open-banking/api/v1/resource'
         prev:
           type: string
           format: url
-          maxLength: 2000
+          maxLength: 4048
           description: "URI da página anterior dessa lista de resultados. Restrição - \tObrigatório quando não for a primeira página da resposta"
           example: 'https://api.banco.com.br/open-banking/api/v1/resource'
         next:
           type: string
           format: url
-          maxLength: 2000
+          maxLength: 4048
           description: URI da próxima página dessa lista de resultados. Restrição - Obrigatório quando não for a última página da resposta
           example: 'https://api.banco.com.br/open-banking/api/v1/resource'
         last:
           type: string
           format: url
-          maxLength: 2000
+          maxLength: 4048
           description: URI da última página dessa lista de resultados. Restrição - Obrigatório quando não for a última página da resposta
           example: 'https://api.banco.com.br/open-banking/api/v1/resource'
     LoansBalloonPayment:
@@ -693,6 +672,7 @@ components:
         - interestRates
         - contractedFees
         - contractedFinanceCharges
+        - productSubTypeCategory
       properties:
         contractNumber:
           type: string
@@ -720,7 +700,7 @@ components:
         productName:
           type: string
           maxLength: 140
-          pattern: '^(?!\s)[\w\W\s]*[^\s]$'
+          pattern: '^[^\s](.*[^\s])?$'
           example: Crédito Pessoal Consignado
           description: |
             Denominação/Identificação do nome da Modalidade da Operação de Crédito divulgado ao cliente
@@ -728,13 +708,16 @@ components:
           $ref: '#/components/schemas/EnumContractProductTypeLoans'
         productSubType:
           $ref: '#/components/schemas/EnumContractProductSubTypeLoans'
+        productSubTypeCategory:
+          $ref: '#/components/schemas/EnumContractProductSubTypeCategory'
         contractDate:
           type: string
           format: date
           maxLength: 10
           pattern: '^(\d{4})-(1[0-2]|0?[1-9])-(3[01]|[12][0-9]|0?[1-9])$'
           example: '2018-01-05'
-          description: Data de contratação da operação de crédito. Especificação RFC-3339
+          description: |
+            Data de contratação da operação de crédito. Especificação RFC-3339. Para produtos rotativos, productSubType `CHEQUE_ESPECIAL` e `CONTA_GARANTIDA`, caso tenha-se múltiplas contratações do mesmo produto, deve-se enviar à última data disponível.
         disbursementDates:
           type: array
           minItems: 1
@@ -756,7 +739,7 @@ components:
           pattern: '^(\d{4})-(1[0-2]|0?[1-9])-(3[01]|[12][0-9]|0?[1-9])$'
           example: '2018-01-15'
           description: |
-            Data de liquidação da operação.
+            Data de liquidação da operação. Data do cancelamento do contrato para casos em que não há saldo devedor restante. No caso de cancelamento com saldo devedor, a data só deve ser preenchida quando o mesmo for liquidado.
         contractAmount:
           type: string
           format: double
@@ -764,7 +747,10 @@ components:
           maxLength: 20
           minLength: 4
           example: '1000.0400'
-          description: Valor contratado da operação. Expresso em valor monetário com no mínimo 2 casas e no máximo 4 casas decimais. Nos casos em que não houver este valor explícito no contrato do produto, enviar como 0.00
+          description: |
+            Valor contratado da operação. Não incluir valores de taxas, tarifas, encargos e seguros. 
+            Expresso em valor monetário com no mínimo 2 casas e no máximo 4 casas decimais. 
+            Nos casos em que não houver este valor explícito no contrato do produto, enviar como 0.00
         currency:
           type: string
           maxLength: 3
@@ -781,12 +767,12 @@ components:
           pattern: '^(\d{4})-(1[0-2]|0?[1-9])-(3[01]|[12][0-9]|0?[1-9])$'
           example: '2028-01-15'
           description: |
-            Data de vencimento Final da operação. Especificação RFC-3339. Informação deve ser enviada caso ela exista.
+            Data do último vencimento da operação, seguindo a especificação RFC-3339. Informação deve ser enviada caso ela exista. Especialmente para contratos repactuados, deve-se alterar a data para a do último vencimento. Para produtos rotativos, productSubType `CHEQUE_ESPECIAL` e `CONTA_GARANTIDA`, o campo representa a data fim da renovação para contratos ativos ou data do cancelamento para contratos cancelados ou vencidos.
         instalmentPeriodicity:
           $ref: '#/components/schemas/EnumContractInstalmentPeriodicity'
         instalmentPeriodicityAdditionalInfo:
           type: string
-          pattern: '^(?!\s)[\w\W\s]*[^\s]$'
+          pattern: '^[^\s](.*[^\s])?$'
           maxLength: 50
           example: Informações adicionais sobre periodicidade
           description: |
@@ -812,16 +798,23 @@ components:
 
             O preenchimento deve respeitar as 6 casas decimais, mesmo que venham preenchidas com zeros (representação de porcentagem p.ex: 0.150000. Este valor representa 15%. O valor 1 representa 100%).
 
-            Para o público PF (pessoa física) o campo é de envio obrigatório para contratos firmados a partir de 2008, conforme Resolução CMN 3.517. Para o público PJ (pessoa jurídica) o campo é de envio obrigatório para contratos firmados a partir de 2011, conforme Resolução CMN 3.909. O campo poderá ser preenchido com 0.00 em cenários nos quais a casa não tenha a informação de CET (Custo efetivo total) apenas para as exceções listadas abaixo:
+            Para o público PF (pessoa física) o campo é de envio obrigatório para contratos firmados a partir de 2008, conforme Resolução CMN 3.517. Para o público PJ (pessoa jurídica) o campo é de envio obrigatório para contratos firmados a partir de 2011, conforme Resolução CMN 3.909. O campo poderá ser preenchido com 0.00 em cenários nos quais a casa não tenha a informação de CET (Custo efetivo total) apenas para as exceções listadas abaixo: 
 
-            - Em contratos anteriores a 2008 (para o público PF);
-            - Em contratos anteriores a 2011 (para o público PJ);
-            - Público PJ de médio ou grande porte.
+            - Em contratos anteriores a 2008 (para o público PF); 
+            - Em contratos anteriores a 2011 (para o público PJ); 
+            - Público PJ de médio ou grande porte. 
+        hasInsuranceContracted:
+          type: boolean
+          description: |
+            Campo que identifica se existe seguro contratado para o Empréstimo, onde seguro contratado é true e não contratado é false.”​
+            
+            [Restrição] Este campo é de envio obrigatório caso o campo productSubTypeCategory seja preenchido CREDITO_PESSOAL_CLEAN.
+          example: true
         amortizationScheduled:
           $ref: '#/components/schemas/EnumContractAmortizationScheduled'
         amortizationScheduledAdditionalInfo:
           type: string
-          pattern: '^(?!\s)[\w\W\s]*[^\s]$'
+          pattern: '^[^\s](.*[^\s])?$'
           maxLength: 200
           example: Informações complementares relativa à amortização do tipo 'OUTROS'
           description: |
@@ -829,18 +822,21 @@ components:
         cnpjConsignee:
           type: string
           maxLength: 14
-          pattern: '^\d{14}$'
+          pattern: '^[0-9A-Z]{12}[0-9]{2}$'
           example: '60500998000135'
           description: |
-            CNPJ do consignante (CNPJ corresponde ao número de inscrição no Cadastro de Pessoa Jurídica).
+            CNPJ do consignante (CNPJ corresponde ao número de inscrição no Cadastro de Pessoa Jurídica). 
 
-            Deve-se ter apenas os números do CNPJ, sem máscara.
+            Deve-se ter apenas a representação alfanumérica do CNPJ, sem máscara.
 
             [Restrição] Informação adicional específica para quando o productSubType for igual a CREDITO_PESSOAL_COM_CONSIGNACAO
         interestRates:
           type: array
           description: |
-            Objeto que traz o conjunto de informações necessárias para demonstrar a composição das taxas de juros remuneratórios da Modalidade de crédito. Caso o contrato não possua taxas de juros, deve ser compartilhada uma lista vazia. Caso o contrato possua uma taxa de juros com valor 0, deve ser compartilhado um objeto com o valor 0 de forma explícita.
+            Objeto que traz o conjunto de informações necessárias para demonstrar a composição das taxas de juros remuneratórios da Modalidade de crédito. 
+            Caso o contrato não possua taxas de juros, deve ser compartilhada uma lista vazia. Caso o contrato possua uma taxa de juros com valor 0, deve ser compartilhado um objeto com o valor 0 de forma explícita. 
+            Para contratos em renegociação, a taxa de empréstimo compartilhada deve se manter a taxa do contrato vigente, sendo alterada para a renegociada ao fim do processo de renegociação. 
+            Para o produto CPC (campo `productSubTypeCategory` preenchido com `CREDITO_PESSOAL_CLEAN`) deve-se obrigatoriamente conter a taxa nominal e a taxa efetiva (campo `taxPeriodicity`) com periodicidade a.a. (ao ano), podendo adicionalmente conter, além das taxas nominal e efetiva ao ano, outras com outra periodicidade.
           items:
             $ref: '#/components/schemas/LoansContractInterestRate'
           minItems: 0
@@ -856,6 +852,18 @@ components:
           items:
             $ref: '#/components/schemas/LoansFinanceCharge'
           minItems: 0
+        nextInstalmentAmount:
+          type: string
+          format: double
+          pattern: '^\d{1,15}\.\d{2,4}$'
+          maxLength: 20
+          minLength: 4
+          example: '1000.0400'
+          description: >
+            Informa o valor de face (corresponde ao valor da parcela no vencimento). Para contratos liquidados, retornar zero, seguindo o pattern.
+            
+            [Restrição] 
+            O envio do campo será obrigatório para CPC (campo “productSubTypeCategory” preenchido com `CREDITO_PESSOAL_CLEAN`).
     LoansContractedFee:
       type: object
       description: Objeto que traz o conjunto de informações necessárias para demonstrar a composição das taxas de juros remuneratórios da Modalidade de crédito
@@ -868,13 +876,13 @@ components:
         feeName:
           type: string
           maxLength: 140
-          pattern: '^(?!\s)[\w\W\s]*[^\s]$'
+          pattern: '^[^\s](.*[^\s])?$'
           description: Denominação da Tarifa pactuada
           example: Renovação de cadastro
         feeCode:
           type: string
           maxLength: 140
-          pattern: '^(?!\s)[\w\W\s]*[^\s]$'
+          pattern: '^[^\s](.*[^\s])?$'
           description: Sigla identificadora da tarifa pactuada
           example: CADASTRO
         feeChargeType:
@@ -888,7 +896,7 @@ components:
           maxLength: 20
           minLength: 4
           description: |
-            Valor monetário da tarifa pactuada no contrato.
+            Valor monetário da tarifa pactuada no contrato. 
 
             [Restrição] Preenchimento obrigatório quando a forma de cobrança for diferente de Percentual.
           example: '100000.0400'
@@ -912,8 +920,6 @@ components:
         - taxPeriodicity
         - calculation
         - referentialRateIndexerType
-        - preFixedRate
-        - postFixedRate
       properties:
         taxType:
           $ref: '#/components/schemas/EnumContractTaxType'
@@ -933,7 +939,7 @@ components:
             Campo livre para complementar a informação relativa ao Tipo de taxa referencial ou indexador.
             [Restrição] Obrigatório para complementar a informação relativa ao Tipo de taxa referencial ou indexador, quando selecionada o tipo ou subtipo OUTRO.
           maxLength: 140
-          pattern: '^(?!\s)[\w\W\s]*[^\s]$'
+          pattern: '^[^\s](.*[^\s])?$'
           example: Informações adicionais
         preFixedRate:
           type: string
@@ -943,7 +949,9 @@ components:
           minLength: 8
           example: '0.600000'
           description: |
-            Taxa pré fixada aplicada sob o contrato da modalidade crédito. p.ex. 0.014500. O preenchimento deve respeitar as 6 casas decimais, mesmo que venham preenchidas com zeros(representação de porcentagem p.ex: 0.150000. Este valor representa 15%. O valor 1 representa 100%). Preencher o campo não aplicável ao contrato com zeros, seguindo o pattern (0.000000).
+            Taxa pré fixada aplicada sob o contrato da modalidade crédito. p.ex. 0.014500. O preenchimento deve respeitar as 6 casas decimais, mesmo que venham preenchidas com zeros(representação de porcentagem p.ex: 0.150000. Este valor representa 15%. O valor 1 representa 100%).
+            
+            [Restrição] Este campo é de envio obrigatório caso não seja enviado o campo postFixedRate.
         postFixedRate:
           type: string
           pattern: '^\d{1,2}\.\d{6}$'
@@ -951,15 +959,17 @@ components:
           maxLength: 9
           minLength: 8
           description: |
-            Taxa pós fixada aplicada sob o contrato da modalidade crédito. p.ex. 0.0045 .O preenchimento deve respeitar as 6 casas decimais, mesmo que venham preenchidas com zeros (representação de porcentagem p.ex: 0.1500. Este valor representa 15%. O valor 1 representa 100%). Preencher o campo não aplicável ao contrato com zeros, seguindo o pattern (0.000000).
+            Taxa pós fixada aplicada sob o contrato da modalidade crédito. p.ex. 0.0045.O preenchimento deve respeitar as 6 casas decimais, mesmo que venham preenchidas com zeros (representação de porcentagem p.ex: 0.1500. Este valor representa 15%. O valor 1 representa 100%). Para taxas pós fixadas necessário informar o indexador (campo referentialRateIndexerSubType).
+            
+            [Restrição] Este campo é de envio obrigatório caso não seja enviado o campo preFixedRate.
           example: '0.550000'
         additionalInfo:
           type: string
           maxLength: 1200
-          pattern: '^(?!\s)[\w\W\s]*[^\s]$'
+          pattern: '^[^\s](.*[^\s])?$'
           example: Informações adicionais
           description: |
-            Texto com informações adicionais sobre a composição das taxas de juros pactuadas.
+            Texto com informações adicionais sobre a composição das taxas de juros pactuadas. 
 
             [Restrição] Caso a instituição possua a informação para compartilhamento, esta deverá ser informada.
     LoansChargeOverParcel:
@@ -972,7 +982,7 @@ components:
           $ref: '#/components/schemas/EnumContractFinanceChargeType'
         chargeAdditionalInfo:
           type: string
-          pattern: '^(?!\s)[\w\W\s]*[^\s]$'
+          pattern: '^[^\s](.*[^\s])?$'
           maxLength: 140
           example: Informações adicionais
           description: |
@@ -1002,7 +1012,7 @@ components:
             Campo para informações adicionais.
 
             [Restrição] Obrigatório se selecionada a opção 'OUTROS' em Tipo de encargo pactuado no contrato.
-          pattern: '^(?!\s)[\w\W\s]*[^\s]$'
+          pattern: '^[^\s](.*[^\s])?$'
           example: Informações adicionais sobre encargos.
         chargeRate:
           type: string
@@ -1092,6 +1102,7 @@ components:
         - productType
         - productSubType
         - ipocCode
+        - productSubTypeCategory
       properties:
         contractId:
           type: string
@@ -1102,20 +1113,22 @@ components:
           description: 'Identifica de forma única o contrato da operação de crédito do cliente, mantendo as regras de imutabilidade dentro da instituição transmissora.'
         brandName:
           type: string
-          pattern: '^(?!\s)[\w\W\s]*[^\s]$'
+          pattern: '^[^\s](.*[^\s])?$'
           maxLength: 80
           example: Organização A
           description: 'Nome da Marca reportada pelo participante no Open Finance. Recomenda-se utilizar, sempre que possível, o mesmo nome de marca atribuído no campo do diretório Customer Friendly Server Name (Authorisation Server).'
         companyCnpj:
           type: string
-          pattern: '\d{14}$'
+          pattern: '^[0-9A-Z]{12}[0-9]{2}$'
           maxLength: 14
           example: '21128159000166'
-          description: 'Número completo do CNPJ da instituição responsável pelo Cadastro - o CNPJ corresponde ao número de inscrição no Cadastro de Pessoa Jurídica. Deve-se ter apenas os números do CNPJ, sem máscara.'
+          description: 'Representação alfanumérica completa do CNPJ da instituição responsável pelo contrato de empréstimo afim de identificar a instituição credora nos casos de portabilidade de crédito - o CNPJ corresponde ao número de inscrição no Cadastro de Pessoa Jurídica. Deve-se ter apenas a representação alfanumérica do CNPJ, sem máscara.'
         productType:
           $ref: '#/components/schemas/EnumContractProductTypeLoans'
         productSubType:
           $ref: '#/components/schemas/EnumContractProductSubTypeLoans'
+        productSubTypeCategory:
+            $ref: '#/components/schemas/EnumContractProductSubTypeCategory'
         ipocCode:
           type: string
           maxLength: 67
@@ -1131,7 +1144,7 @@ components:
               1. Para clientes pessoa física com CPF (tipo de cliente = 1), informar as 11 (onze) posições do CPF;
               2. Para clientes pessoa jurídica com CNPJ (tipo de cliente = 2), informar as 8 (oito) posições iniciais do CNPJ;
               3. Para os demais clientes (tipos de cliente 3, 4, 5 e 6), informar 14 (catorze) posições com complemento de zeros à esquerda se a identificação tiver tamanho inferior;
-            - **Código do contrato:** 1 (uma) até 40 (quarenta) posições, sem complemento de caracteres.
+            - **Código do contrato:** 1 (uma) até 40 (quarenta) posições, sem complemento de caracteres.          
     LoansPayments:
       type: object
       description: Conjunto de informações referentes aos pagamentos realizados de uma operação de crédito de empréstimos.
@@ -1151,7 +1164,30 @@ components:
           maxLength: 20
           minLength: 4
           example: '1000.0400'
-          description: Valor necessário para o cliente liquidar a dívida.
+          description: |
+            Valor necessário para o cliente liquidar a dívida, ou seja, este campo deve ser preenchido com o saldo devedor atualizado descrito no DDC (Documento Descritivo de Crédito). 
+            O valor a liquidar atualizado do dia deve ser ajustado para compartilhamento pela Transmissora até às 10:00 do mesmo dia, especialmente para Crédito Pessoal Clean, escopo de Portabilidade de Crédito, pois este valor é utilizado pela Receptora em papel de Proponente para pagamento à Transmissora em papel de Credora.
+        lastUpdatedContractOutstandingBalance:
+          type: string
+          format: date-time
+          description: |
+            Data e hora da última atualização do valor do campo contractOutstandingBalance, conforme especificação RFC-3339, formato UTC. 
+            
+            [Restrição] O envio do campo será obrigatório para CPC (campo “productSubTypeCategory” preenchido com CREDITO_PESSOAL_CLEAN na identificação da operação, no endpoint /contracts/{contractId}).
+          minLength: 24
+          maxLength: 24
+          example: "2021-05-21T08:30:03.374Z"
+        totalRemainingAmount:
+          description: |
+            Valor total que falta para o cliente liquidar o contrato, considerando o somatório total de todas as parcelas a vencer e vencidas, bem como todas as taxas, tarifas e encargos das parcelas. Nos casos de contrato com taxas pós-fixadas, considerar apenas valores pré-fixados, visto que o cálculo pós-fixado ocorre apenas em momento futuro, e que o valor está sujeito às variações de seu indexador. 
+            
+            [Restrição] O envio do campo será obrigatório para CPC (campo “productSubTypeCategory” preenchido com CREDITO_PESSOAL_CLEAN na identificação da operação, no endpoint /contracts/{contractId}).
+          type: string
+          format: double
+          pattern: '^\d{1,15}\.\d{2,4}$'
+          maxLength: 20
+          minLength: 4
+          example: '1000.0400'
         releases:
           type: array
           minItems: 0
@@ -1186,7 +1222,7 @@ components:
           pattern: '^[a-zA-Z0-9][a-zA-Z0-9-]{0,99}$'
           example: WGx0aExYcEJMVm93TFRsZFcyRXRla0V0V2pBdE9Wd3RYWH
           description: |
-            Identificador de parcela, de responsabilidade de cada Instituição transmissora.
+            Identificador de parcela, de responsabilidade de cada Instituição transmissora.  
             [Restrição] Informação de envio obrigatório quando isOverParcelPayment tiver o valor FALSE.
         paidDate:
           type: string
@@ -1211,8 +1247,7 @@ components:
           minLength: 4
           example: '1000.0400'
           description: |
-            Valor do pagamento referente ao  contrato da modalidade de crédito consultada.
-            Expresso em valor monetário com no mínimo 2 casas e no máximo 4 casas decimais.
+            Valor do pagamento referente ao contrato da modalidade de crédito consultada. Expresso em valor monetário com no mínimo 2 casas e no máximo 4 casas decimais. Se encargos e taxas foram pagos juntos da parcela, a soma total deve ser adicionada ao valor da parcela neste campo. Caso o pagamento de taxas e encargos tenham sido feitos a parte, devem ser listados no campo ovelParcel.
         overParcel:
           type: object
           description: |
@@ -1245,14 +1280,14 @@ components:
         feeName:
           type: string
           maxLength: 140
-          pattern: '^(?!\s)[\w\W\s]*[^\s]$'
+          pattern: '^[^\s](.*[^\s])?$'
           example: Reavaliação periódica do bem
           description: |
             Denominação da Tarifa pactuada.
         feeCode:
           type: string
           maxLength: 140
-          pattern: '^(?!\s)[\w\W\s]*[^\s]$'
+          pattern: '^[^\s](.*[^\s])?$'
           example: aval_bem
           description: |
             Sigla identificadora da tarifa pactuada.
@@ -1295,7 +1330,7 @@ components:
           description: |
             Valor original da garantia. Expresso em valor monetário com no mínimo 2 casas e no máximo 4 casas decimais.
 
-            [Restrição] Para casos em que warrantyType for igual a "GARANTIA_FIDEJUSSORIA" o valor da garantia corresponde a uma porcentagem do total garantido.
+            [Restrição] Para casos em que warrantyType for igual a "GARANTIA_FIDEJUSSORIA" o valor da garantia corresponde a uma porcentagem do total garantido. 
             Dessa forma, os casos de garantia fidejussória para os quais não é possível determinar um valor monetário para a garantia devem ser preenchidos com 0.00.
     LoansBalloonPaymentAmount:
       type: object
@@ -1318,6 +1353,18 @@ components:
           maxLength: 3
           description: 'Moeda referente ao valor monetário, seguindo o modelo ISO-4217.'
           example: BRL
+    MetaNonPaginated:
+      type: object
+      description: Meta informações referente à API requisitada.
+      required:
+        - requestDateTime
+      properties:
+        requestDateTime:
+          description: 'Data e hora da consulta, conforme especificação RFC-3339, formato UTC.'
+          type: string
+          maxLength: 20
+          format: date-time
+          example: '2021-05-21T08:30:00Z'
     Meta:
       type: object
       description: Meta informações referente à API requisitada.
@@ -1336,6 +1383,18 @@ components:
           format: int32
           description: Número total de páginas no resultado
           example: 1
+        requestDateTime:
+          description: 'Data e hora da consulta, conforme especificação RFC-3339, formato UTC.'
+          type: string
+          maxLength: 20
+          format: date-time
+          example: '2021-05-21T08:30:00Z'
+    MetaError:
+      type: object
+      description: Meta informações referente à API requisitada.
+      required:
+        - requestDateTime
+      properties:
         requestDateTime:
           description: 'Data e hora da consulta, conforme especificação RFC-3339, formato UTC.'
           type: string
@@ -1369,9 +1428,9 @@ components:
         data:
           $ref: '#/components/schemas/LoansContract'
         links:
-          $ref: '#/components/schemas/LinksContractId'
+          $ref: '#/components/schemas/LinksNonPaginated'
         meta:
-          $ref: '#/components/schemas/Meta'
+          $ref: '#/components/schemas/MetaNonPaginated'
     ResponseLoansInstalments:
       type: object
       required:
@@ -1382,9 +1441,9 @@ components:
         data:
           $ref: '#/components/schemas/LoansInstalments'
         links:
-          $ref: '#/components/schemas/Links'
+          $ref: '#/components/schemas/LinksNonPaginated'
         meta:
-          $ref: '#/components/schemas/Meta'
+          $ref: '#/components/schemas/MetaNonPaginated'
     ResponseLoansPayments:
       type: object
       required:
@@ -1395,9 +1454,9 @@ components:
         data:
           $ref: '#/components/schemas/LoansPayments'
         links:
-          $ref: '#/components/schemas/Links'
+          $ref: '#/components/schemas/LinksNonPaginated'
         meta:
-          $ref: '#/components/schemas/Meta'
+          $ref: '#/components/schemas/MetaNonPaginated'
     ResponseLoansWarranties:
       type: object
       required:
@@ -1423,6 +1482,11 @@ components:
       maxLength: 36
       example: d78fc4e5-37ca-4da3-adf2-9b082bf92280
       description: 'Um UUID [RFC4122](https://tools.ietf.org/html/rfc4122) usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.'
+    XV:
+      type: string
+      pattern: '^\d+\.\d+\.\d+$'
+      example: 1.0.0
+      description: 'Cabeçalho que indica a versão implementada da API pela instituição financeira. Deve ser preenchido de forma completa, por exemplo: x-v : 1.0.2'        
   parameters:
     Authorization:
       name: Authorization
@@ -1532,6 +1596,9 @@ components:
         x-fapi-interaction-id:
           schema:
             $ref: '#/components/schemas/XFapiInteractionId'
+        x-v:
+          schema:
+            $ref: '#/components/schemas/XV'
       content:
         application/json:
           schema:
@@ -1542,6 +1609,9 @@ components:
         x-fapi-interaction-id:
           schema:
             $ref: '#/components/schemas/XFapiInteractionId'
+        x-v:
+          schema:
+            $ref: '#/components/schemas/XV'
       content:
         application/json:
           schema:
@@ -1552,6 +1622,9 @@ components:
         x-fapi-interaction-id:
           schema:
             $ref: '#/components/schemas/XFapiInteractionId'
+        x-v:
+          schema:
+            $ref: '#/components/schemas/XV'
       content:
         application/json:
           schema:
@@ -1562,6 +1635,9 @@ components:
         x-fapi-interaction-id:
           schema:
             $ref: '#/components/schemas/XFapiInteractionId'
+        x-v:
+          schema:
+            $ref: '#/components/schemas/XV'
       content:
         application/json:
           schema:
@@ -1572,6 +1648,9 @@ components:
         x-fapi-interaction-id:
           schema:
             $ref: '#/components/schemas/XFapiInteractionId'
+        x-v:
+          schema:
+            $ref: '#/components/schemas/XV'
       content:
         application/json:
           schema:

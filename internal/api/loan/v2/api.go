@@ -121,14 +121,18 @@ func (s Server) LoansGetContracts(ctx context.Context, req LoansGetContractsRequ
 		Links: *api.NewPaginatedLinks(s.baseURL+"/contracts", loans),
 	}
 	for _, loan := range loans.Records {
-		resp.Data = append(resp.Data, LoansListContract{
+		data := LoansListContract{
 			BrandName:      s.config.Brand(),
-			CompanyCnpj:    s.config.CNPJ(),
+			CompanyCnpj:    loan.CompanyCNPJ,
 			ContractID:     loan.ID.String(),
 			IpocCode:       loan.IPOCCode,
 			ProductSubType: EnumContractProductSubTypeLoans(loan.ProductSubType),
 			ProductType:    EnumContractProductTypeLoans(loan.ProductType),
-		})
+		}
+		if loan.ProductSubTypeCategory != nil {
+			data.ProductSubTypeCategory = EnumContractProductSubTypeCategory(*loan.ProductSubTypeCategory)
+		}
+		resp.Data = append(resp.Data, data)
 	}
 
 	return LoansGetContracts200JSONResponse{OKResponseLoansContractListJSONResponse(resp)}, nil
@@ -138,7 +142,7 @@ func (s Server) LoansGetContractsContractID(ctx context.Context, req LoansGetCon
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
 	consentID := ctx.Value(api.CtxKeyConsentID).(string)
 
-	loan, err := s.service.ConsentedContract(ctx, req.ContractID, consentID, orgID, resource.TypeLoan)
+	loan, err := s.service.ConsentedContract(ctx, req.ContractID, consentID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -166,9 +170,15 @@ func (s Server) LoansGetContractsContractID(ctx context.Context, req LoansGetCon
 			SettlementDate:                      loan.SettlementDate,
 			ContractedFees:                      []LoansContractedFee{},
 			ContractedFinanceCharges:            []LoansFinanceCharge{},
+			NextInstalmentAmount:                loan.NextInstalmentAmount,
+			HasInsuranceContracted:              loan.HasInsuranceContracted,
 		},
 		Links: *api.NewLinks(s.baseURL + "/contracts/" + req.ContractID),
 		Meta:  *api.NewSingleRecordMeta(),
+	}
+
+	if loan.ProductSubTypeCategory != nil {
+		resp.Data.ProductSubTypeCategory = EnumContractProductSubTypeCategory(*loan.ProductSubTypeCategory)
 	}
 
 	for _, fee := range loan.ContractedFees {
@@ -199,19 +209,13 @@ func (s Server) LoansGetContractsContractID(ctx context.Context, req LoansGetCon
 			ReferentialRateIndexerType:           EnumContractReferentialRateIndexerType(interestRate.RateIndexerType),
 			TaxPeriodicity:                       EnumContractTaxPeriodicity(interestRate.TaxPeriodicity),
 			TaxType:                              EnumContractTaxType(interestRate.TaxType),
+			PostFixedRate:                        interestRate.PostFixedRate,
+			PreFixedRate:                         interestRate.FixedRate,
 		}
 
 		if interestRate.RateIndexerSubType != nil {
 			subType := EnumContractReferentialRateIndexerSubType(*interestRate.RateIndexerSubType)
 			data.ReferentialRateIndexerSubType = &subType
-		}
-
-		if interestRate.PostFixedRate != nil {
-			data.PostFixedRate = *interestRate.PostFixedRate
-		}
-
-		if interestRate.FixedRate != nil {
-			data.PreFixedRate = *interestRate.FixedRate
 		}
 
 		resp.Data.InterestRates = append(resp.Data.InterestRates, data)
@@ -223,7 +227,7 @@ func (s Server) LoansGetContractsContractID(ctx context.Context, req LoansGetCon
 func (s Server) LoansGetContractsContractIDPayments(ctx context.Context, req LoansGetContractsContractIDPaymentsRequestObject) (LoansGetContractsContractIDPaymentsResponseObject, error) {
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
 	consentID := ctx.Value(api.CtxKeyConsentID).(string)
-	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
+	pag := page.NewPagination(nil, nil)
 
 	contract, payments, err := s.service.ConsentedRealesePayments(ctx, req.ContractID, consentID, orgID, resource.TypeLoan, pag)
 	if err != nil {
@@ -235,8 +239,8 @@ func (s Server) LoansGetContractsContractIDPayments(ctx context.Context, req Loa
 			ContractOutstandingBalance: contract.OutstandingBalance,
 			Releases:                   []LoansReleases{},
 		},
-		Meta:  *api.NewPaginatedMeta(payments),
-		Links: *api.NewPaginatedLinks(s.baseURL+"/contracts/"+req.ContractID+"/payments", payments),
+		Meta:  *api.NewMeta(),
+		Links: *api.NewLinks(s.baseURL + "/contracts/" + req.ContractID + "/payments"),
 	}
 	if contract.PaidInstalments != nil {
 		paidInstalments := float32(*contract.PaidInstalments)
@@ -279,7 +283,7 @@ func (s Server) LoansGetContractsContractIDPayments(ctx context.Context, req Loa
 func (s Server) LoansGetContractsContractIDScheduledInstalments(ctx context.Context, req LoansGetContractsContractIDScheduledInstalmentsRequestObject) (LoansGetContractsContractIDScheduledInstalmentsResponseObject, error) {
 	orgID := ctx.Value(api.CtxKeyOrgID).(string)
 	consentID := ctx.Value(api.CtxKeyConsentID).(string)
-	pag := page.NewPagination(req.Params.Page, req.Params.PageSize)
+	pag := page.NewPagination(nil, nil)
 
 	contract, balloonPayments, err := s.service.ConsentedBalloonPayments(ctx, req.ContractID, consentID, orgID, resource.TypeLoan, pag)
 	if err != nil {
@@ -293,8 +297,8 @@ func (s Server) LoansGetContractsContractIDScheduledInstalments(ctx context.Cont
 			TypeContractRemaining:   LoansInstalmentsTypeContractRemaining(contract.RemainingInstalmentType),
 			TypeNumberOfInstalments: LoansInstalmentsTypeNumberOfInstalments(contract.TotalInstalmentType),
 		},
-		Meta:  *api.NewPaginatedMeta(balloonPayments),
-		Links: *api.NewPaginatedLinks(s.baseURL+"/contracts/"+req.ContractID+"/scheduled-instalments", balloonPayments),
+		Meta:  *api.NewMeta(),
+		Links: *api.NewLinks(s.baseURL + "/contracts/" + req.ContractID + "/scheduled-instalments"),
 	}
 
 	if contract.PaidInstalments != nil {

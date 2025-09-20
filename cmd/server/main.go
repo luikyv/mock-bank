@@ -196,12 +196,12 @@ func main() {
 	app.NewServer(bankConfig, APPHost, sessionService, userService, consentService, resourceService, accountService, enrollmentService).RegisterRoutes(mux)
 	consentapi.NewServer(bankConfig, consentService, op).RegisterRoutes(mux)
 	resourceapi.NewServer(bankConfig, resourceService, consentService, op).RegisterRoutes(mux)
-	accountapi.NewServer(bankConfig, accountService, consentService, op).RegisterRoutes(mux)
+	accountapi.NewServer(APIMTLSHost, accountService, consentService, op).RegisterRoutes(mux)
 	loanapi.NewServer(bankConfig, creditOpService, consentService, op).RegisterRoutes(mux)
 	paymentapi.NewServer(bankConfig, paymentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 	autopaymentapi.NewServer(bankConfig, autoPaymentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 	enrollmentapi.NewServer(bankConfig, enrollmentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
-	creditportabilityapi.NewServer(bankConfig, creditPortabilityService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
+	creditportabilityapi.NewServer(bankConfig, creditPortabilityService, consentService, idempotencyService, jwtService, op, KeyStoreHost, OrgID, orgSigner).RegisterRoutes(mux)
 
 	handler := middleware(mux)
 	slog.Info("starting mock bank")
@@ -346,6 +346,7 @@ func openidProvider(
 		autopayment.Scope,
 		enrollment.ScopeConsent,
 		enrollment.ScopeID,
+		creditportability.Scope,
 	}
 
 	op, err := provider.New(goidc.ProfileFAPI1, AuthHost, func(_ context.Context) (goidc.JSONWebKeySet, error) {
@@ -455,7 +456,7 @@ func middleware(next http.Handler) http.Handler {
 		if fapiID := r.Header.Get("X-Fapi-Interaction-Id"); fapiID != "" {
 			ctx = context.WithValue(ctx, api.CtxKeyInteractionID, fapiID)
 		}
-		slog.InfoContext(ctx, "request received", "method", r.Method, "path", r.URL.Path, "url", r.URL.String())
+		slog.InfoContext(ctx, "request received", "method", r.Method, "path", r.URL.Path)
 
 		start := timeutil.DateTimeNow()
 		defer func() {

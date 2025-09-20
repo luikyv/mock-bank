@@ -11,7 +11,7 @@ info:
     # Orientações
     A `Role`  do diretório de participantes relacionada à presente API é a `DADOS`.\
     Para todos os `endpoints` desta API é previsto o envio de um `token` através do header `Authorization`.\
-    Este token deverá estar relacionado ao consentimento (`consentId`) mantido na instituição transmissora dos dados, o qual permitirá a pesquisa e retorno, na API em questão, dos
+    Este token deverá estar relacionado ao consentimento (`consentId`) mantido na instituição transmissora dos dados, o qual permitirá a pesquisa e retorno, na API em questão, dos 
     dados relacionados ao `consentId` específico relacionado.\
     Os dados serão devolvidos na consulta desde que o `consentId` relacionado corresponda a um consentimento válido e com o status `AUTHORISED`.\
     É também necessário que o recurso em questão (conta, contrato, etc) esteja disponível na instituição transmissora (ou seja, sem boqueios de qualquer natureza e com todas as autorizações/consentimentos já autorizados).\
@@ -86,7 +86,7 @@ info:
     ```
 
     Para consultar as regras aplicáveis ao comportamento do transacionID de acordo com o status da transação, consultar a página [Orientações - Contas](https://openfinancebrasil.atlassian.net/wiki/spaces/OF/pages/193658890)
-  version: 2.4.1
+  version: 2.4.2
   license:
     name: Apache 2.0
     url: 'https://www.apache.org/licenses/LICENSE-2.0'
@@ -678,7 +678,7 @@ components:
           pattern: '^(\w{3}){1}$'
           maxLength: 3
           description: |
-            Moeda referente ao valor da transação, segundo modelo ISO-4217. p.ex. 'BRL'
+            Moeda referente ao valor da transação, segundo modelo ISO-4217. p.ex. 'BRL' 
             Todos os saldos informados estão representados com a moeda vigente do Brasil
           example: BRL
     AccountOverdraftLimitsData:
@@ -706,8 +706,8 @@ components:
         transactionId:
           type: string
           description: |
-            Código ou identificador único prestado pela instituição que mantém a conta para representar a transação individual.
-            O ideal é que o `transactionId` seja imutável.
+            Código ou identificador único prestado pela instituição que mantém a conta para representar a transação individual. 
+            O ideal é que o `transactionId` seja imutável. 
             No entanto, o `transactionId` deve obedecer, no mínimo, as regras de imutabilidade propostas conforme tabela “Data de imutabilidade por tipo de transação” presente nas orientações desta API.
           maxLength: 100
           minLength: 1
@@ -721,8 +721,13 @@ components:
           type: string
           maxLength: 200
           pattern: '[\w\W\s]*'
-          description: "Literal usada na instituição financeira para identificar a transação. A informação apresentada precisa ser a mesma utilizada nos canais eletrônicos da instituição (extrato). Em casos onde a descrição da transação é apresentada com múltiplas linhas, todas as linhas devem ser enviadas (concatenadas) neste atributo, não sendo obrigatória a concatenação das informações já enviadas em outros atributos (ex: valor, data) do mesmo endpoint."
-          example: TRANSFCWAR5TXHCX5I9IDBHML8082N8NEO30M6LNNG7ANAYIJYRM00ZBZPU8
+          description: |
+            Literal usada na instituição financeira para identificar a transação. 
+            A informação apresentada precisa ser a mesma utilizada nos canais digitais da instituição (assim como o histórico de transações apresentado na tela do aplicativo ou do navegador). 
+            Caso a instituição possua mais de um canal digital, a informação compartilhada deve ser a do canal que apresenta a descrição mais completa possível da transação. 
+            Em casos onde a descrição da transação é apresentada com múltiplas linhas, todas as linhas devem ser enviadas (concatenadas) neste atributo, não sendo obrigatória a concatenação das informações já enviadas em outros atributos (ex: valor, data) do mesmo endpoint. 
+            Adicionalmente, o Banco Central pode determinar o formato de compartilhamento a ser adotado por uma instituição participante específica.
+          example: Transferencia Enviada Lima Santos
         type:
           $ref: '#/components/schemas/EnumTransactionTypes'
         transactionAmount:
@@ -797,7 +802,7 @@ components:
         - CONJUNTA_SIMPLES
         - CONJUNTA_SOLIDARIA
       description: |
-        Subtipo de conta (vide Enum):
+        Subtipo de conta (vide Enum): 
         Conta individual - possui um único titular
         Conta conjunta simples - onde as movimentações financeiras só podem serem realizadas mediante autorização de TODOS os correntistas da conta.
         Conta conjunta solidária - é a modalidade cujos titulares podem realizar movimentações de forma isolada, isto é, sem que seja necessária a autorização dos demais titulares
@@ -817,7 +822,7 @@ components:
     EnumCompletedAuthorisedPaymentIndicator:
       type: string
       description: |
-        Indicador da transação:
+        Indicador da transação: 
           - Transação efetivada: a transação atinge esse status quando o `transactionId` torna-se imutável;
           - Lançamento futuro: a transação será efetivada em momento futuro, ou seja, o `transactionId` pode mudar;
           - Transação processando: a transação está em processamento, ou seja, o `transactionId` pode mudar.
@@ -829,7 +834,7 @@ components:
     EnumCreditDebitIndicator:
       type: string
       description: |
-        Indicador do tipo de lançamento:
+        Indicador do tipo de lançamento: 
         Débito (no extrato) Em um extrato bancário, os débitos, marcados com a letra “D” ao lado do valor registrado, informam as saídas de dinheiro na conta-corrente.
         Crédito (no extrato) Em um extrato bancário, os créditos, marcados com a letra “C” ao lado do valor registrado, informam as entradas de dinheiro na conta-corrente.
       enum:
@@ -843,15 +848,15 @@ components:
         - PESSOA_JURIDICA
       example: PESSOA_NATURAL
       description: |
-        Identificação do Tipo de Pessoa da pessoa envolvida na transação.
-        Pessoa Natural - Informar CPF no campo “partieCnpjCpf”.
+        Identificação do Tipo de Pessoa da pessoa envolvida na transação.   
+        Pessoa Natural - Informar CPF no campo “partieCnpjCpf”.   
         Pessoa Jurídica - Informar CNPJ no campo “partieCnpjCpf”.
     EnumTransactionTypes:
       type: string
       description: |
-        O campo deve classificar a transação em um dos tipos descritos.
-        O transmissor deve classificar as transações disponíveis associando-a a um dos itens do Enum listado neste campo.
-        A opção OUTROS só deve ser utilizada para os casos em que de fato a transação compartilhada não possa ser classificada como um dos itens deste Enum.
+        O campo deve classificar a transação em um dos tipos descritos. 
+        O transmissor deve classificar as transações disponíveis associando-a a um dos itens do Enum listado neste campo. 
+        A opção OUTROS só deve ser utilizada para os casos em que de fato a transação compartilhada não possa ser classificada como um dos itens deste Enum. 
         Por exemplo no caso de recebimento de pensão alimentícia.
       enum:
         - TED
@@ -997,7 +1002,7 @@ components:
           description: 'Data e hora da consulta, conforme especificação RFC-3339, formato UTC.'
           type: string
           maxLength: 20
-          format: date
+          format: date-time
           example: '2021-05-21T08:30:00Z'
     MetaOnlyRequestDateTime:
       type: object
@@ -1151,6 +1156,13 @@ components:
                 maxLength: 2048
         meta:
           $ref: '#/components/schemas/Meta'
+    XFapiInteractionId:
+      type: string
+      format: uuid
+      maxLength: 36
+      pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+      example: d78fc4e5-37ca-4da3-adf2-9b082bf92280
+      description: 'Um UUID [RFC4122](https://tools.ietf.org/html/rfc4122) usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.'
   parameters:
     accountId:
       name: accountId
@@ -1198,8 +1210,8 @@ components:
       in: query
       name: fromBookingDate
       description: |
-        Data inicial de filtragem. O período máximo utilizado no filtro é de 7 dias inclusive (D-6).
-        [Restrição] Deve obrigatoriamente ser enviado caso o campo toBookingDate seja informado.
+        Data inicial de filtragem. O período máximo utilizado no filtro é de 7 dias inclusive (D-6).   
+        [Restrição] Deve obrigatoriamente ser enviado caso o campo toBookingDate seja informado. 
         Caso não seja informado, deve ser assumido o dia atual.
       required: false
       schema:
@@ -1211,8 +1223,8 @@ components:
       in: query
       name: toBookingDate
       description: |
-        Data final de filtragem. O período máximo utilizado no filtro é de 7 dias inclusive (D-6).
-        [Restrição] Deve obrigatoriamente ser enviado caso o campo fromBookingDate seja informado.
+        Data final de filtragem. O período máximo utilizado no filtro é de 7 dias inclusive (D-6).   
+        [Restrição] Deve obrigatoriamente ser enviado caso o campo fromBookingDate seja informado. 
         Caso não seja informado, deve ser assumido o dia atual.
       required: false
       schema:
@@ -1321,12 +1333,7 @@ components:
           required: true
           description: 'Um UUID [RFC4122](https://tools.ietf.org/html/rfc4122) usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.'
           schema:
-            type: string
-            pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-            minLength: 1
-            maxLength: 36
-            example: d78fc4e5-37ca-4da3-adf2-9b082bf92280
-            format: uuid
+            $ref: '#/components/schemas/XFapiInteractionId'
       content:
         application/json:
           schema:
@@ -1338,12 +1345,7 @@ components:
           required: true
           description: 'Um UUID [RFC4122](https://tools.ietf.org/html/rfc4122) usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.'
           schema:
-            type: string
-            pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-            minLength: 1
-            maxLength: 36
-            example: d78fc4e5-37ca-4da3-adf2-9b082bf92280
-            format: uuid
+            $ref: '#/components/schemas/XFapiInteractionId'
       content:
         application/json:
           schema:
@@ -1355,12 +1357,7 @@ components:
           required: true
           description: 'Um UUID [RFC4122](https://tools.ietf.org/html/rfc4122) usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.'
           schema:
-            type: string
-            pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-            minLength: 1
-            maxLength: 36
-            example: d78fc4e5-37ca-4da3-adf2-9b082bf92280
-            format: uuid
+            $ref: '#/components/schemas/XFapiInteractionId'
       content:
         application/json:
           schema:
@@ -1372,12 +1369,7 @@ components:
           required: true
           description: 'Um UUID [RFC4122](https://tools.ietf.org/html/rfc4122) usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.'
           schema:
-            type: string
-            pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-            minLength: 1
-            maxLength: 36
-            example: d78fc4e5-37ca-4da3-adf2-9b082bf92280
-            format: uuid
+            $ref: '#/components/schemas/XFapiInteractionId'
       content:
         application/json:
           schema:
@@ -1389,12 +1381,7 @@ components:
           required: true
           description: 'Um UUID [RFC4122](https://tools.ietf.org/html/rfc4122) usado como um ID de correlação entre request e response. Campo de geração e envio obrigatório pela receptora (client) e o seu valor deve ser “espelhado” pela transmissora (server) no cabeçalho de resposta. Caso não seja recebido ou se for recebido um valor inválido, a transmissora deve gerar um x-fapi-interaction-id e retorná-lo na resposta com o HTTP Status Code 400. A receptora deve acatar o valor recebido da transmissora.'
           schema:
-            type: string
-            pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-            minLength: 1
-            maxLength: 36
-            example: d78fc4e5-37ca-4da3-adf2-9b082bf92280
-            format: uuid
+            $ref: '#/components/schemas/XFapiInteractionId'
       content:
         application/json:
           schema:

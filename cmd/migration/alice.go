@@ -9,6 +9,7 @@ import (
 	"github.com/luikyv/mock-bank/cmd/cmdutil"
 	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/creditop"
+	"github.com/luikyv/mock-bank/internal/creditportability"
 	"github.com/luikyv/mock-bank/internal/resource"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 	"github.com/luikyv/mock-bank/internal/user"
@@ -63,6 +64,12 @@ func seedAlice(ctx context.Context, db *gorm.DB) error {
 		ID:                          uuid.MustParse("291e5a29-49ed-401f-a583-193caa7aceee"),
 		OwnerID:                     testUser.ID,
 		Number:                      "94088392",
+		Currency:                    "BRL",
+		BranchCode:                  cmdutil.PointerOf("6272"),
+		CheckDigit:                  "4",
+		CompeCode:                   "123",
+		BrandName:                   "Mock Bank",
+		CompanyCNPJ:                 "12345678900000",
 		Type:                        account.TypeCheckingAccount,
 		SubType:                     account.SubTypeIndividual,
 		AvailableAmount:             "100000000.04",
@@ -143,6 +150,7 @@ func seedAlice(ctx context.Context, db *gorm.DB) error {
 			Name:             "PIX",
 			Type:             account.TransactionTypePix,
 			Amount:           "771.52",
+			Currency:         "BRL",
 			PartieBranchCode: cmdutil.PointerOf("6272"),
 			PartieCheckDigit: cmdutil.PointerOf("4"),
 			PartieCNPJCPF:    cmdutil.PointerOf("87517400444"),
@@ -180,6 +188,7 @@ func seedAlice(ctx context.Context, db *gorm.DB) error {
 			Name:             "PIX",
 			Type:             account.TransactionTypePix,
 			Amount:           "771.52",
+			Currency:         "BRL",
 			PartieBranchCode: cmdutil.PointerOf("6272"),
 			PartieCheckDigit: cmdutil.PointerOf("4"),
 			PartieCNPJCPF:    cmdutil.PointerOf("87517400444"),
@@ -199,6 +208,12 @@ func seedAlice(ctx context.Context, db *gorm.DB) error {
 		ID:                          uuid.MustParse("9e207cd7-a881-48e0-9755-0e6bda6cb181"),
 		OwnerID:                     testUser.ID,
 		Number:                      "11188222",
+		Currency:                    "BRL",
+		BranchCode:                  cmdutil.PointerOf("6272"),
+		CheckDigit:                  "4",
+		CompeCode:                   "123",
+		BrandName:                   "Mock Bank",
+		CompanyCNPJ:                 "12345678900000",
 		Type:                        account.TypeSavingsAccount,
 		SubType:                     account.SubTypeIndividual,
 		AvailableAmount:             "100000000.04",
@@ -219,6 +234,7 @@ func seedAlice(ctx context.Context, db *gorm.DB) error {
 		ID:                                  uuid.MustParse("dadd421d-184e-4689-a085-409d1bca4193"),
 		Type:                                resource.TypeLoan,
 		OwnerID:                             testUser.ID,
+		CompanyCNPJ:                         "12345678900000",
 		Number:                              "90847453264",
 		IPOCCode:                            "01181521040211011740907325668478542336597",
 		ProductName:                         "Aquisição de equipamentos",
@@ -271,6 +287,7 @@ func seedAlice(ctx context.Context, db *gorm.DB) error {
 		TotalInstalments:        cmdutil.PointerOf(1),
 		TotalInstalmentType:     creditop.InstalmentPeriodicityTotalDay,
 		RemainingInstalments:    cmdutil.PointerOf(727),
+		HasInsuranceContracted:  cmdutil.PointerOf(false),
 		RemainingInstalmentType: creditop.InstalmentPeriodicityRemainingDay,
 		OrgID:                   OrgID,
 		CrossOrg:                true,
@@ -291,6 +308,216 @@ func seedAlice(ctx context.Context, db *gorm.DB) error {
 		UpdatedAt:  timeutil.DateTimeNow(),
 	}
 	if err := db.WithContext(ctx).Omit("CreatedAt").Save(balloonPayment).Error; err != nil {
+		return fmt.Errorf("failed to add balloon payment: %w", err)
+	}
+
+	testPortabilityEligibility := &creditportability.Eligibility{
+		ID:              uuid.MustParse("dadd421d-184e-4689-a085-409d1bca4196"),
+		ContractID:      testLoan.ID,
+		IsEligible:      true,
+		Status:          pointerOf(creditportability.EligibilityStatusAvailable),
+		StatusUpdatedAt: pointerOf(timeutil.DateTimeNow()),
+		Channel:         pointerOf(creditportability.ChannelOFB),
+		CompanyName:     pointerOf("Empresa A"),
+		CompanyCNPJ:     pointerOf("12345678901234"),
+		OrgID:           OrgID,
+		CrossOrg:        true,
+		UpdatedAt:       timeutil.DateTimeNow(),
+	}
+	if err := db.WithContext(ctx).Omit("CreatedAt").Save(testPortabilityEligibility).Error; err != nil {
+		return fmt.Errorf("failed to create test portability eligibility: %w", err)
+	}
+
+	testLoan2 := &creditop.Contract{
+		ID:                                  uuid.MustParse("dadd421d-184e-4689-a085-409d1bca4194"),
+		Type:                                resource.TypeLoan,
+		OwnerID:                             testUser.ID,
+		CompanyCNPJ:                         "12345678900000",
+		Number:                              "90847453264",
+		IPOCCode:                            "01181521040211011740907325668478542336597",
+		ProductName:                         "Aquisição de equipamentos",
+		ProductType:                         creditop.ProductTypeLoan,
+		ProductSubType:                      creditop.ProductSubTypePersonalLoanWithoutConsignment,
+		ProductSubTypeCategory:              cmdutil.PointerOf(creditop.ProductSubTypeCategoryPersonal),
+		Date:                                timeutil.NewBrazilDate(time.Date(2022, 1, 8, 12, 0, 0, 0, time.UTC)),
+		DisbursementDates:                   cmdutil.PointerOf([]timeutil.BrazilDate{timeutil.NewBrazilDate(time.Date(2022, 1, 8, 12, 0, 0, 0, time.UTC))}),
+		SettlementDate:                      cmdutil.PointerOf(timeutil.NewBrazilDate(time.Date(2021, 6, 21, 12, 0, 0, 0, time.UTC))),
+		Amount:                              "12070.60",
+		Currency:                            cmdutil.PointerOf("BRL"),
+		DueDate:                             cmdutil.PointerOf(timeutil.NewBrazilDate(time.Date(2023, 1, 8, 12, 0, 0, 0, time.UTC))),
+		InstalmentPeriodicity:               creditop.PeriodicityIrregular,
+		InstalmentPeriodicityAdditionalInfo: cmdutil.PointerOf("DIA"),
+		NextInstalmentAmount:                cmdutil.PointerOf("100.00"),
+		FirstInstalmentDueDate:              cmdutil.PointerOf(timeutil.NewBrazilDate(time.Date(2022, 1, 8, 12, 0, 0, 0, time.UTC))),
+		CET:                                 "0.015000",
+		AmortizationSchedule:                creditop.AmortizationSchedulePRICE,
+		AmortizationScheduleAdditionalInfo:  cmdutil.PointerOf("NA"),
+		CNPJConsignee:                       cmdutil.PointerOf("13832718000196"),
+		InterestRates: []creditop.InterestRate{{
+			TaxType:                   creditop.TaxTypeNominal,
+			Type:                      creditop.InterestRateTypeSimple,
+			TaxPeriodicity:            creditop.TaxPeriodicityAA,
+			Calculation:               creditop.CalculationBusinessDays,
+			RateIndexerType:           creditop.RateIndexerTypeFixed,
+			RateIndexerSubType:        cmdutil.PointerOf(creditop.RateIndexerSubTypeFixed),
+			RateIndexerAdditionalInfo: nil,
+			FixedRate:                 cmdutil.PointerOf("0.015000"),
+			PostFixedRate:             cmdutil.PointerOf("0.000000"),
+			AdditionalInfo:            cmdutil.PointerOf("NA"),
+		}},
+		ContractedFees: []creditop.Fee{{
+			Name:              "Taxa de administracao",
+			Code:              "ADMNISTRACAO",
+			ChargeType:        creditop.ChargeTypeUnique,
+			ChargeCalculation: creditop.ChargeCalculationFixed,
+			Amount:            cmdutil.PointerOf("200.50"),
+			Rate:              cmdutil.PointerOf("0.000000"),
+		}},
+		FinanceCharges: []creditop.FinanceCharge{{
+			Type:           creditop.FinanceChargeTypeLatePaymentFine,
+			AdditionalInfo: cmdutil.PointerOf("NA"),
+			Rate:           cmdutil.PointerOf("0.060000"),
+		}},
+		OutstandingBalance:      "14402.37",
+		PaidInstalments:         cmdutil.PointerOf(3),
+		DueInstalments:          730,
+		PastDueInstalments:      727,
+		TotalInstalments:        cmdutil.PointerOf(1),
+		TotalInstalmentType:     creditop.InstalmentPeriodicityTotalDay,
+		RemainingInstalments:    cmdutil.PointerOf(727),
+		HasInsuranceContracted:  cmdutil.PointerOf(false),
+		RemainingInstalmentType: creditop.InstalmentPeriodicityRemainingDay,
+		OrgID:                   OrgID,
+		CrossOrg:                true,
+		UpdatedAt:               timeutil.DateTimeNow(),
+	}
+	if err := db.WithContext(ctx).Omit("CreatedAt").Save(testLoan2).Error; err != nil {
+		return fmt.Errorf("failed to create test loan: %w", err)
+	}
+
+	balloonPayment2 := &creditop.BalloonPayment{
+		ID:         uuid.New(),
+		ContractID: testLoan2.ID,
+		DueDate:    timeutil.NewBrazilDate(time.Date(2020, 1, 10, 12, 0, 0, 0, time.UTC)),
+		Amount:     "100.0000",
+		Currency:   "BRL",
+		OrgID:      OrgID,
+		CrossOrg:   true,
+		UpdatedAt:  timeutil.DateTimeNow(),
+	}
+	if err := db.WithContext(ctx).Omit("CreatedAt").Save(balloonPayment2).Error; err != nil {
+		return fmt.Errorf("failed to add balloon payment: %w", err)
+	}
+
+	testPortabilityEligibility2 := &creditportability.Eligibility{
+		ID:                                uuid.MustParse("dadd421d-184e-4689-a085-409d1bca4195"),
+		ContractID:                        testLoan2.ID,
+		IsEligible:                        false,
+		IneligibilityReason:               pointerOf(creditportability.IneligibilityReasonOther),
+		IneligibilityReasonAdditionalInfo: pointerOf("Motivo da inelegibilidade"),
+		OrgID:                             OrgID,
+		CrossOrg:                          true,
+		UpdatedAt:                         timeutil.DateTimeNow(),
+	}
+	if err := db.WithContext(ctx).Omit("CreatedAt").Save(testPortabilityEligibility2).Error; err != nil {
+		return fmt.Errorf("failed to create test portability eligibility: %w", err)
+	}
+
+	testLoan3 := &creditop.Contract{
+		ID:                                  uuid.MustParse("dadd421d-184e-4689-a085-409d1bca4197"),
+		Type:                                resource.TypeLoan,
+		OwnerID:                             testUser.ID,
+		CompanyCNPJ:                         "12345678900000",
+		Number:                              "90847453264",
+		IPOCCode:                            "01181521040211011740907325668478542336597",
+		ProductName:                         "Aquisição de equipamentos",
+		ProductType:                         creditop.ProductTypeLoan,
+		ProductSubType:                      creditop.ProductSubTypePersonalLoanWithoutConsignment,
+		ProductSubTypeCategory:              cmdutil.PointerOf(creditop.ProductSubTypeCategoryPersonal),
+		Date:                                timeutil.NewBrazilDate(time.Date(2022, 1, 8, 12, 0, 0, 0, time.UTC)),
+		DisbursementDates:                   cmdutil.PointerOf([]timeutil.BrazilDate{timeutil.NewBrazilDate(time.Date(2022, 1, 8, 12, 0, 0, 0, time.UTC))}),
+		SettlementDate:                      cmdutil.PointerOf(timeutil.NewBrazilDate(time.Date(2021, 6, 21, 12, 0, 0, 0, time.UTC))),
+		Amount:                              "12070.60",
+		Currency:                            cmdutil.PointerOf("BRL"),
+		DueDate:                             cmdutil.PointerOf(timeutil.NewBrazilDate(time.Date(2023, 1, 8, 12, 0, 0, 0, time.UTC))),
+		InstalmentPeriodicity:               creditop.PeriodicityIrregular,
+		InstalmentPeriodicityAdditionalInfo: cmdutil.PointerOf("DIA"),
+		NextInstalmentAmount:                cmdutil.PointerOf("100.00"),
+		FirstInstalmentDueDate:              cmdutil.PointerOf(timeutil.NewBrazilDate(time.Date(2022, 1, 8, 12, 0, 0, 0, time.UTC))),
+		CET:                                 "0.015000",
+		AmortizationSchedule:                creditop.AmortizationSchedulePRICE,
+		AmortizationScheduleAdditionalInfo:  cmdutil.PointerOf("NA"),
+		CNPJConsignee:                       cmdutil.PointerOf("13832718000196"),
+		InterestRates: []creditop.InterestRate{{
+			TaxType:                   creditop.TaxTypeNominal,
+			Type:                      creditop.InterestRateTypeSimple,
+			TaxPeriodicity:            creditop.TaxPeriodicityAA,
+			Calculation:               creditop.CalculationBusinessDays,
+			RateIndexerType:           creditop.RateIndexerTypeFixed,
+			RateIndexerSubType:        cmdutil.PointerOf(creditop.RateIndexerSubTypeFixed),
+			RateIndexerAdditionalInfo: nil,
+			FixedRate:                 cmdutil.PointerOf("0.015000"),
+			PostFixedRate:             cmdutil.PointerOf("0.000000"),
+			AdditionalInfo:            cmdutil.PointerOf("NA"),
+		}},
+		ContractedFees: []creditop.Fee{{
+			Name:              "Taxa de administracao",
+			Code:              "ADMNISTRACAO",
+			ChargeType:        creditop.ChargeTypeUnique,
+			ChargeCalculation: creditop.ChargeCalculationFixed,
+			Amount:            cmdutil.PointerOf("200.50"),
+			Rate:              cmdutil.PointerOf("0.000000"),
+		}},
+		FinanceCharges: []creditop.FinanceCharge{{
+			Type:           creditop.FinanceChargeTypeLatePaymentFine,
+			AdditionalInfo: cmdutil.PointerOf("NA"),
+			Rate:           cmdutil.PointerOf("0.060000"),
+		}},
+		OutstandingBalance:      "14402.37",
+		PaidInstalments:         cmdutil.PointerOf(3),
+		DueInstalments:          730,
+		PastDueInstalments:      727,
+		TotalInstalments:        cmdutil.PointerOf(1),
+		TotalInstalmentType:     creditop.InstalmentPeriodicityTotalDay,
+		RemainingInstalments:    cmdutil.PointerOf(727),
+		HasInsuranceContracted:  cmdutil.PointerOf(false),
+		RemainingInstalmentType: creditop.InstalmentPeriodicityRemainingDay,
+		OrgID:                   OrgID,
+		CrossOrg:                true,
+		UpdatedAt:               timeutil.DateTimeNow(),
+	}
+	if err := db.WithContext(ctx).Omit("CreatedAt").Save(testLoan3).Error; err != nil {
+		return fmt.Errorf("failed to create test loan: %w", err)
+	}
+
+	testPortabilityEligibility3 := &creditportability.Eligibility{
+		ID:              uuid.MustParse("dadd421d-184e-4689-a085-409d1bca4198"),
+		ContractID:      testLoan3.ID,
+		IsEligible:      true,
+		Status:          pointerOf(creditportability.EligibilityStatusInProgress),
+		StatusUpdatedAt: pointerOf(timeutil.DateTimeNow()),
+		Channel:         pointerOf(creditportability.ChannelOFB),
+		CompanyName:     pointerOf("Empresa B"),
+		CompanyCNPJ:     pointerOf("12345678901235"),
+		OrgID:           OrgID,
+		CrossOrg:        true,
+		UpdatedAt:       timeutil.DateTimeNow(),
+	}
+	if err := db.WithContext(ctx).Omit("CreatedAt").Save(testPortabilityEligibility3).Error; err != nil {
+		return fmt.Errorf("failed to create test portability eligibility: %w", err)
+	}
+
+	balloonPayment3 := &creditop.BalloonPayment{
+		ID:         uuid.New(),
+		ContractID: testLoan3.ID,
+		DueDate:    timeutil.NewBrazilDate(time.Date(2020, 1, 10, 12, 0, 0, 0, time.UTC)),
+		Amount:     "100.0000",
+		Currency:   "BRL",
+		OrgID:      OrgID,
+		CrossOrg:   true,
+		UpdatedAt:  timeutil.DateTimeNow(),
+	}
+	if err := db.WithContext(ctx).Omit("CreatedAt").Save(balloonPayment3).Error; err != nil {
 		return fmt.Errorf("failed to add balloon payment: %w", err)
 	}
 

@@ -273,18 +273,23 @@ func reverseProxyWithFallback(mainAddr, fallbackAddr string) http.HandlerFunc {
 	var healthy atomic.Bool
 	check := func() {
 		c, err := net.DialTimeout("tcp", mainAddr, 200*time.Millisecond)
-		if err == nil {
+		if err != nil {
+			// If we were previously healthy, log the transition to unhealthy.
+			if healthy.Swap(false) {
+				log.Printf("%s is unhealthy, falling back to %s\n", mainAddr, fallbackAddr)
+			}
+			return
+		}
+
+		_ = c.Close()
+		// If we were previously unhealthy, log the transition.
+		if !healthy.Swap(true) {
 			log.Printf("%s is healthy\n", mainAddr)
-			healthy.Store(true)
-			_ = c.Close()
-		} else {
-			log.Printf("%s is unhealthy, falling back to %s\n", mainAddr, fallbackAddr)
-			healthy.Store(false)
 		}
 	}
 	check()
 	go func() {
-		t := time.NewTicker(500 * time.Millisecond)
+		t := time.NewTicker(1 * time.Second)
 		defer t.Stop()
 		for range t.C {
 			check()

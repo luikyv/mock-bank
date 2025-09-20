@@ -32,6 +32,7 @@ type Contract struct {
 	ID                                  uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Type                                resource.Type
 	Number                              string
+	CompanyCNPJ                         string `gorm:"column:company_cnpj"`
 	IPOCCode                            string `gorm:"column:ipoc_code"`
 	ProductName                         string
 	ProductType                         ProductType
@@ -62,11 +63,9 @@ type Contract struct {
 	TotalInstalments                    *int
 	TotalInstalmentType                 InstalmentPeriodicityTotal
 	RemainingInstalments                *int
+	HasInsuranceContracted              *bool
 	// This should be DIA, SEMANA, MES, ANO, SEM_PRAZO_REMANESCENTE.
-	RemainingInstalmentType                   InstalmentPeriodicityRemaining
-	PortabilityIsEligible                     bool
-	PortabilityIneligibleReason               *PortabilityIneligibilityReason
-	PortabilityIneligibleReasonAdditionalInfo *string
+	RemainingInstalmentType InstalmentPeriodicityRemaining
 
 	OrgID     string
 	CrossOrg  bool
@@ -433,13 +432,4 @@ const (
 	InstalmentPeriodicityRemainingMonth InstalmentPeriodicityRemaining = "MES"
 	InstalmentPeriodicityRemainingYear  InstalmentPeriodicityRemaining = "ANO"
 	InstalmentPeriodicityRemainingTotal InstalmentPeriodicityRemaining = "SEM_PRAZO_REMANESCENTE"
-)
-
-type PortabilityIneligibilityReason string
-
-const (
-	PortabilityIneligibilityReasonContractLiquidated PortabilityIneligibilityReason = "CONTRATO_LIQUIDADO"
-	PortabilityIneligibilityReasonJudicialAction     PortabilityIneligibilityReason = "CLIENTE_COM_ACAO_JUDICIAL"
-	PortabilityIneligibilityReasonIncompatibleMode   PortabilityIneligibilityReason = "MODALIDADE_OPERACAO_INCOMPATIVEL"
-	PortabilityIneligibilityReasonOther              PortabilityIneligibilityReason = "OUTROS"
 )

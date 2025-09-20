@@ -220,19 +220,6 @@ func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
 		if err := s.updateConsentStatus(ctx, c, ConsentStatusPartiallyAccepted); err != nil {
 			return err
 		}
-
-		go func() {
-			ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-			defer cancel()
-
-			time.Sleep(1 * time.Minute)
-
-			c.ApprovalDueAt = nil
-			if err := s.updateConsentStatus(ctx, c, ConsentStatusAuthorized); err != nil {
-				slog.ErrorContext(ctx, "error authorizing recurring consent", "consent_id", c.ID, "error", err)
-				return
-			}
-		}()
 		return nil
 	}
 
@@ -313,10 +300,7 @@ func (s Service) RejectConsentByID(ctx context.Context, id, orgID string, reject
 }
 
 func (s Service) RejectConsent(ctx context.Context, c *Consent, rejection ConsentRejection) error {
-	if !slices.Contains([]ConsentStatus{
-		ConsentStatusAwaitingAuthorization,
-		ConsentStatusPartiallyAccepted,
-	}, c.Status) {
+	if !slices.Contains([]ConsentStatus{ConsentStatusAwaitingAuthorization, ConsentStatusPartiallyAccepted}, c.Status) {
 		return ErrCannotRejectConsent
 	}
 

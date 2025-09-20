@@ -318,7 +318,7 @@ func grantConsentStep(
 		if c.Permissions.HasLoanPermissions() {
 			loanIDs := r.Form[formParamLoanIDs]
 			slog.InfoContext(r.Context(), "authorizing loans", "loans", loanIDs)
-			if err := creditOpService.AuthorizeContracts(r.Context(), loanIDs, c.ID.String(), orgID, resource.TypeLoan); err != nil {
+			if err := creditOpService.AuthorizeContracts(r.Context(), loanIDs, c.ID.String(), c.OwnerID.String(), orgID, resource.TypeLoan); err != nil {
 				slog.InfoContext(r.Context(), "could not authorize loans", "error", err)
 				return goidc.StatusFailure, err
 			}

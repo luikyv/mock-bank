@@ -37,6 +37,11 @@ type Account struct {
 	ID                          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	OwnerID                     uuid.UUID
 	Number                      string
+	BranchCode                  *string
+	BrandName                   string
+	CheckDigit                  string
+	CompanyCNPJ                 string `gorm:"column:company_cnpj"`
+	CompeCode                   string
 	Type                        Type
 	SubType                     SubType `gorm:"column:subtype"`
 	AvailableAmount             string
@@ -45,6 +50,7 @@ type Account struct {
 	OverdraftLimitContracted    string
 	OverdraftLimitUsed          string
 	OverdraftLimitUnarranged    string
+	Currency                    string
 
 	OrgID     string
 	CrossOrg  bool
@@ -82,6 +88,7 @@ type Transaction struct {
 	Name             string
 	Type             TransactionType
 	Amount           string
+	Currency         string
 	PartieBranchCode *string
 	PartieCheckDigit *string
 	PartieCNPJCPF    *string `gorm:"column:partie_cnpj_cpf"`

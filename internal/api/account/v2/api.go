@@ -21,35 +21,28 @@ import (
 
 var _ StrictServerInterface = Server{}
 
-type BankConfig interface {
-	Host() string
-	Brand() string
-	CNPJ() string
-	ISPB() string
-	IBGETownCode() string
-	Currency() string
-	AccountCompeCode() string
-	AccountBranch() string
-	AccountCheckDigit() string
-}
+// type BankConfig interface {
+// 	Host() string
+// 	Brand() string
+// 	CNPJ() string
+// 	ISPB() string
+// 	IBGETownCode() string
+// 	Currency() string
+// 	AccountCompeCode() string
+// 	AccountBranch() string
+// 	AccountCheckDigit() string
+// }
 
 type Server struct {
-	config         BankConfig
 	baseURL        string
 	service        account.Service
 	consentService consent.Service
 	op             *provider.Provider
 }
 
-func NewServer(
-	config BankConfig,
-	service account.Service,
-	consentService consent.Service,
-	op *provider.Provider,
-) Server {
+func NewServer(host string, service account.Service, consentService consent.Service, op *provider.Provider) Server {
 	return Server{
-		config:         config,
-		baseURL:        config.Host() + "/open-banking/accounts/v2",
+		baseURL:        host + "/open-banking/accounts/v2",
 		service:        service,
 		consentService: consentService,
 		op:             op,
@@ -145,15 +138,14 @@ func (s Server) AccountsGetAccounts(ctx context.Context, req AccountsGetAccounts
 		Meta:  *api.NewPaginatedMeta(accs),
 		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts", accs),
 	}
-	defaultBranch := s.config.AccountBranch()
 	for _, acc := range accs.Records {
 		resp.Data = append(resp.Data, AccountData{
 			AccountID:   acc.ID.String(),
-			BranchCode:  &defaultBranch,
-			BrandName:   s.config.Brand(),
-			CheckDigit:  s.config.AccountCheckDigit(),
-			CompanyCnpj: s.config.CNPJ(),
-			CompeCode:   s.config.AccountCompeCode(),
+			BranchCode:  acc.BranchCode,
+			BrandName:   acc.BrandName,
+			CheckDigit:  acc.CheckDigit,
+			CompanyCnpj: acc.CompanyCNPJ,
+			CompeCode:   acc.CompeCode,
 			Number:      acc.Number,
 			Type:        EnumAccountType(acc.Type),
 		})
@@ -171,13 +163,12 @@ func (s Server) AccountsGetAccountsAccountID(ctx context.Context, req AccountsGe
 		return nil, err
 	}
 
-	defaultBranch := s.config.AccountBranch()
 	resp := ResponseAccountIdentification{
 		Data: AccountIdentificationData{
-			BranchCode: &defaultBranch,
-			CheckDigit: s.config.AccountCheckDigit(),
-			CompeCode:  s.config.AccountCompeCode(),
-			Currency:   s.config.Currency(),
+			BranchCode: acc.BranchCode,
+			CheckDigit: acc.CheckDigit,
+			CompeCode:  acc.CompeCode,
+			Currency:   acc.Currency,
 			Number:     acc.Number,
 			Subtype:    EnumAccountSubType(acc.SubType),
 			Type:       EnumAccountType(acc.Type),
@@ -201,15 +192,15 @@ func (s Server) AccountsGetAccountsAccountIDBalances(ctx context.Context, req Ac
 		Data: AccountBalancesData{
 			AutomaticallyInvestedAmount: AccountBalancesDataAutomaticallyInvestedAmount{
 				Amount:   acc.AvailableAmount,
-				Currency: s.config.Currency(),
+				Currency: acc.Currency,
 			},
 			AvailableAmount: AccountBalancesDataAvailableAmount{
 				Amount:   acc.AvailableAmount,
-				Currency: s.config.Currency(),
+				Currency: acc.Currency,
 			},
 			BlockedAmount: AccountBalancesDataBlockedAmount{
 				Amount:   acc.BlockedAmount,
-				Currency: s.config.Currency(),
+				Currency: acc.Currency,
 			},
 			UpdateDateTime: acc.UpdatedAt,
 		},
@@ -235,19 +226,19 @@ func (s Server) AccountsGetAccountsAccountIDOverdraftLimits(ctx context.Context,
 	if acc.OverdraftLimitContracted != "" {
 		resp.Data.OverdraftContractedLimit = &AccountOverdraftLimitsDataOverdraftContractedLimit{
 			Amount:   acc.OverdraftLimitContracted,
-			Currency: s.config.Currency(),
+			Currency: acc.Currency,
 		}
 	}
 	if acc.OverdraftLimitUsed != "" {
 		resp.Data.OverdraftUsedLimit = &AccountOverdraftLimitsDataOverdraftUsedLimit{
 			Amount:   acc.OverdraftLimitUsed,
-			Currency: s.config.Currency(),
+			Currency: acc.Currency,
 		}
 	}
 	if acc.OverdraftLimitUnarranged != "" {
 		resp.Data.UnarrangedOverdraftAmount = &AccountOverdraftLimitsDataUnarrangedOverdraftAmount{
 			Amount:   acc.OverdraftLimitUnarranged,
-			Currency: s.config.Currency(),
+			Currency: acc.Currency,
 		}
 	}
 
@@ -288,7 +279,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 			PartieNumber:                   tx.PartieNumber,
 			TransactionAmount: AccountTransactionsDataAmount{
 				Amount:   tx.Amount,
-				Currency: s.config.Currency(),
+				Currency: tx.Currency,
 			},
 			TransactionDateTime: tx.DateTime.Format(timeutil.DateTimeMillisFormat),
 			TransactionID:       tx.ID.String(),
@@ -338,7 +329,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 			PartieNumber:                   tx.PartieNumber,
 			TransactionAmount: AccountTransactionsDataAmount{
 				Amount:   tx.Amount,
-				Currency: s.config.Currency(),
+				Currency: tx.Currency,
 			},
 			TransactionDateTime: tx.DateTime.Format(timeutil.DateTimeMillisFormat),
 			TransactionID:       tx.ID.String(),

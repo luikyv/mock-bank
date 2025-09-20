@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/luikyv/mock-bank/cmd/cmdutil"
 	"github.com/luikyv/mock-bank/internal/account"
 	"github.com/luikyv/mock-bank/internal/timeutil"
 	"github.com/luikyv/mock-bank/internal/user"
@@ -29,6 +30,12 @@ func seedBob(ctx context.Context, db *gorm.DB) error {
 		ID:                          uuid.MustParse("291e5a29-49ed-401f-a583-193caa7ac79d"),
 		OwnerID:                     testUser.ID,
 		Number:                      "94088393",
+		Currency:                    "BRL",
+		BranchCode:                  cmdutil.PointerOf("6272"),
+		CheckDigit:                  "4",
+		CompeCode:                   "123",
+		BrandName:                   "Mock Bank",
+		CompanyCNPJ:                 "12345678900000",
 		Type:                        account.TypeCheckingAccount,
 		SubType:                     account.SubTypeJointSimple,
 		AvailableAmount:             "12000.24",

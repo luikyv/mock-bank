@@ -208,7 +208,32 @@
             "ApiFamilyType": "enrollments",
             "ApiVersion": "2.1.0",
             "Status": "Active"
-          }
+          },
+          {
+            "ApiFamilyType": "credit-portability",
+            "ApiVersion": "1.0.0",
+            "Status": "Active",
+            "ApiDiscoveryEndpoints": [
+                {
+                    "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-portability/v1/portabilities"
+                },
+                {
+                    "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-portability/v1/portabilities/{portabilityId}"
+                },
+                {
+                    "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-portability/v1/portabilities/{portabilityId}/cancel"
+                },
+                {
+                    "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-portability/v1/portabilities/{portabilityId}/portability-eligibility"
+                },
+                {
+                    "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-portability/v1/account-data"
+                },
+                {
+                    "ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-portability/v1/{portabilityId}/payment"
+                }
+            ]
+        }
         ]
       }
     ]

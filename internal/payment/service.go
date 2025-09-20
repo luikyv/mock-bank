@@ -237,19 +237,6 @@ func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
 		if err := s.updateConsentStatus(ctx, c, ConsentStatusPartiallyAccepted); err != nil {
 			return err
 		}
-
-		go func() {
-			ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-			defer cancel()
-
-			time.Sleep(1 * time.Minute)
-
-			if err := s.updateConsentStatus(ctx, c, ConsentStatusAuthorized); err != nil {
-				slog.ErrorContext(ctx, "error authorizing consent", "consent_id", c.ID, "error", err)
-				return
-			}
-		}()
-
 		return nil
 	}
 	return s.updateConsentStatus(ctx, c, ConsentStatusAuthorized)

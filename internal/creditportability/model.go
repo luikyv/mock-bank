@@ -12,46 +12,61 @@ var (
 )
 
 type Portability struct {
-	ID                                  uuid.UUID
-	ConsentID                           uuid.UUID
-	Status                              Status
-	StatusUpdatedAt                     timeutil.DateTime
-	ContractID                          uuid.UUID
-	Contract                            *creditop.Contract
-	CustomerContacts                    []Contact
-	InstitutionName                     string
-	InstitutionCNPJ                     string
-	InstitutionContacts                 *[]Contact
-	InterestRates                       []creditop.InterestRate  `gorm:"serializer:json"`
-	Fees                                []creditop.Fee           `gorm:"serializer:json"`
-	FinanceCharges                      []creditop.FinanceCharge `gorm:"serializer:json"`
-	CET                                 string                   `gorm:"column:cet"`
-	AmortizationSchedule                creditop.AmortizationSchedule
-	AmortizationScheduledAdditionalInfo *string
-	DigitalSignatureProof               string
-	InstalmentPeriodicity               Periodicity
-	TotalInstalments                    int
-	InstalmentAmount                    string
-	InstalmentCurrency                  string
-	DueDate                             timeutil.BrazilDate
-	ClientID                            string
+	ID                                          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ConsentID                                   uuid.UUID
+	Status                                      Status
+	StatusUpdatedAt                             timeutil.DateTime
+	ContractID                                  uuid.UUID
+	ContractNumber                              string
+	ContractIPOCCode                            string `gorm:"column:contract_ipoc_code"`
+	Contract                                    *creditop.Contract
+	CustomerContacts                            []Contact `gorm:"serializer:json"`
+	CreditorInstitutionName                     string
+	CreditorInstitutionCNPJ                     string
+	ProposingInstitutionName                    string
+	ProposingInstitutionCNPJ                    string
+	ProposingInstitutionContacts                *[]Contact               `gorm:"serializer:json"`
+	ProposedInterestRates                       []creditop.InterestRate  `gorm:"serializer:json"`
+	ProposedFees                                []creditop.Fee           `gorm:"serializer:json"`
+	ProposedFinanceCharges                      []creditop.FinanceCharge `gorm:"serializer:json"`
+	ProposedCET                                 string                   `gorm:"column:proposed_cet"`
+	ProposedAmortizationSchedule                creditop.AmortizationSchedule
+	ProposedAmortizationScheduledAdditionalInfo *string
+	DigitalSignatureProofDocumentID             string
+	DigitalSignatureProofSignedAt               string
+	ProposedInstalmentPeriodicity               creditop.Periodicity
+	ProposedTotalInstalments                    int
+	ProposedInstalmentAmount                    string
+	ProposedInstalmentCurrency                  string
+	ProposedAmount                              string
+	ProposedCurrency                            string
+	ProposedDueDate                             string
+	ClientID                                    string
+	Rejection                                   *Rejection             `gorm:"serializer:json"`
+	LoanSettlementInstruction                   *SettlementInstruction `gorm:"serializer:json"`
+	StatusReason                                *StatusReason          `gorm:"serializer:json"`
+	Payment                                     *Payment               `gorm:"serializer:json"`
 
 	OrgID     string
 	CreatedAt timeutil.DateTime
 	UpdatedAt timeutil.DateTime
 }
 
+func (Portability) TableName() string {
+	return "credit_portabilities"
+}
+
 type Status string
 
 const (
-	StatusReceived                     Status = "RECEBIDO"
-	StatusPending                      Status = "PENDENTE"
-	StatusAcceptedSettlementInProgress Status = "ACORDO_DE_LIQUIDACAO_EM_ANDAMENTO"
-	StatusAcceptedSettlementCompleted  Status = "ACORDO_DE_LIQUIDACAO_CONCLUIDO"
-	StatusPortabilityCompleted         Status = "PORTABILIDADE_CONCLUIDA"
-	StatusRejected                     Status = "REJEITADO"
-	StatusCancelled                    Status = "CANCELADO"
-	StatusPaymentIssue                 Status = "PROBLEMA_DE_PAGAMENTO"
+	StatusReceived                     Status = "RECEIVED"
+	StatusPending                      Status = "PENDING"
+	StatusAcceptedSettlementInProgress Status = "ACCEPTED_SETTLEMENT_IN_PROGRESS"
+	StatusAcceptedSettlementCompleted  Status = "ACCEPTED_SETTLEMENT_COMPLETED"
+	StatusPortabilityCompleted         Status = "PORTABILITY_COMPLETED"
+	StatusRejected                     Status = "REJECTED"
+	StatusCancelled                    Status = "CANCELLED"
+	StatusPaymentIssue                 Status = "PAYMENT_ISSUE"
 )
 
 type Contact struct {
@@ -66,30 +81,26 @@ const (
 	ContactTypeEmail ContactType = "EMAIL"
 )
 
-type Periodicity string
-
-const (
-	PeriodicityIrregular  Periodicity = "SEM_PERIODICIDADE_REGULAR"
-	PeriodicityDaily      Periodicity = "DIARIO"
-	PeriodicityWeekly     Periodicity = "SEMANAL"
-	PeriodicityBiweekly   Periodicity = "QUINZENAL"
-	PeriodicityMonthly    Periodicity = "MENSAL"
-	PeriodicityBimonthly  Periodicity = "BIMESTRAL"
-	PeriodicityQuarterly  Periodicity = "TRIMESTRAL"
-	PeriodicitySemiannual Periodicity = "SEMESTRAL"
-	PeriodicityAnnual     Periodicity = "ANNUAL"
-)
-
 type Eligibility struct {
+	ID                                uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	IsEligible                        bool
-	IneligibilityReason               *creditop.PortabilityIneligibilityReason
+	IneligibilityReason               *IneligibilityReason
 	IneligibilityReasonAdditionalInfo *string
 	Status                            *EligibilityStatus
 	StatusUpdatedAt                   *timeutil.DateTime
 	Channel                           *Channel
 	CompanyName                       *string
 	CompanyCNPJ                       *string
-	ContractID                        string
+	ContractID                        uuid.UUID
+
+	OrgID     string
+	CrossOrg  bool
+	CreatedAt timeutil.DateTime
+	UpdatedAt timeutil.DateTime
+}
+
+func (e Eligibility) TableName() string {
+	return "credit_portability_eligibilities"
 }
 
 type EligibilityStatus string
@@ -99,6 +110,15 @@ const (
 	EligibilityStatusInProgress EligibilityStatus = "EM_ANDAMENTO"
 )
 
+type IneligibilityReason string
+
+const (
+	IneligibilityReasonContractLiquidated IneligibilityReason = "CONTRATO_LIQUIDADO"
+	IneligibilityReasonJudicialAction     IneligibilityReason = "CLIENTE_COM_ACAO_JUDICIAL"
+	IneligibilityReasonIncompatibleMode   IneligibilityReason = "MODALIDADE_OPERACAO_INCOMPATIVEL"
+	IneligibilityReasonOther              IneligibilityReason = "OUTROS"
+)
+
 type Channel string
 
 const (
@@ -106,6 +126,69 @@ const (
 	ChannelRegistrar Channel = "REGISTRADORA"
 )
 
+type Rejection struct {
+	Reason         RejectionReason `json:"rejectionReason"`
+	By             RejectedBy      `json:"rejectedBy"`
+	AdditionalInfo *string         `json:"rejectionAdditionalInfo"`
+}
+
+type RejectedBy string
+
+const (
+	RejectedByProposer RejectedBy = "PROPONENTE"
+	RejectedByUser     RejectedBy = "USUARIO"
+	RejectedByCreditor RejectedBy = "CREDORA"
+)
+
+type RejectionReason string
+
+const (
+	RejectionReasonCanceledByClient         RejectionReason = "CANCELADO_PELO_CLIENTE"
+	RejectionReasonDivergentDebt            RejectionReason = "SALDO_DEVEDOR_ATUALIZADO_SUBSTANCIALMENTE_DIVERGENTE"
+	RejectionReasonCreditPolicy             RejectionReason = "POLITICA_DE_CREDITO"
+	RejectionReasonRetentionOfClient        RejectionReason = "RETENCAO_DO_CLIENTE"
+	RejectionReasonContractLiquidated       RejectionReason = "CONTRATO_JA_LIQUIDADO"
+	RejectionReasonPaymentDiscrepancy       RejectionReason = "DIVERGENCIA_DE_PAGAMENTO_EFETUADO"
+	RejectionReasonPaymentDue               RejectionReason = "DECURSO_DO_PRAZO_PARA_PAGAMENTO"
+	RejectionReasonPortabilityNotLiquidated RejectionReason = "PORTABILIDADE_CANCELADA_POR_FALTA_DE_LIQUIDACAO"
+	RejectionReasonPortabilityInProgress    RejectionReason = "PORTABILIDADE_EM_ANDAMENTO"
+	RejectionReasonLegalAction              RejectionReason = "CLIENTE_COM_ACAO_JUDICIAL"
+	RejectionReasonIncompatibleOperation    RejectionReason = "MODALIDADE_DA_OPERACAO_INCOMPATIVEL"
+	RejectionReasonOther                    RejectionReason = "OUTROS"
+)
+
+type SettlementInstruction struct {
+	Amount        string            `json:"settlementAmount"`
+	Currency      string            `json:"currency"`
+	DateTime      timeutil.DateTime `json:"settlementDateTime"`
+	TransactionID string            `json:"transactionId"`
+}
+
+type StatusReason struct {
+	ReasonType               *RejectionReason `json:"reasonType"`
+	ReasonTypeAdditionalInfo *string          `json:"reasonTypeAdditionalInfo"`
+	DigitalSignatureProof    *struct {
+		DocumentID        string `json:"documentId"`
+		SignatureDateTime string `json:"signatureDateTime"`
+	} `json:"digitalSignatureProof"`
+}
+
 type AccountData struct {
 	Number string
+}
+
+type Query struct {
+	ID           string
+	ContractID   string
+	ConsentID    string
+	Statuses     []Status
+	LoadContract bool
+}
+
+type Payment struct {
+	PortabilityID string            `json:"portabilityId"`
+	DateTime      timeutil.DateTime `json:"paymentDateTime"`
+	Amount        string            `json:"amount"`
+	Currency      string            `json:"currency"`
+	TransactionID string            `json:"transactionId"`
 }

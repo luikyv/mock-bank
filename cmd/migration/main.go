@@ -47,7 +47,7 @@ func main() {
 	}
 
 	// Migrations.
-	// migrationsPath := "file://../../db/migrations"
+	// migrationsPath := "file://../../db/migrations" // Uncomment this line and comment the next when running locally out of a container.
 	migrationsPath := "file://db/migrations"
 	slog.Info("running database migrations")
 	if err := runMigrations(db, migrationsPath); err != nil {
@@ -104,7 +104,7 @@ func seedDatabase(ctx context.Context, db *gorm.DB) error {
 	}
 
 	if Env == cmdutil.LocalEnvironment {
-		if err := createOAuthClients(ctx, db); err != nil {
+		if err := seedOAuthClients(ctx, db); err != nil {
 			return fmt.Errorf("failed to create OAuth client: %w", err)
 		}
 	}
@@ -112,7 +112,7 @@ func seedDatabase(ctx context.Context, db *gorm.DB) error {
 	return nil
 }
 
-func createOAuthClients(ctx context.Context, db *gorm.DB) error {
+func seedOAuthClients(ctx context.Context, db *gorm.DB) error {
 	testClientOne := &client.Client{
 		ID: "client_one",
 		Data: goidc.Client{
@@ -123,7 +123,7 @@ func createOAuthClients(ctx context.Context, db *gorm.DB) error {
 				GrantTypes:           []goidc.GrantType{"authorization_code", "client_credentials", "implicit", "refresh_token"},
 				ResponseTypes:        []goidc.ResponseType{"code id_token"},
 				PublicJWKSURI:        "https://keystore.local/00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111/application.jwks",
-				ScopeIDs:             "openid consents consent resources accounts customers loans payments recurring-payments recurring-consent enrollment nrp-consents",
+				ScopeIDs:             "openid consents consent resources accounts customers loans payments recurring-payments recurring-consent enrollment nrp-consents credit-portability",
 				IDTokenKeyEncAlg:     "RSA-OAEP",
 				IDTokenContentEncAlg: "A256GCM",
 				TokenAuthnMethod:     goidc.ClientAuthnPrivateKeyJWT,
@@ -153,7 +153,7 @@ func createOAuthClients(ctx context.Context, db *gorm.DB) error {
 				GrantTypes:           []goidc.GrantType{"authorization_code", "client_credentials", "implicit", "refresh_token"},
 				ResponseTypes:        []goidc.ResponseType{"code id_token"},
 				PublicJWKSURI:        "https://keystore.local/00000000-0000-0000-0000-000000000000/22222222-2222-2222-2222-222222222222/application.jwks",
-				ScopeIDs:             "openid consents consent resources accounts customers loans payments recurring-payments recurring-consent enrollment nrp-consents",
+				ScopeIDs:             "openid consents consent resources accounts customers loans payments recurring-payments recurring-consent enrollment nrp-consents credit-portability",
 				IDTokenKeyEncAlg:     "RSA-OAEP",
 				IDTokenContentEncAlg: "A256GCM",
 				TokenAuthnMethod:     goidc.ClientAuthnPrivateKeyJWT,
