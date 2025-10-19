@@ -1,5 +1,5 @@
 services:
-  mockbank:
+  bank:
     build:
       context: .
       dockerfile: cmd/server/Dockerfile
@@ -24,8 +24,8 @@ services:
       - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./testdata/setup-localstack.sh:/etc/localstack/init/ready.d/setup.sh:ro
-      - ./testdata/keys/:/keys:ro
+      - ./setup-aws.sh:/etc/localstack/init/ready.d/setup.sh:ro
+      - ./keys/:/keys:ro
     healthcheck:
       test: bash -c 'awslocal ssm get-parameter --name /mockbank/ready >/dev/null 2>&1'
       interval: 5s
@@ -72,18 +72,12 @@ services:
       context: .
       dockerfile: cmd/gateway/Dockerfile
     volumes:
-      - ./testdata/keys/server.crt:/mocks/server.crt:ro
-      - ./testdata/keys/server.key:/mocks/server.key:ro
-      - ./testdata/keys/client_one_pub.jwks:/mocks/client.jwks:ro
-      - ./testdata/keys/client_two_pub.jwks:/mocks/client2.jwks:ro
-      - ./testdata/keys/ca.crt:/mocks/ca.crt:ro
-      - ./testdata/keys/org_pub.jwks:/mocks/org.jwks:ro
-      - ./testdata/participants.json:/mocks/participants.json:ro
-      - ./testdata/directory_jwks.json:/mocks/directory_jwks.json:ro
-      - ./testdata/directory_well_known.json:/mocks/directory_well_known.json:ro
-      - ./testdata/id_token.json:/mocks/id_token.json:ro
-      - ./testdata/software_statement.json:/mocks/software_statement.json:ro
-      - ./testdata/software_statement_jwks.json:/mocks/software_statement_jwks.json:ro
+      - ./keys/server.crt:/mocks/server.crt:ro
+      - ./keys/server.key:/mocks/server.key:ro
+      - ./keys/client_one_pub.jwks:/mocks/client.jwks:ro
+      - ./keys/client_two_pub.jwks:/mocks/client2.jwks:ro
+      - ./keys/ca.crt:/mocks/ca.crt:ro
+      - ./keys/org_pub.jwks:/mocks/org.jwks:ro
     ports:
       - 443:443
     networks:
@@ -105,13 +99,13 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  mockbank-ui:
+  ui:
     profiles:
       - ui
     image: node:20-alpine
     working_dir: /app
     volumes:
-      - ./mock-bank-ui:/app
+      - ./ui:/app
     command: sh -c "npm install && npm run dev -- --host"
 
   migration:
@@ -133,12 +127,12 @@ services:
     profiles:
       - conformance
     build:
-      context: ./conformance-suite/httpd
+      context: ./conformance/suite/httpd
       dockerfile: Dockerfile-static
     ports:
       - "8443:8443"
     volumes:
-      - ./conformance-suite/src/main/resources/:/usr/local/apache2/htdocs/
+      - ./conformance/suite/src/main/resources/:/usr/local/apache2/htdocs/
     depends_on:
       - cs-server
     networks:
@@ -152,11 +146,11 @@ services:
     hostname: server
     image: openjdk:17-jdk-slim
     build:
-      context: ./conformance-suite/server-dev
+      context: ./conformance/suite/server-dev
     ports:
       - "9999:9999"
     volumes:
-      - ./conformance-suite/target/:/server/
+      - ./conformance/suite/target/:/server/
     command: >
       java
       -Xdebug -Xrunjdwp:transport=dt_socket,address=*:9999,server=y,suspend=n

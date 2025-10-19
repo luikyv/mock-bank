@@ -309,3 +309,7 @@ const (
 	RelationCPF  Relation = "CPF"
 	RelationCNPJ Relation = "CNPJ"
 )
+
+type Filter struct {
+	OwnerID string
+}

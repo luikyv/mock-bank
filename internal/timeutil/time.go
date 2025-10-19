@@ -227,6 +227,10 @@ func (d BrazilDate) WithDay(day int) BrazilDate {
 	return NewBrazilDate(time.Date(d.Year(), d.Month(), day, 12, 0, 0, 0, d.Location()))
 }
 
+func (d BrazilDate) IsZero() bool {
+	return d.Time.IsZero()
+}
+
 func BrazilDateNow() BrazilDate {
 	return NewBrazilDate(now())
 }

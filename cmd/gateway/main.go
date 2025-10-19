@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -25,40 +27,19 @@ import (
 
 func main() {
 	// Load and parse the directory JWKS.
-	directoryJWKSBytes, err := os.ReadFile("/mocks/directory_jwks.json")
-	if err != nil {
-		log.Fatal("failed to read directory jwks:", err)
-	}
-	var directoryJWKS jose.JSONWebKeySet
-	if err := json.Unmarshal(directoryJWKSBytes, &directoryJWKS); err != nil {
-		log.Fatal("failed to parse directory jwks:", err)
+	directoryKey, _ := rsa.GenerateKey(rand.Reader, 4096)
+	directoryJWK := jose.JSONWebKey{
+		KeyID:     "directory_signer",
+		Algorithm: string(jose.PS256),
+		Key:       directoryKey,
 	}
 
-	// Load and parse the keystore JWKS.
-	keystoreJWKSBytes, err := os.ReadFile("/mocks/software_statement_jwks.json")
-	if err != nil {
-		log.Fatal("failed to read keystore jwks:", err)
+	keystoreKey, _ := rsa.GenerateKey(rand.Reader, 4096)
+	keystoreJWK := jose.JSONWebKey{
+		KeyID:     "keystore_signer",
+		Algorithm: string(jose.PS256),
+		Key:       keystoreKey,
 	}
-	var keystoreJWKS jose.JSONWebKeySet
-	if err := json.Unmarshal(keystoreJWKSBytes, &keystoreJWKS); err != nil {
-		log.Fatal("failed to parse keystore jwks:", err)
-	}
-
-	// Load and parse the participant ID token.
-	idTokenBytes, err := os.ReadFile("/mocks/id_token.json")
-	if err != nil {
-		log.Fatal("failed to read id token:", err)
-	}
-	var idTokenClaims map[string]any
-	_ = json.Unmarshal(idTokenBytes, &idTokenClaims)
-
-	// Load and parse the software statement.
-	ssBytes, err := os.ReadFile("/mocks/software_statement.json")
-	if err != nil {
-		log.Fatal("failed to read id token:", err)
-	}
-	var ssClaims map[string]any
-	_ = json.Unmarshal(ssBytes, &ssClaims)
 
 	// Define routes.
 
@@ -68,18 +49,31 @@ func main() {
 		mux.HandleFunc("GET /.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 			log.Println("request directory openid configuration")
 			w.Header().Set("Content-Type", "application/json")
-			http.ServeFile(w, r, "/mocks/directory_well_known.json")
+
+			w.WriteHeader(http.StatusOK)
+			io.WriteString(w, `{
+				"authorization_endpoint": "https://directory.local/authorize",
+				"id_token_signing_alg_values_supported": [
+					"RS256",
+					"ES256"
+				],
+				"issuer": "https://directory.local",
+				"jwks_uri": "https://directory.local/jwks",
+				"mtls_endpoint_aliases": {
+					"pushed_authorization_request_endpoint": "https://matls-directory.local/par",
+					"token_endpoint": "https://matls-directory.local/token"
+				},
+				"pushed_authorization_request_endpoint": "https://directory.local/par",
+				"token_endpoint": "https://directory.local/token"
+				}
+			`)
 		})
 
 		mux.HandleFunc("GET /jwks", func(w http.ResponseWriter, r *http.Request) {
 			log.Println("request directory jwks")
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			var jwks jose.JSONWebKeySet
-			for _, key := range directoryJWKS.Keys {
-				jwks.Keys = append(jwks.Keys, key.Public())
-			}
-			_ = json.NewEncoder(w).Encode(jwks)
+			_ = json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{directoryJWK.Public()}})
 		})
 
 		mux.HandleFunc("GET /authorize", func(w http.ResponseWriter, r *http.Request) {
@@ -101,16 +95,43 @@ func main() {
 				return
 			}
 
-			key := directoryJWKS.Keys[0]
 			joseSigner, _ := jose.NewSigner(jose.SigningKey{
-				Algorithm: jose.SignatureAlgorithm(key.Algorithm),
-				Key:       key,
+				Algorithm: jose.SignatureAlgorithm(directoryJWK.Algorithm),
+				Key:       directoryJWK,
 			}, (&jose.SignerOptions{}).WithType("JWT"))
 
-			idTokenClaims["iat"] = time.Now().Unix()
-			idTokenClaims["exp"] = time.Now().Unix() + 60
-			idToken, _ := jwt.Signed(joseSigner).Claims(idTokenClaims).Serialize()
+			idTokenClaims := map[string]any{
+				"aud":   "mockbank",
+				"iss":   "https://directory.local",
+				"nonce": "gXGldLyaaty",
+				"sub":   "admin",
+				"trust_framework_profile": map[string]any{
+					"basic_information": map[string]any{
+						"status":     "Active",
+						"user_email": "admin@mail.com",
+					},
+					"certification_manager": false,
+					"org_access_details": map[string]any{
+						"00000000-0000-0000-0000-000000000000": map[string]any{
+							"org_admin":               true,
+							"org_registration_number": "0000000000",
+							"organisation_name":       "MockBank",
+						},
+						"11111111-1111-1111-1111-111111111111": map[string]any{
+							"org_admin":               true,
+							"org_registration_number": "1111111111",
+							"organisation_name":       "Participant",
+						},
+					},
+					"super_user":  true,
+					"system_user": true,
+				},
+				"txn": "q0RwM_vzkv39zoa0nTJDDaJm_VHpHLzSheB7waKB-tT",
+				"iat": time.Now().Unix(),
+				"exp": time.Now().Unix() + 60,
+			}
 
+			idToken, _ := jwt.Signed(joseSigner).Claims(idTokenClaims).Serialize()
 			_, _ = io.WriteString(w, fmt.Sprintf(`{
 				"access_token": "random_token",
 				"id_token": "%s",
@@ -139,13 +160,53 @@ func main() {
 
 		mux.HandleFunc("GET /organisations/{org_id}/softwarestatements/{ss_id}/assertion", func(w http.ResponseWriter, r *http.Request) {
 			log.Println("request directory software statement")
-			key := keystoreJWKS.Keys[0]
 			joseSigner, _ := jose.NewSigner(jose.SigningKey{
-				Algorithm: jose.SignatureAlgorithm(key.Algorithm),
-				Key:       key,
+				Algorithm: jose.SignatureAlgorithm(keystoreJWK.Algorithm),
+				Key:       keystoreJWK,
 			}, (&jose.SignerOptions{}).WithType("JWT"))
 
-			ssClaims["iat"] = time.Now().Unix()
+			ssClaims := map[string]any{
+				"iss":        "Open Banking Brasil sandbox SSA issuer",
+				"org_id":     "00000000-0000-0000-0000-000000000000",
+				"org_name":   "MockBank",
+				"org_number": "00000000000000",
+				"org_status": "Active",
+				"software_api_webhook_uris": []string{
+					"https://localhost.emobix.co.uk:8443/test-mtls/a/mockbank",
+				},
+				"software_client_id":   "11111111-1111-1111-1111-111111111111",
+				"software_client_name": "Mockbank Client",
+				"software_environment": "Sandbox",
+				"software_id":          "11111111-1111-1111-1111-111111111111",
+				"software_jwks_uri":    "https://keystore.local/00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111/application.jwks",
+				"software_mode":        "Live",
+				"software_origin_uris": []string{
+					"https://mockbank.local",
+				},
+				"software_redirect_uris": []string{
+					"https://localhost.emobix.co.uk:8443/test/a/mockbank/callback",
+				},
+				"software_roles": []string{
+					"DADOS",
+					"PAGTO",
+				},
+				"software_statement_roles": []any{
+					map[string]any{
+						"authorisation_domain": "Open Banking Brasil ",
+						"role":                 "DADOS",
+						"status":               "Active",
+					},
+					map[string]any{
+						"authorisation_domain": "Open Banking Brasil ",
+						"role":                 "PAGTO",
+						"status":               "Active",
+					},
+				},
+				"software_status":  "Active",
+				"software_version": "1.00",
+				"iat":              time.Now().Unix(),
+			}
+
 			ssa, _ := jwt.Signed(joseSigner).Claims(ssClaims).Serialize()
 
 			w.Header().Set("Content-Type", "application/jwt")
@@ -180,11 +241,7 @@ func main() {
 			log.Println("request keystore open banking jwks")
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			var jwks jose.JSONWebKeySet
-			for _, key := range keystoreJWKS.Keys {
-				jwks.Keys = append(jwks.Keys, key.Public())
-			}
-			_ = json.NewEncoder(w).Encode(jwks)
+			_ = json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{keystoreJWK.Public()}})
 		})
 
 		return mux
@@ -214,7 +271,247 @@ func main() {
 	// does not accept self-signed certificates.
 	http.HandleFunc("GET directory.local/participants", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		http.ServeFile(w, r, "/mocks/participants.json")
+		io.WriteString(w, `[
+			{
+				"OrganisationId": "00000000-0000-0000-0000-000000000000",
+				"AuthorisationServers": [
+				{
+					"AuthorisationServerId": "ee6fd655-5bb3-4446-9fac-e1788d9c4049",
+					"OpenIDDiscoveryDocument": "https://auth.mockbank.local/.well-known/openid-configuration",
+					"ApiResources": [
+					{
+						"ApiDiscoveryEndpoints": [
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/consents/v3/consents"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/consents/v3/consents/{consentId}"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/consents/v3/consents/{consentId}/extend"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/consents/v3/consents/{consentId}/extensions"
+						}
+						],
+						"ApiFamilyType": "consents",
+						"ApiVersion": "3.2.0",
+						"Status": "Active"
+					},
+					{
+						"ApiDiscoveryEndpoints": [
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/resources/v3/resources"
+						}
+						],
+						"ApiFamilyType": "resources",
+						"ApiVersion": "3.0.0",
+						"Status": "Active"
+					},
+					{
+						"ApiDiscoveryEndpoints": [
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/customers/v2/personal/identifications"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/customers/v2/personal/qualifications"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/customers/v2/personal/financial-relations"
+						}
+						],
+						"ApiFamilyType": "customers-personal",
+						"ApiVersion": "2.2.0",
+						"Status": "Active"
+					},
+					{
+						"ApiDiscoveryEndpoints": [
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}/balances"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}/transactions"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}/transactions-current"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits"
+						}
+						],
+						"ApiFamilyType": "accounts",
+						"ApiVersion": "2.4.1",
+						"Status": "Active"
+					},
+					{
+						"ApiFamilyType": "loans",
+						"ApiVersion": "2.0.0",
+						"Status": "Active",
+						"ApiDiscoveryEndpoints": [
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/loans/v2/contracts"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/loans/v2/contracts/{contractId}"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/loans/v2/contracts/{contractId}/warranties"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/loans/v2/contracts/{contractId}/scheduled-instalments"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/loans/v2/contracts/{contractId}/payments"
+						}
+						]
+					},
+					{
+						"ApiDiscoveryEndpoints": [
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/bills"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/bills/{billId}/transactions"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/limits"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/transactions"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/transactions-current"
+						}
+						],
+						"ApiFamilyType": "credit-cards-accounts",
+						"ApiVersion": "2.3.1",
+						"Status": "Active"
+					},
+					{
+						"ApiDiscoveryEndpoints": [
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/consents"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/consents/{consentId}"
+						}
+						],
+						"ApiFamilyType": "payments-consents",
+						"ApiVersion": "4.0.0",
+						"Status": "Active"
+					},
+					{
+						"ApiDiscoveryEndpoints": [
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/pix/payments"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/pix/payments/{paymentId}"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/payments/v4/pix/payments/consents/{consentId}"
+						}
+						],
+						"ApiFamilyType": "payments-pix",
+						"ApiVersion": "4.0.0",
+						"Status": "Active"
+					},
+					{
+						"ApiDiscoveryEndpoints": [
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/recurring-consents"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+						}
+						],
+						"ApiFamilyType": "payments-recurring-consents",
+						"ApiVersion": "2.0.0",
+						"Status": "Active"
+					},
+					{
+						"ApiDiscoveryEndpoints": [
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/pix/recurring-payments"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}"
+						}
+						],
+						"ApiFamilyType": "payments-pix-recurring-payments",
+						"ApiVersion": "2.0.0",
+						"Status": "Active"
+					},
+					{
+						"ApiDiscoveryEndpoints": [
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/risk-signals"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-sign-options"
+						},
+						{
+							"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/enrollments/v2/consents/{consentId}/authorise"
+						}
+						],
+						"ApiFamilyType": "enrollments",
+						"ApiVersion": "2.1.0",
+						"Status": "Active"
+					},
+					{
+						"ApiFamilyType": "credit-portability",
+						"ApiVersion": "1.0.0",
+						"Status": "Active",
+						"ApiDiscoveryEndpoints": [
+							{
+								"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-portability/v1/portabilities"
+							},
+							{
+								"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-portability/v1/portabilities/{portabilityId}"
+							},
+							{
+								"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-portability/v1/portabilities/{portabilityId}/cancel"
+							},
+							{
+								"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-portability/v1/portabilities/{portabilityId}/portability-eligibility"
+							},
+							{
+								"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-portability/v1/account-data"
+							},
+							{
+								"ApiEndpoint": "https://matls-api.mockbank.local/open-banking/credit-portability/v1/{portabilityId}/payment"
+							}
+						]
+					}
+					]
+				}
+				]
+			}
+		]`)
 	})
 	go func() {
 		if err := http.ListenAndServe(":80", nil); err != http.ErrServerClosed {

@@ -134,7 +134,7 @@ CREATE TABLE accounts (
     number TEXT NOT NULL,
     branch_code TEXT,
     brand_name TEXT NOT NULL,
-    check_digit TEXT NOT NULL,
+    check_digit TEXT,
     company_cnpj TEXT NOT NULL,
     compe_code TEXT NOT NULL,
     type TEXT NOT NULL,
@@ -146,6 +146,7 @@ CREATE TABLE accounts (
     overdraft_limit_used TEXT,
     overdraft_limit_unarranged TEXT,
     currency TEXT NOT NULL,
+    has_reserved_balance BOOLEAN,
 
     org_id TEXT NOT NULL,
     cross_org BOOLEAN NOT NULL DEFAULT FALSE,

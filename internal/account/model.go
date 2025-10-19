@@ -10,7 +10,6 @@ import (
 
 const (
 	TransactionIDLength int = 80
-	letterBytes             = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 )
 
 var (
@@ -39,7 +38,7 @@ type Account struct {
 	Number                      string
 	BranchCode                  *string
 	BrandName                   string
-	CheckDigit                  string
+	CheckDigit                  *string
 	CompanyCNPJ                 string `gorm:"column:company_cnpj"`
 	CompeCode                   string
 	Type                        Type
@@ -51,6 +50,7 @@ type Account struct {
 	OverdraftLimitUsed          string
 	OverdraftLimitUnarranged    string
 	Currency                    string
+	HasReservedBalance          *bool
 
 	OrgID     string
 	CrossOrg  bool
@@ -61,6 +61,10 @@ type Account struct {
 type Query struct {
 	ID     string
 	Number string
+}
+
+type Filter struct {
+	OwnerID string
 }
 
 type Type string
@@ -157,12 +161,12 @@ type TransactionFilter struct {
 	movementType MovementType
 }
 
-func (f TransactionFilter) WithMovementType(mt MovementType) TransactionFilter {
+func (f *TransactionFilter) WithMovementType(mt MovementType) *TransactionFilter {
 	f.movementType = mt
 	return f
 }
 
-func NewTransactionFilter(from, to *string) (TransactionFilter, error) {
+func NewTransactionFilter(from, to *string) (*TransactionFilter, error) {
 	today := timeutil.BrazilDateNow()
 	filter := TransactionFilter{
 		from: today.StartOfDay(),
@@ -172,47 +176,47 @@ func NewTransactionFilter(from, to *string) (TransactionFilter, error) {
 	if from != nil {
 		fromDate, err := timeutil.ParseBrazilDate(*from)
 		if err != nil {
-			return TransactionFilter{}, errorutil.Format("invalid from booking date: %w", err)
+			return nil, errorutil.Format("invalid from booking date: %w", err)
 		}
 		filter.from = fromDate.StartOfDay()
 
 		if to == nil {
-			return TransactionFilter{}, errorutil.New("to booking date is required if from booking date is informed")
+			return nil, errorutil.New("to booking date is required if from booking date is informed")
 		}
 	}
 
 	if to != nil {
 		toDate, err := timeutil.ParseBrazilDate(*to)
 		if err != nil {
-			return TransactionFilter{}, errorutil.Format("invalid to booking date: %w", err)
+			return nil, errorutil.Format("invalid to booking date: %w", err)
 		}
 		filter.to = toDate.EndOfDay()
 
 		if from == nil {
-			return TransactionFilter{}, errorutil.New("from booking date is required if to booking date is informed")
+			return nil, errorutil.New("from booking date is required if to booking date is informed")
 		}
 	}
 
 	if filter.from.After(filter.to) {
-		return TransactionFilter{}, errorutil.New("from booking date must be before to booking date")
+		return nil, errorutil.New("from booking date must be before to booking date")
 	}
 
-	return filter, nil
+	return &filter, nil
 }
 
-func NewCurrentTransactionFilter(from, to *string) (TransactionFilter, error) {
+func NewCurrentTransactionFilter(from, to *string) (*TransactionFilter, error) {
 	filter, err := NewTransactionFilter(from, to)
 	if err != nil {
-		return TransactionFilter{}, err
+		return nil, err
 	}
 
 	today := timeutil.BrazilDateNow()
 	if filter.from.Before(today.AddDate(0, 0, -7)) {
-		return TransactionFilter{}, errorutil.New("from booking date too far in the past")
+		return nil, errorutil.New("from booking date too far in the past")
 	}
 
 	if filter.to.After(today.AddDate(1, 0, 0)) {
-		return TransactionFilter{}, errorutil.New("to booking date too far in the future")
+		return nil, errorutil.New("to booking date too far in the future")
 	}
 
 	return filter, nil

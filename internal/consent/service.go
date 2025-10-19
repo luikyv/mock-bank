@@ -2,8 +2,6 @@ package consent
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log/slog"
 	"reflect"
 	"strings"
@@ -20,28 +18,28 @@ import (
 )
 
 type Service struct {
-	db              *gorm.DB
+	storage         Storage
 	userService     user.Service
 	resourceService resource.Service
 }
 
 func NewService(db *gorm.DB, userService user.Service, resourceService resource.Service) Service {
 	return Service{
-		db:              db,
+		storage:         storage{db: db},
 		userService:     userService,
 		resourceService: resourceService,
 	}
 }
 
 func (s Service) Create(ctx context.Context, c *Consent) error {
-	c.Status = StatusAwaitingAuthorization
-	now := timeutil.DateTimeNow()
-	c.StatusUpdatedAt = now
-	c.CreatedAt = now
-	c.UpdatedAt = now
 
-	if err := s.validate(ctx, c); err != nil {
+	if err := validatePermissions(c.Permissions); err != nil {
 		return err
+	}
+
+	now := timeutil.DateTimeNow()
+	if c.ExpiresAt != nil && (c.ExpiresAt.After(now.AddDate(1, 0, 0)) || c.ExpiresAt.Before(now)) {
+		return ErrInvalidExpiration
 	}
 
 	if u, err := s.userService.User(ctx, user.Query{CPF: c.UserIdentification}, c.OrgID); err == nil {
@@ -54,7 +52,11 @@ func (s Service) Create(ctx context.Context, c *Consent) error {
 		}
 	}
 
-	return s.db.WithContext(ctx).Create(c).Error
+	c.Status = StatusAwaitingAuthorization
+	c.StatusUpdatedAt = now
+	c.CreatedAt = now
+	c.UpdatedAt = now
+	return s.storage.create(ctx, c)
 }
 
 func (s Service) Authorize(ctx context.Context, c *Consent) error {
@@ -67,11 +69,8 @@ func (s Service) Authorize(ctx context.Context, c *Consent) error {
 
 func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error) {
 	id = strings.TrimPrefix(id, URNPrefix)
-	c := &Consent{}
-	if err := s.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).First(c).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
+	c, err := s.storage.consent(ctx, id, orgID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -83,9 +82,7 @@ func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error
 }
 
 func (s Service) Consents(ctx context.Context, ownerID uuid.UUID, orgID string, pag page.Pagination) (page.Page[*Consent], error) {
-	query := s.db.WithContext(ctx).Model(&Consent{}).Where("owner_id = ? AND org_id = ?", ownerID, orgID).Order("created_at DESC")
-
-	consents, err := page.Paginate[*Consent](query, pag)
+	consents, err := s.storage.consents(ctx, orgID, &Filter{OwnerID: ownerID.String()}, pag)
 	if err != nil {
 		return page.Page[*Consent]{}, err
 	}
@@ -175,32 +172,12 @@ func (s Service) Extend(ctx context.Context, id, orgID string, ext *Extension) (
 	}
 
 	ext.PreviousExpiresAt = c.ExpiresAt
-	return c, s.db.WithContext(ctx).Create(ext).Error
+	return c, s.storage.createExtension(ctx, ext)
 }
 
 func (s Service) Extensions(ctx context.Context, consentURN, orgID string, pag page.Pagination) (page.Page[*Extension], error) {
 	consentID := strings.TrimPrefix(consentURN, URNPrefix)
-	query := s.db.WithContext(ctx).Model(&Extension{}).Where("consent_id = ? AND org_id = ?", consentID, orgID).Order("created_at DESC")
-
-	extensions, err := page.Paginate[*Extension](query, pag)
-	if err != nil {
-		return page.Page[*Extension]{}, fmt.Errorf("could not find extensions: %w", err)
-	}
-
-	return extensions, nil
-}
-
-func (s Service) validate(_ context.Context, c *Consent) error {
-	if err := validatePermissions(c.Permissions); err != nil {
-		return err
-	}
-
-	now := timeutil.DateTimeNow()
-	if c.ExpiresAt != nil && (c.ExpiresAt.After(now.AddDate(1, 0, 0)) || c.ExpiresAt.Before(now)) {
-		return ErrInvalidExpiration
-	}
-
-	return nil
+	return s.storage.extensions(ctx, consentID, orgID, pag)
 }
 
 func (s Service) runAutomations(ctx context.Context, c *Consent) error {
@@ -240,9 +217,5 @@ func (s Service) updateStatus(ctx context.Context, c *Consent, status Status) er
 
 func (s Service) update(ctx context.Context, c *Consent) error {
 	c.UpdatedAt = timeutil.DateTimeNow()
-	return s.db.WithContext(ctx).
-		Model(&Consent{}).
-		Omit("ID", "CreatedAt", "OrgID").
-		Where("id = ? AND org_id = ?", c.ID, c.OrgID).
-		Updates(c).Error
+	return s.storage.update(ctx, c)
 }

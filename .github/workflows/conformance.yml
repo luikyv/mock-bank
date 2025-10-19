@@ -24,7 +24,7 @@ jobs:
           uses: actions/cache@v3
           id: cache-cs
           with:
-            path: ./conformance-suite
+            path: ./conformance/suite
             key: cs-${{ env.CS_VERSION }}
 
         - name: Set Up Conformance Suite
@@ -73,7 +73,7 @@ jobs:
           if: always()
           with:
             name: mockbank
-            path: conformance-suite/results/*.zip
+            path: conformance/results/*.zip
 
   all-tests-succeeded:
     runs-on: ubuntu-latest

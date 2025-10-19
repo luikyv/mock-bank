@@ -32,7 +32,7 @@ func seedBob(ctx context.Context, db *gorm.DB) error {
 		Number:                      "94088393",
 		Currency:                    "BRL",
 		BranchCode:                  cmdutil.PointerOf("6272"),
-		CheckDigit:                  "4",
+		CheckDigit:                  cmdutil.PointerOf("4"),
 		CompeCode:                   "123",
 		BrandName:                   "Mock Bank",
 		CompanyCNPJ:                 "12345678900000",

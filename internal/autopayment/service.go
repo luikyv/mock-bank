@@ -24,7 +24,7 @@ import (
 )
 
 type Service struct {
-	db             *gorm.DB
+	storage        Storage
 	userService    user.Service
 	accountService account.Service
 	webhookService webhook.Service
@@ -37,15 +37,11 @@ func NewService(
 	webhookService webhook.Service,
 ) Service {
 	return Service{
-		db:             db,
+		storage:        storage{db: db},
 		userService:    userService,
 		accountService: accountService,
 		webhookService: webhookService,
 	}
-}
-
-func (s Service) WithTx(tx *gorm.DB) Service {
-	return NewService(tx, s.userService, s.accountService, s.webhookService)
 }
 
 func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payment.Account) error {
@@ -175,10 +171,7 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payme
 	}
 
 	if debtorAcc == nil {
-		if err := s.db.WithContext(ctx).Create(c).Error; err != nil {
-			return fmt.Errorf("could not create recurring consent: %w", err)
-		}
-		return nil
+		return s.storage.createConsent(ctx, c)
 	}
 
 	acc, err := s.accountService.Account(ctx, account.Query{Number: debtorAcc.Number}, c.OrgID)
@@ -191,11 +184,7 @@ func (s Service) CreateConsent(ctx context.Context, c *Consent, debtorAcc *payme
 	}
 
 	c.DebtorAccountID = &acc.ID
-	if err := s.db.WithContext(ctx).Create(c).Error; err != nil {
-		return fmt.Errorf("could not create recurring consent: %w", err)
-	}
-
-	return nil
+	return s.storage.createConsent(ctx, c)
 }
 
 func (s Service) AuthorizeConsent(ctx context.Context, c *Consent) error {
@@ -258,11 +247,8 @@ func (s Service) EnrollConsent(ctx context.Context, id, orgID string, opts payme
 
 func (s Service) Consent(ctx context.Context, id, orgID string) (*Consent, error) {
 	id = strings.TrimPrefix(id, ConsentURNPrefix)
-	c := &Consent{}
-	if err := s.db.WithContext(ctx).Preload("DebtorAccount").First(c, "id = ? AND org_id = ?", id, orgID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
+	c, err := s.storage.consent(ctx, id, orgID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -309,41 +295,34 @@ func (s Service) RejectConsent(ctx context.Context, c *Consent, rejection Consen
 }
 
 func (s Service) RevokeConsent(ctx context.Context, id, orgID string, revocation ConsentRevocation) (*Consent, error) {
-	var revoked *Consent
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		txService := s.WithTx(tx)
-		c, err := txService.Consent(ctx, id, orgID)
-		if err != nil {
-			return err
-		}
+	c, err := s.Consent(ctx, id, orgID)
+	if err != nil {
+		return nil, err
+	}
 
-		if c.Status != ConsentStatusAuthorized {
-			return ErrInvalidConsentStatus
-		}
+	if c.Status != ConsentStatusAuthorized {
+		return nil, ErrInvalidConsentStatus
+	}
 
-		c.Revocation = &revocation
-		if err := s.updateConsentStatus(ctx, c, ConsentStatusRevoked); err != nil {
-			return fmt.Errorf("could not revoke consent: %w", err)
-		}
+	c.Revocation = &revocation
+	if err := s.updateConsentStatus(ctx, c, ConsentStatusRevoked); err != nil {
+		return nil, fmt.Errorf("could not revoke consent: %w", err)
+	}
 
-		payments, err := txService.Payments(ctx, orgID, &Filter{
-			ConsentID: id,
-			Statuses:  []payment.Status{payment.StatusPDNG, payment.StatusSCHD}},
-		)
-		if err != nil {
-			return err
+	payments, err := s.Payments(ctx, orgID, &Filter{
+		ConsentID: id,
+		Statuses:  []payment.Status{payment.StatusPDNG, payment.StatusSCHD}},
+	)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range payments {
+		if err := s.cancel(ctx, p, payment.TerminatedFromInitiator, c.UserIdentification); err != nil {
+			return nil, err
 		}
-		for _, p := range payments {
-			if err := txService.cancel(ctx, p, payment.TerminatedFromInitiator, c.UserIdentification); err != nil {
-				return err
-			}
-		}
+	}
 
-		revoked = c
-		return nil
-	})
-
-	return revoked, err
+	return c, nil
 }
 
 func (s Service) EditConsent(ctx context.Context, id, orgID string, edition ConsentEdition) (*Consent, error) {
@@ -511,8 +490,8 @@ func (s Service) Create(ctx context.Context, p *Payment) error {
 	p.CreatedAt = timeutil.DateTimeNow()
 	p.UpdatedAt = timeutil.DateTimeNow()
 
-	if err := s.db.WithContext(ctx).Create(p).Error; err != nil {
-		return fmt.Errorf("could not create payment: %w", err)
+	if err := s.storage.create(ctx, p); err != nil {
+		return err
 	}
 	slog.DebugContext(ctx, "recurring payment created", "id", p.ID)
 
@@ -813,27 +792,8 @@ func (s Service) Create(ctx context.Context, p *Payment) error {
 }
 
 func (s Service) Payment(ctx context.Context, query Query, orgID string) (*Payment, error) {
-	dbQuery := s.db.WithContext(ctx).Where("org_id = ?", orgID)
-	if query.ID != "" {
-		dbQuery = dbQuery.Where("id = ?", query.ID)
-	}
-	if query.ConsentID != "" {
-		dbQuery = dbQuery.Where("consent_id = ?", query.ConsentID)
-	}
-	if query.Statuses != nil {
-		dbQuery = dbQuery.Where("status IN ?", query.Statuses)
-	}
-	if query.DebtorAccount {
-		dbQuery = dbQuery.Preload("DebtorAccount")
-	}
-	if query.Order != "" {
-		dbQuery = dbQuery.Order(query.Order)
-	}
-	p := &Payment{}
-	if err := dbQuery.First(p).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
+	p, err := s.storage.payment(ctx, query, orgID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -845,26 +805,9 @@ func (s Service) Payment(ctx context.Context, query Query, orgID string) (*Payme
 }
 
 func (s Service) Payments(ctx context.Context, orgID string, opts *Filter) ([]*Payment, error) {
-	if opts == nil {
-		opts = &Filter{}
-	}
-	query := s.db.WithContext(ctx).Where("org_id = ?", orgID)
-	if opts.ConsentID != "" {
-		query = query.Where("consent_id = ?", strings.TrimPrefix(opts.ConsentID, ConsentURNPrefix))
-	}
-	if opts.Statuses != nil {
-		query = query.Where("status IN ?", opts.Statuses)
-	}
-	if opts.From != nil {
-		query = query.Where("date >= ?", opts.From)
-	}
-	if opts.To != nil {
-		query = query.Where("date <= ?", opts.To)
-	}
-
-	var payments []*Payment
-	if err := query.Find(&payments).Error; err != nil {
-		return nil, fmt.Errorf("could not find payments: %w", err)
+	payments, err := s.storage.payments(ctx, orgID, opts)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, p := range payments {
@@ -927,17 +870,7 @@ func (s Service) updateConsentStatus(ctx context.Context, c *Consent, status Con
 
 func (s Service) updateConsent(ctx context.Context, c *Consent) error {
 	c.UpdatedAt = timeutil.DateTimeNow()
-	err := s.db.WithContext(ctx).
-		Model(&Consent{}).
-		Select("*").
-		Omit("ID", "CreatedAt", "OrgID").
-		Where("id = ? AND org_id = ?", c.ID, c.OrgID).
-		Updates(c).Error
-	if err != nil {
-		return fmt.Errorf("could not update consent: %w", err)
-	}
-
-	return nil
+	return s.storage.updateConsent(ctx, c)
 }
 
 func (s Service) reject(ctx context.Context, p *Payment, code RejectionReasonCode, detail string) error {
@@ -991,13 +924,8 @@ func (s Service) updateStatus(ctx context.Context, p *Payment, status payment.St
 	p.Status = status
 	p.StatusUpdatedAt = timeutil.DateTimeNow()
 	p.UpdatedAt = timeutil.DateTimeNow()
-	err := s.db.WithContext(ctx).
-		Model(&Payment{}).
-		Omit("ID", "CreatedAt", "OrgID").
-		Where("id = ? AND org_id = ?", p.ID, p.OrgID).
-		Updates(p).Error
-	if err != nil {
-		return fmt.Errorf("could not update payment status: %w", err)
+	if err := s.storage.update(ctx, p); err != nil {
+		return err
 	}
 
 	if slices.Contains([]payment.Status{

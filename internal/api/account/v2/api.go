@@ -139,16 +139,19 @@ func (s Server) AccountsGetAccounts(ctx context.Context, req AccountsGetAccounts
 		Links: *api.NewPaginatedLinks(s.baseURL+"/accounts", accs),
 	}
 	for _, acc := range accs.Records {
-		resp.Data = append(resp.Data, AccountData{
+		data := AccountData{
 			AccountID:   acc.ID.String(),
 			BranchCode:  acc.BranchCode,
 			BrandName:   acc.BrandName,
-			CheckDigit:  acc.CheckDigit,
 			CompanyCnpj: acc.CompanyCNPJ,
 			CompeCode:   acc.CompeCode,
 			Number:      acc.Number,
 			Type:        EnumAccountType(acc.Type),
-		})
+		}
+		if acc.CheckDigit != nil {
+			data.CheckDigit = *acc.CheckDigit
+		}
+		resp.Data = append(resp.Data, data)
 	}
 
 	return AccountsGetAccounts200JSONResponse{OKResponseAccountListJSONResponse: OKResponseAccountListJSONResponse(resp)}, nil
@@ -163,16 +166,21 @@ func (s Server) AccountsGetAccountsAccountID(ctx context.Context, req AccountsGe
 		return nil, err
 	}
 
+	data := AccountIdentificationData{
+		BranchCode: acc.BranchCode,
+		CompeCode:  acc.CompeCode,
+		Currency:   acc.Currency,
+		Number:     acc.Number,
+		Subtype:    EnumAccountSubType(acc.SubType),
+		Type:       EnumAccountType(acc.Type),
+	}
+
+	if acc.CheckDigit != nil {
+		data.CheckDigit = *acc.CheckDigit
+	}
+
 	resp := ResponseAccountIdentification{
-		Data: AccountIdentificationData{
-			BranchCode: acc.BranchCode,
-			CheckDigit: acc.CheckDigit,
-			CompeCode:  acc.CompeCode,
-			Currency:   acc.Currency,
-			Number:     acc.Number,
-			Subtype:    EnumAccountSubType(acc.SubType),
-			Type:       EnumAccountType(acc.Type),
-		},
+		Data:  data,
 		Meta:  *api.NewSingleRecordMeta(),
 		Links: *api.NewLinks(s.baseURL + "/accounts/" + req.AccountID),
 	}
@@ -258,7 +266,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactions(ctx context.Context, re
 		filter = filter.WithMovementType(account.MovementType(*req.Params.CreditDebitIndicator))
 	}
 
-	txs, err := s.service.ConsentedTransactions(ctx, req.AccountID, consentID, orgID, pag, filter)
+	txs, err := s.service.ConsentedTransactions(ctx, req.AccountID, consentID, orgID, filter, pag)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +316,7 @@ func (s Server) AccountsGetAccountsAccountIDTransactionsCurrent(ctx context.Cont
 		filter = filter.WithMovementType(account.MovementType(*req.Params.CreditDebitIndicator))
 	}
 
-	txs, err := s.service.ConsentedTransactions(ctx, req.AccountID, consentID, orgID, pag, filter)
+	txs, err := s.service.ConsentedTransactions(ctx, req.AccountID, consentID, orgID, filter, pag)
 	if err != nil {
 		return nil, err
 	}
