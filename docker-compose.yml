@@ -127,8 +127,8 @@ services:
     profiles:
       - conformance
     build:
-      context: ./conformance
-      dockerfile: Dockerfile-static
+      context: ./conformance/suite/httpd
+      dockerfile: ../../Dockerfile-static
     ports:
       - "8443:8443"
     volumes:
