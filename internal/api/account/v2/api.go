@@ -54,7 +54,7 @@ func (s Server) Handler() (http.Handler, string) {
 
 	authCodeAuthMiddleware := middleware.Auth(s.op, goidc.GrantAuthorizationCode, goidc.ScopeOpenID, consent.ScopeID)
 	swaggerMiddleware, version := middleware.Swagger(GetSwagger, func(err error) api.Error {
-		return api.NewError("PARAMETRO_INVALIDO", http.StatusBadRequest, err.Error())
+		return api.NewError("PARAMETRO_INVALIDO", http.StatusUnprocessableEntity, err.Error())
 	})
 
 	wrapper := ServerInterfaceWrapper{

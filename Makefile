@@ -19,17 +19,16 @@ setup-cs:
 	  echo "Cloning open finance conformance suite repository..."; \
 	  cd conformance; \
 	  git clone https://gitlab.com/raidiam-conformance/open-finance/certification.git suite; \
-	  cd suite && git checkout $(CS_VERSION); \
-	  echo "Updating httpd/Dockerfile-static to use debian/eol:buster instead of debian:buster..."; \
-	  sed -i.bak 's|debian:buster|debian/eol:buster|g' httpd/Dockerfile-static && rm httpd/Dockerfile-static.bak; \
-	  docker compose -f ./builder-compose.yml run builder; \
 	fi
 	
-	@if [ ! -d "conformance/suite/venv" ]; then \
-	  python3 -m venv conformance/suite/venv; \
-	  . ./conformance/suite/venv/bin/activate; \
-	  python3 -m pip install httpx; \
+	@if [ ! -d "conformance/venv" ]; then \
+	  python3 -m venv conformance/venv; \
+	  . ./conformance/venv/bin/activate; \
+	  python3 -m pip install httpx pyparsing; \
 	fi
+
+	@cd conformance/suite && git checkout $(CS_VERSION)
+	@docker compose -f ./conformance/suite/builder-compose.yml run builder
 
 setup-ui:
 	@if [ ! -d "mock-bank-ui" ]; then \
@@ -58,10 +57,6 @@ migration:
 build:
 	@docker compose build
 
-# Build the Conformance Suite JAR file.
-build-cs:
-	@docker compose -f ./conformance/suite/builder-compose.yml run builder
-
 lint:
 	@golangci-lint run ./...
 
@@ -74,18 +69,9 @@ test-coverage:
 	@echo "Total Coverage: `go tool cover -func=coverage.out | grep total | grep -Eo '[0-9]+\.[0-9]+'` %"
 
 cs-tests:
-	@conformance/suite/venv/bin/python conformance/suite/scripts/run-test-plan.py \
-		no-redirect-payments_test-plan_v2-2 ./conformance/config/phase3_no_redirect_payments_v2-config.json \
-		automatic-pix-payments_test-plan_v2-2 ./conformance/config/phase3_automatic_pix_payments_v2-config.json \
-		automatic-payments_test-plan_v2-2 ./conformance/config/phase3_automatic_payments_v2-config.json \
-		payments_test-plan_v4 ./conformance/config/phase3_payments_v4-config.json \
-		--expected-skips-file ./conformance/config/expected_skips.json \
-		--expected-failures-file ./conformance/config/expected_failures.json \
-		--export-dir ./conformance/results \
-		--verbose
-
-cs-tests-wip:
-	@conformance/suite/venv/bin/python conformance/suite/scripts/run-test-plan.py \
-		no-redirect-payments_test-plan_v2-2 ./conformance/config/phase3_no_redirect_payments_v2-config.json \
+	@conformance/venv/bin/python conformance/run-test-plan.py \
+		accounts_test-plan_v2-4 ./conformance/phase2_config.json \
+		--expected-skips-file ./conformance/expected_skips.json \
+		--expected-failures-file ./conformance/expected_failures.json \
 		--export-dir ./conformance/results \
 		--verbose

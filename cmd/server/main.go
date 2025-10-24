@@ -382,6 +382,7 @@ func openidProvider(
 		provider.WithTLSCertTokenBindingRequired(),
 		provider.WithPAR(oidc.HandlePARSessionFunc(), 60),
 		provider.WithUnregisteredRedirectURIsForPAR(),
+		provider.WithUnregisteredRedirectURIsForPAR(),
 		provider.WithJAR(goidc.PS256),
 		provider.WithJAREncryption(goidc.RSA_OAEP),
 		provider.WithJARContentEncryptionAlgs(goidc.A256GCM),

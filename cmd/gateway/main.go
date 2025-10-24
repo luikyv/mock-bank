@@ -257,7 +257,7 @@ func main() {
 	mux.Handle("keystore.sandbox.directory.openbankingbrasil.org.br/", keystoreHandler())
 
 	// Mock Bank backend can be accessed from the host machine for local development.
-	mbHandler := reverseProxyWithFallback("host.docker.internal:80", "mockbank:80")
+	mbHandler := reverseProxyWithFallback("host.docker.internal:80", "bank:80")
 	mux.HandleFunc("auth.mockbank.local/", mbHandler)
 	mux.HandleFunc("matls-auth.mockbank.local/", mbHandler)
 	mux.HandleFunc("matls-api.mockbank.local/", mbHandler)

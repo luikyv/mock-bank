@@ -26,6 +26,7 @@ go.work.sum
 
 .DS_Store
 conformance/suite/
+conformance/results/
 playground/
 .idea/
 .vscode/

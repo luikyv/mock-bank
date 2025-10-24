@@ -1,5 +1,4 @@
 {
-  "alias": "mockbank",
   "server": {
     "discoveryUrl": "https://auth.mockbank.local/.well-known/openid-configuration"
   },
