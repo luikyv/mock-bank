@@ -24,6 +24,9 @@ actions:
   description: Remove $ref fields from links properties to ensure the application of the custom x-go-type
   remove: true
 
+- target: $.components.schemas.LoansPayments.properties.lastUpdatedContractOutstandingBalance.format
+  remove: true
+
 - target: $..[*][?(@.format == "date")]
   update:
     x-go-type: timeutil.BrazilDate

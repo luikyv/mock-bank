@@ -57,6 +57,7 @@ type Contract struct {
 	FinanceCharges                      []FinanceCharge `gorm:"serializer:json"`
 	OwnerID                             uuid.UUID
 	OutstandingBalance                  string
+	OutstandingBalanceUpdatedAt         *timeutil.DateTime
 	PaidInstalments                     *int
 	DueInstalments                      int
 	PastDueInstalments                  int
@@ -66,6 +67,7 @@ type Contract struct {
 	HasInsuranceContracted              *bool
 	// This should be DIA, SEMANA, MES, ANO, SEM_PRAZO_REMANESCENTE.
 	RemainingInstalmentType InstalmentPeriodicityRemaining
+	TotalRemainingAmount    *string
 
 	OrgID     string
 	CrossOrg  bool

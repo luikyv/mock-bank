@@ -14,6 +14,7 @@ import (
 	"github.com/luikyv/mock-bank/internal/creditop"
 	"github.com/luikyv/mock-bank/internal/page"
 	"github.com/luikyv/mock-bank/internal/resource"
+	"github.com/luikyv/mock-bank/internal/timeutil"
 )
 
 var _ StrictServerInterface = Server{}
@@ -238,9 +239,14 @@ func (s Server) LoansGetContractsContractIDPayments(ctx context.Context, req Loa
 		Data: LoansPayments{
 			ContractOutstandingBalance: contract.OutstandingBalance,
 			Releases:                   []LoansReleases{},
+			TotalRemainingAmount:       contract.TotalRemainingAmount,
 		},
 		Meta:  *api.NewMeta(),
 		Links: *api.NewLinks(s.baseURL + "/contracts/" + req.ContractID + "/payments"),
+	}
+	if contract.OutstandingBalanceUpdatedAt != nil {
+		lastUpdatedContractOutstandingBalance := contract.OutstandingBalanceUpdatedAt.Format(timeutil.DateTimeMillisFormat)
+		resp.Data.LastUpdatedContractOutstandingBalance = &lastUpdatedContractOutstandingBalance
 	}
 	if contract.PaidInstalments != nil {
 		paidInstalments := float32(*contract.PaidInstalments)

@@ -223,6 +223,7 @@ CREATE TABLE credit_contracts (
     cnpj_consignee TEXT,
     next_instalment_amount TEXT,
     outstanding_balance TEXT NOT NULL,
+    outstanding_balance_updated_at TIMESTAMPTZ,
     paid_instalments INT,
     due_instalments INT NOT NULL,
     past_due_instalments INT NOT NULL,
@@ -231,6 +232,7 @@ CREATE TABLE credit_contracts (
     remaining_instalments INT,
     remaining_instalment_type TEXT,
     has_insurance_contracted BOOLEAN,
+    total_remaining_amount TEXT,
 
     org_id TEXT NOT NULL,
     cross_org BOOLEAN NOT NULL DEFAULT FALSE,

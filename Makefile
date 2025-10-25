@@ -71,6 +71,7 @@ test-coverage:
 cs-tests:
 	@conformance/venv/bin/python conformance/run-test-plan.py \
 		accounts_test-plan_v2-4 ./conformance/phase2_config.json \
+		loans_test-plan_v2-5 ./conformance/phase2_config.json \
 		--expected-skips-file ./conformance/expected_skips.json \
 		--expected-failures-file ./conformance/expected_failures.json \
 		--export-dir ./conformance/results \

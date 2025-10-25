@@ -74,11 +74,3 @@ jobs:
           with:
             name: mockbank
             path: conformance/results/*.zip
-
-  all-tests-succeeded:
-    runs-on: ubuntu-latest
-    needs: run-tests
-    if: success()
-    steps:
-      - name: Test plans passed
-        run: echo "All test plans passed successfully!"
